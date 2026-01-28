@@ -6,8 +6,8 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Automna - Your Private AI Agent, Working in 60 Seconds",
-  description: "Your own, private, fully autonomous AI agent. Not just chat — execute tasks, manage files, automate workflows. Powered by Claude. Starting at $79/month.",
-  keywords: "AI agent, Claude, autonomous AI, AI assistant, chatbot, automation, Discord bot, Telegram bot",
+  description: "Your own, private, fully autonomous AI agent. Not just chat — execute tasks, manage files, automate workflows, and deploy apps. Starting at $30/month.",
+  keywords: "AI agent, autonomous AI, AI assistant, automation, Discord bot, Telegram bot, personal AI",
   openGraph: {
     title: "Automna - Your Private AI Agent",
     description: "Your own, private, fully autonomous AI agent. Working in 60 seconds.",

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function Home() {
   const [email, setEmail] = useState('');
@@ -26,8 +27,9 @@ export default function Home() {
           <div className="text-2xl font-bold">
             <span className="text-purple-400">Auto</span>mna
           </div>
-          <div className="text-gray-400 text-sm">
-            Powered by Claude
+          <div className="flex gap-6 text-gray-400 text-sm">
+            <Link href="/privacy" className="hover:text-white transition">Privacy</Link>
+            <Link href="/terms" className="hover:text-white transition">Terms</Link>
           </div>
         </nav>
 
@@ -43,7 +45,7 @@ export default function Home() {
           </p>
           
           <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
-            Not just chat. A Claude-powered agent that executes tasks, manages files, 
+            Not just chat. An AI agent that executes tasks, manages files, 
             automates workflows, and integrates with Discord, Telegram, and more.
           </p>
 
@@ -74,7 +76,7 @@ export default function Home() {
           )}
           
           <p className="text-gray-600 text-sm mt-4">
-            Starting at $79/month · Bring your own Claude API key
+            Starting at $30/month · Bring your own API key
           </p>
         </div>
 
@@ -115,7 +117,7 @@ export default function Home() {
         {/* Comparison */}
         <div className="mt-32 max-w-4xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">
-            More than chat. More than Claude Max.
+            More than a chatbot.
           </h2>
           
           <div className="overflow-x-auto">
@@ -123,8 +125,8 @@ export default function Home() {
               <thead>
                 <tr className="border-b border-gray-800">
                   <th className="py-4 px-4 text-gray-400 font-normal">Feature</th>
-                  <th className="py-4 px-4 text-center text-gray-400 font-normal">ChatGPT/Claude Pro</th>
-                  <th className="py-4 px-4 text-center text-gray-400 font-normal">Claude Max</th>
+                  <th className="py-4 px-4 text-center text-gray-400 font-normal">Typical AI Chat</th>
+                  <th className="py-4 px-4 text-center text-gray-400 font-normal">Self-Hosted Agent</th>
                   <th className="py-4 px-4 text-center text-purple-400 font-semibold">Automna</th>
                 </tr>
               </thead>
@@ -141,8 +143,8 @@ export default function Home() {
           </div>
           
           <p className="text-center text-gray-500 mt-8">
-            Claude Max gives you Claude Code on your machine.<br />
-            Automna gives you Claude Code in the cloud, fully managed, with integrations.
+            Self-hosted agents require technical expertise.<br />
+            Automna gives you full agent capabilities with zero setup.
           </p>
         </div>
 
@@ -151,30 +153,36 @@ export default function Home() {
           <h2 className="text-3xl font-bold mb-4">Simple Pricing</h2>
           <p className="text-gray-400 mb-12">Less than a human assistant. More capable than any chatbot.</p>
           
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-4 gap-6">
+            <PricingCard
+              tier="Lite"
+              price="$30"
+              description="Try it out"
+              features={['1 AI agent', 'Web chat interface', 'Persistent memory', 'BYOK']}
+            />
             <PricingCard
               tier="Starter"
               price="$79"
               description="For individuals"
-              features={['1 AI agent', 'Web chat interface', '1 integration (Discord or Telegram)', 'Persistent memory']}
+              features={['1 AI agent', '1 integration', 'Persistent memory', 'Email support']}
             />
             <PricingCard
               tier="Pro"
               price="$149"
               description="For power users"
-              features={['1 AI agent', 'All integrations', 'Priority support', 'Custom skills', 'App hosting']}
+              features={['1 AI agent', 'All integrations', 'App hosting', 'Priority support']}
               highlighted
             />
             <PricingCard
               tier="Business"
               price="$299"
               description="For teams"
-              features={['3 AI agents', 'Shared workspace', 'API access', 'Analytics', 'Dedicated support']}
+              features={['3 AI agents', 'Shared workspace', 'API access', 'Dedicated support']}
             />
           </div>
           
           <p className="text-gray-500 text-sm mt-8">
-            + Bring your own Anthropic API key (usage-based, typically $5-50/mo)
+            + Bring your own API key (usage-based, typically $5-50/mo)
           </p>
         </div>
 
@@ -209,8 +217,15 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-gray-800 py-8">
-        <div className="container mx-auto px-6 text-center text-gray-500 text-sm">
-          <p>© 2026 Automna. Powered by <a href="https://github.com/clawdbot/clawdbot" className="text-gray-400 hover:text-white">Clawdbot</a>.</p>
+        <div className="container mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-gray-500 text-sm">© 2026 Automna.</p>
+            <div className="flex gap-6 text-gray-500 text-sm">
+              <Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-white transition">Terms of Service</Link>
+              <Link href="/licenses" className="hover:text-white transition">Open Source</Link>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
@@ -252,7 +267,7 @@ function PricingCard({ tier, price, description, features, highlighted }: {
       <div className="text-4xl font-bold mb-6">{price}<span className="text-lg text-gray-400">/mo</span></div>
       <ul className="text-left space-y-2">
         {features.map((feature, i) => (
-          <li key={i} className="flex items-center gap-2 text-gray-300">
+          <li key={i} className="flex items-center gap-2 text-gray-300 text-sm">
             <span className="text-purple-400">✓</span> {feature}
           </li>
         ))}
