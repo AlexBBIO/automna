@@ -24,7 +24,7 @@ export default function Home() {
       <main className="container mx-auto px-6 pt-20 pb-32">
         <nav className="flex justify-between items-center mb-20">
           <div className="text-2xl font-bold">
-            <span className="text-purple-400">Go</span>Agentik
+            <span className="text-purple-400">Auto</span>mna
           </div>
           <div className="text-gray-400 text-sm">
             Powered by Claude
@@ -125,7 +125,7 @@ export default function Home() {
                   <th className="py-4 px-4 text-gray-400 font-normal">Feature</th>
                   <th className="py-4 px-4 text-center text-gray-400 font-normal">ChatGPT/Claude Pro</th>
                   <th className="py-4 px-4 text-center text-gray-400 font-normal">Claude Max</th>
-                  <th className="py-4 px-4 text-center text-purple-400 font-semibold">GoAgentik</th>
+                  <th className="py-4 px-4 text-center text-purple-400 font-semibold">Automna</th>
                 </tr>
               </thead>
               <tbody className="text-gray-300">
@@ -142,7 +142,7 @@ export default function Home() {
           
           <p className="text-center text-gray-500 mt-8">
             Claude Max gives you Claude Code on your machine.<br />
-            GoAgentik gives you Claude Code in the cloud, fully managed, with integrations.
+            Automna gives you Claude Code in the cloud, fully managed, with integrations.
           </p>
         </div>
 
@@ -210,7 +210,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-gray-800 py-8">
         <div className="container mx-auto px-6 text-center text-gray-500 text-sm">
-          <p>© 2026 GoAgentik. Powered by <a href="https://github.com/clawdbot/clawdbot" className="text-gray-400 hover:text-white">Clawdbot</a>.</p>
+          <p>© 2026 Automna. Powered by <a href="https://github.com/clawdbot/clawdbot" className="text-gray-400 hover:text-white">Clawdbot</a>.</p>
         </div>
       </footer>
     </div>

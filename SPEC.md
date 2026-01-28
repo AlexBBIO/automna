@@ -1,6 +1,6 @@
-# GoAgentik.ai — Product Specification
+# Automna.ai — Product Specification
 
-> **Note:** Original name was "GoAgentik" but changed to "GoAgentik" (K spelling) to avoid trademark conflict with Agent IQ (USPTO #99399937). Domain goagentik.ai confirmed available 2026-01-28.
+> **Note:** Original name was "Automna" but changed to "Automna" (K spelling) to avoid trademark conflict with Agent IQ (USPTO #99399937). Domain automna.ai confirmed available 2026-01-28.
 
 **Version:** 0.1  
 **Date:** 2026-01-28  
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-GoAgentik.ai is a hosted platform for fully agentic AI assistants powered by Clawdbot. Unlike ChatGPT or Claude Pro (which are just chat interfaces), GoAgentik provides AI agents that **actually execute tasks**: browse the web, manage files, control integrations, automate workflows, and even build and deploy apps.
+Automna.ai is a hosted platform for fully agentic AI assistants powered by Clawdbot. Unlike ChatGPT or Claude Pro (which are just chat interfaces), Automna provides AI agents that **actually execute tasks**: browse the web, manage files, control integrations, automate workflows, and even build and deploy apps.
 
 **Value Proposition:** "Your own, private, fully autonomous AI agent. Working in 60s."
 
@@ -96,7 +96,7 @@ This is NOT a chatbot. Users will have their agents:
 | Web chat interface | P0 | Clawdbot built-in web UI |
 | Discord integration setup | P1 | Guide user through bot token |
 | Agent status dashboard | P1 | Online/offline, last active |
-| Subdomain per user | P2 | username.goagentik.ai |
+| Subdomain per user | P2 | username.automna.ai |
 
 #### Non-Goals (MVP)
 - Multiple agents per account
@@ -200,13 +200,13 @@ Agents can build and deploy web apps for users. Architecture:
 User: "Build me a dashboard for my sales data"
 Agent: *builds app, saves to /apps/sales-dashboard*
 System: Auto-exposes via Cloudflare Tunnel
-Result: Live at sales-dashboard.username.goagentik.ai
+Result: Live at sales-dashboard.username.automna.ai
 ```
 
 **Implementation:**
 - Each user container has an `/apps` directory
 - Cloudflare Tunnel daemon runs in container
-- Apps auto-exposed at `{app-name}.{username}.goagentik.ai`
+- Apps auto-exposed at `{app-name}.{username}.automna.ai`
 - No separate hosting needed — runs in same container as agent
 
 **This is a killer feature:** "Your agent can build AND deploy apps."
@@ -220,7 +220,7 @@ Each user agent runs in an isolated Docker container:
 version: '3.8'
 services:
   clawdbot:
-    image: goagentik/clawdbot:latest
+    image: automna/clawdbot:latest
     container_name: agent_${USER_ID}
     restart: unless-stopped
     mem_limit: 512m
@@ -234,7 +234,7 @@ services:
       - agent_${USER_ID}_config:/config
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.agent_${USER_ID}.rule=Host(`${USERNAME}.goagentik.ai`)"
+      - "traefik.http.routers.agent_${USER_ID}.rule=Host(`${USERNAME}.automna.ai`)"
     networks:
       - agent_network
 ```
@@ -277,12 +277,12 @@ services:
 
 **Price Justification:**
 - Claude Max: $100-200/mo for Claude Code on YOUR machine, YOU configure everything
-- GoAgentik: Same capabilities + managed hosting + integrations + app hosting = worth $79-299
+- Automna: Same capabilities + managed hosting + integrations + app hosting = worth $79-299
 
 **Comparison to alternatives:**
 - Human VA: $15-25/hr = $2,400-4,000/mo
 - ChatGPT/Claude Pro: $20/mo but chat-only, no execution
-- GoAgentik: $79-299/mo for full agentic capabilities
+- Automna: $79-299/mo for full agentic capabilities
 
 ### Cost Structure (Per User)
 
@@ -426,7 +426,7 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 > 
 > Skip the server setup. Skip the Docker commands. Skip the config files.
 > 
-> GoAgentik gives you a personal AI assistant that lives in your Discord, 
+> Automna gives you a personal AI assistant that lives in your Discord, 
 > Telegram, or browser — with memory, tools, and real capabilities.
 > 
 > Just bring your Claude API key. We handle everything else.
@@ -470,7 +470,7 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 | **Poe** | $20/mo | Multi-model chat | Many models | Chat only, no agent capabilities |
 | **Character.ai** | Free/Premium | Chat personas | Fun, engaging | Entertainment only, no productivity |
 | **Self-hosted Clawdbot** | DIY | Full agent | Full control, free | Requires technical skills, maintenance burden |
-| **GoAgentik** | $79-299/mo | Full managed agent | Always-on, integrations, app hosting, zero setup | Newer, smaller |
+| **Automna** | $79-299/mo | Full managed agent | Always-on, integrations, app hosting, zero setup | Newer, smaller |
 
 **Our Differentiators:**
 1. **Full execution** — Not chat, actual task completion
@@ -527,7 +527,7 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 ## Timeline
 
 ### Week 1-2: Validation
-- [ ] Register domain (goagentik.ai)
+- [ ] Register domain (automna.ai)
 - [ ] Build landing page
 - [ ] Set up waitlist (email capture)
 - [ ] Post to Reddit, HN, Twitter
@@ -564,7 +564,7 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 
 ## Open Questions
 
-1. **Naming:** GoAgentik.ai confirmed? Check trademark conflicts?
+1. **Naming:** Automna.ai confirmed? Check trademark conflicts?
 2. **Founding team:** Solo or bring in co-founder for dev work?
 3. **Legal:** Terms of service, privacy policy, liability for user agents
 4. **Support:** Email only? Discord community? Live chat?
@@ -598,7 +598,7 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 **Social Proof:** (Add after beta) "Finally, an AI that does my actual work." — Beta User
 
 **Comparison Section:**
-| Feature | ChatGPT/Claude | GoAgentik |
+| Feature | ChatGPT/Claude | Automna |
 |---------|---------------|-----------|
 | Chat | ✅ | ✅ |
 | Execute tasks | ❌ | ✅ |

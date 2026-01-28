@@ -5,18 +5,18 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "GoAgentik - Your Private AI Agent, Working in 60 Seconds",
+  title: "Automna - Your Private AI Agent, Working in 60 Seconds",
   description: "Your own, private, fully autonomous AI agent. Not just chat — execute tasks, manage files, automate workflows. Powered by Claude. Starting at $79/month.",
   keywords: "AI agent, Claude, autonomous AI, AI assistant, chatbot, automation, Discord bot, Telegram bot",
   openGraph: {
-    title: "GoAgentik - Your Private AI Agent",
+    title: "Automna - Your Private AI Agent",
     description: "Your own, private, fully autonomous AI agent. Working in 60 seconds.",
     type: "website",
-    url: "https://goagentik.ai",
+    url: "https://automna.ai",
   },
   twitter: {
     card: "summary_large_image",
-    title: "GoAgentik - Your Private AI Agent",
+    title: "Automna - Your Private AI Agent",
     description: "Your own, private, fully autonomous AI agent. Working in 60 seconds.",
   },
 };
