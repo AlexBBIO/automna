@@ -177,7 +177,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       }
       ws.close();
     };
-  }, [config.gatewayUrl, config.authToken, sendConnect]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.gatewayUrl, config.authToken]); // sendConnect is stable via refs
 
   // Handle incoming messages
   const handleMessage = useCallback((msg: { type: string; id?: string; ok?: boolean; payload?: unknown; event?: string; error?: unknown }) => {
