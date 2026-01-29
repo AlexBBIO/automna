@@ -189,10 +189,16 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         // Connect response
         if (payload.type === 'hello-ok') {
           console.log('[clawdbot] Connected to gateway');
-          setIsConnected(true);
-          
-          // Load chat history
-          wsSend('chat.history', { sessionKey });
+          if (mountedRef.current) {
+            setIsConnected(true);
+            
+            // Load chat history
+            try {
+              wsSend('chat.history', { sessionKey });
+            } catch (e) {
+              console.error('[clawdbot] Failed to request history:', e);
+            }
+          }
         }
         
         // History response
