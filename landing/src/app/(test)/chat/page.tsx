@@ -1,40 +1,17 @@
 'use client';
 
 /**
- * Test Chat Page
- * 
- * For testing the chat UI against test.automna.ai
- * Access: /chat?token=test123
+ * Simple Chat Test - Just embed the working Control UI
  */
 
-import { AutomnaChat } from '@/components/AutomnaChat';
-import { useEffect, useState } from 'react';
-
 export default function ChatPage() {
-  const [token, setToken] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  // Get token from URL on client side only
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setToken(params.get('token') || 'test123');
-    setMounted(true);
-  }, []);
-
-  if (!mounted || !token) {
-    return (
-      <div className="h-screen bg-gray-950 flex items-center justify-center text-white">
-        Loading...
-      </div>
-    );
-  }
-
+  // Just use an iframe to the working Control UI
   return (
-    <div className="h-screen bg-gray-950">
-      <AutomnaChat
-        gatewayUrl="wss://test.automna.ai"
-        authToken={token}
-        sessionKey="main"
+    <div className="h-screen w-screen">
+      <iframe 
+        src="https://test.automna.ai/?token=test123"
+        className="w-full h-full border-0"
+        allow="clipboard-read; clipboard-write"
       />
     </div>
   );
