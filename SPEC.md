@@ -403,9 +403,52 @@ interface UserAgent {
 5. Proxy request to correct backend with internal auth header
 6. User doesn't know/care if they're on shared or dedicated infra
 
+**Two-Layer Auth (User vs Service-to-Service):**
+```
+Browser                    Main Server              Backend (any server)
+   │                      (automna.ai)              (local or remote)
+   │                           │                           │
+   │  1. Request + Clerk       │                           │
+   │     session cookie        │                           │
+   │ ─────────────────────────►│                           │
+   │                           │                           │
+   │                      2. Validate Clerk                │
+   │                         session cookie                │
+   │                           │                           │
+   │                      3. Look up backend               │
+   │                         from database                 │
+   │                           │                           │
+   │                           │  4. Forward with          │
+   │                           │     internal auth         │
+   │                           │ ─────────────────────────►│
+   │                           │     X-Automna-Internal    │
+   │                           │                           │
+   │                           │  5. Backend validates     │
+   │                           │     internal token        │
+   │                           │                           │
+   │                           │  6. Response              │
+   │                           │ ◄─────────────────────────│
+   │  7. Response              │                           │
+   │ ◄─────────────────────────│                           │
+```
+
+**What Each Component Validates:**
+
+| Component | Validates | Trusts |
+|-----------|-----------|--------|
+| Main server (proxy) | Clerk session cookie, user owns agent | Nothing - it's the auth source |
+| Backend (container/VM) | Internal auth header only | Requests from main server |
+
+**Why This Works Across Servers:**
+- Backend doesn't need to know about Clerk
+- Backend only validates the internal `X-Automna-Internal` header
+- Same internal token works for all backends
+- Only the main server proxy knows the internal token
+- Works whether backend is localhost, same datacenter, or another region
+
 **Implementation:**
 
-1. **Middleware** (auth check + proxy):
+1. **Middleware** (auth check):
 ```typescript
 // middleware.ts
 import { clerkMiddleware } from '@clerk/nextjs/server';
@@ -432,7 +475,7 @@ export default clerkMiddleware(async (auth, req) => {
 });
 ```
 
-2. **Proxy Route** (forwards to container):
+2. **Proxy Route** (forwards to correct backend):
 ```typescript
 // app/a/[userId]/[...path]/route.ts
 import { auth } from '@clerk/nextjs/server';
@@ -441,11 +484,21 @@ export async function GET(req: Request, { params }) {
   const { userId } = await auth();
   const user = await db.user.findUnique({ where: { clerkId: userId } });
   
-  // Get container URL from our records
-  const containerUrl = await getContainerUrl(user.containerId);
+  // Look up where this user's agent runs
+  const agent = await db.agent.findUnique({ where: { userId: user.id } });
   
-  // Forward request with internal auth
-  const proxyRes = await fetch(`${containerUrl}/${params.path.join('/')}`, {
+  // Build backend URL based on type
+  let backendUrl: string;
+  if (agent.backendType === 'local') {
+    // Shared container on this server
+    backendUrl = `http://localhost:${agent.containerPort}`;
+  } else {
+    // Dedicated VM on another server
+    backendUrl = `http://${agent.vmIp}:${agent.vmPort}`;
+  }
+  
+  // Forward request with internal auth header
+  const proxyRes = await fetch(`${backendUrl}/${params.path.join('/')}`, {
     headers: {
       'X-Automna-Internal': process.env.INTERNAL_PROXY_SECRET,
       'X-Automna-User': user.id,
@@ -454,14 +507,44 @@ export async function GET(req: Request, { params }) {
   
   return proxyRes;
 }
+```
 
-// WebSocket upgrade handled similarly
+3. **WebSocket Proxy** (for chat streaming):
+```typescript
+// app/a/[userId]/ws/route.ts
+import { auth } from '@clerk/nextjs/server';
+import { WebSocketServer } from 'ws';
+
 export async function UPGRADE(req: Request, { params }) {
-  // ... WebSocket proxy logic
+  const { userId } = await auth();
+  const agent = await getAgentBackend(userId);
+  
+  // Accept client connection
+  const clientWs = await acceptWebSocket(req);
+  
+  // Connect to backend with internal auth
+  const backendWs = new WebSocket(
+    agent.backendType === 'local' 
+      ? `ws://localhost:${agent.containerPort}`
+      : `ws://${agent.vmIp}:${agent.vmPort}`,
+    {
+      headers: {
+        'X-Automna-Internal': process.env.INTERNAL_PROXY_SECRET,
+      }
+    }
+  );
+  
+  // Relay messages both directions
+  clientWs.on('message', (data) => backendWs.send(data));
+  backendWs.on('message', (data) => clientWs.send(data));
+  
+  // Handle disconnects
+  clientWs.on('close', () => backendWs.close());
+  backendWs.on('close', () => clientWs.close());
 }
 ```
 
-3. **Container Config**:
+4. **Backend Config** (same for all backends):
 ```json
 {
   "gateway": {
@@ -471,10 +554,20 @@ export async function UPGRADE(req: Request, { params }) {
       "mode": "token",
       "token": "${INTERNAL_PROXY_SECRET}"
     },
-    "trustedProxies": ["10.0.0.0/8", "172.16.0.0/12"]
+    "trustedProxies": ["10.0.0.0/8", "172.16.0.0/12", "100.64.0.0/10"]
   }
 }
 ```
+
+**Note on trustedProxies:**
+- `10.0.0.0/8` - Hetzner private network
+- `172.16.0.0/12` - Docker networks
+- `100.64.0.0/10` - Tailscale CGNAT range (if using Tailscale mesh)
+
+All backends use the same `INTERNAL_PROXY_SECRET`. This token is:
+- Generated once, stored in our secrets manager
+- Never exposed to users
+- Used only for service-to-service auth between proxy and backends
 
 **Security Properties:**
 - ✅ Same-origin: Clerk cookie works automatically

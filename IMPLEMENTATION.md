@@ -384,19 +384,54 @@ ingress:
 - Option B: Tailscale mesh (works across datacenters)
 - Dedicated VMs only need to be reachable from main server
 
-**Proxy Logic (simplified):**
+**Two-Layer Auth Model:**
+```
+User Auth (Clerk)              Service Auth (Internal Token)
+     │                                    │
+     ▼                                    ▼
+┌─────────┐                        ┌─────────────┐
+│ Browser │ ──Clerk cookie──────► │ Main Server │ ──X-Automna-Internal──► Backend
+└─────────┘                        └─────────────┘
+```
+
+- **User auth:** Clerk session cookie, validated by main server
+- **Service auth:** Internal token header, validated by backends
+- Backends don't need to know about Clerk - they just trust the proxy
+
+**Proxy Logic:**
 ```typescript
 // Look up where user's agent runs
-const backend = await db.userAgent.findUnique({ userId });
+const agent = await db.agent.findUnique({ userId });
 
-if (backend.backendType === 'local') {
-  // Shared: proxy to local container
-  return proxy(`http://localhost:${backend.containerPort}`);
-} else {
-  // Dedicated: proxy to remote VM
-  return proxy(`http://${backend.vmIp}:${backend.vmPort}`);
+// Build backend URL
+const backendUrl = agent.backendType === 'local'
+  ? `http://localhost:${agent.containerPort}`
+  : `http://${agent.vmIp}:${agent.vmPort}`;
+
+// Forward with internal auth (backend validates this)
+const response = await fetch(`${backendUrl}/${path}`, {
+  headers: {
+    'X-Automna-Internal': process.env.INTERNAL_PROXY_SECRET,
+    'X-Automna-User': userId,
+  }
+});
+```
+
+**Backend Config (same everywhere):**
+```json
+{
+  "gateway": {
+    "auth": { "mode": "token", "token": "${INTERNAL_PROXY_SECRET}" },
+    "trustedProxies": ["10.0.0.0/8", "172.16.0.0/12", "100.64.0.0/10"]
+  }
 }
 ```
+
+**Why this works across servers:**
+- Backend location is just a database lookup
+- Same internal token works for localhost or remote VMs
+- Adding a new server = adding its IP to trustedProxies
+- User experience is identical regardless of backend location
 
 **Note:** Dashboard must run on Hetzner (not Vercel) for WebSocket proxying to work.
 
@@ -620,6 +655,7 @@ At $29/mo Starter plan:
 | Container orchestration | Docker Compose → Swarm | Simple first, scale later | 2026-01-29 |
 | URL structure | Path-based (`/a/{userId}/`) | No subdomains - simpler same-origin cookie auth | 2026-01-29 |
 | Gateway auth | Token URL (prototype) → Cookie (production) | Quick testing now, proper auth later | 2026-01-29 |
+| Auth pattern | Two-layer (Clerk + internal token) | User auth at proxy, service auth to backends; works across servers | 2026-01-29 |
 | Clawdbot config | JSON not YAML, port 18789 | Learned from prototype testing | 2026-01-29 |
 
 ---
