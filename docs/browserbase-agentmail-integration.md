@@ -187,6 +187,65 @@ The skill reads credentials from:
 
 ---
 
+---
+
+## Deployment Steps
+
+### On the Server (100.96.168.114)
+
+1. **Pull latest code:**
+```bash
+cd /path/to/automna
+git pull
+```
+
+2. **Update gateway config** (`docker/config/clawdbot.json`):
+```json
+{
+  "browser": {
+    "enabled": true,
+    "defaultProfile": "browserbase",
+    "remoteCdpTimeoutMs": 5000,
+    "remoteCdpHandshakeTimeoutMs": 10000,
+    "profiles": {
+      "browserbase": {
+        "cdpUrl": "wss://connect.browserbase.com?apiKey=<BROWSERBASE_API_KEY>&projectId=<BROWSERBASE_PROJECT_ID>",
+        "color": "#00AA00"
+      }
+    }
+  }
+}
+```
+
+3. **Add Agentmail config** (`docker/workspace/config/agentmail.json`):
+```json
+{
+  "api_key": "<AGENTMAIL_API_KEY>",
+  "inbox_id": "automnajoi@agentmail.to"
+}
+```
+
+4. **Rebuild and restart Docker:**
+```bash
+docker build -t automna-gateway docker/
+docker stop automna-gateway
+docker rm automna-gateway
+docker run -d \
+  --name automna-gateway \
+  -p 3000:3000 \
+  -v $(pwd)/docker/config:/root/.clawdbot \
+  -v $(pwd)/docker/workspace:/root/clawd \
+  automna-gateway
+```
+
+5. **Verify:**
+```bash
+docker logs automna-gateway
+curl http://localhost:3000/
+```
+
+---
+
 ## Security Notes
 
 - Browserbase API key is sensitive - don't commit to repo
