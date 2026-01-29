@@ -137,8 +137,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           console.log('[clawdbot] Connected successfully');
           if (mountedRef.current) {
             setIsConnected(true);
-            // Skip history for now - just test basic send/receive
-            // wsSend('chat.history', { sessionKey: configRef.current.sessionKey || 'main' });
+            // Load history
+            wsSend('chat.history', { sessionKey: configRef.current.sessionKey || 'main' });
           }
           return;
         }
