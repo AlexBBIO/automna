@@ -8,29 +8,23 @@
  */
 
 import { AutomnaChat } from '@/components/AutomnaChat';
-import { useSearchParams } from 'next/navigation';
-import { Suspense, useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-function ChatContent() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token') || 'test123';
-  const [isReady, setIsReady] = useState(false);
-  
-  // Wait a moment to ensure we're stable and on client
+export default function ChatPage() {
+  const [token, setToken] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Get token from URL on client side only
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 100);
-    return () => clearTimeout(timer);
+    const params = new URLSearchParams(window.location.search);
+    setToken(params.get('token') || 'test123');
+    setMounted(true);
   }, []);
 
-  // For prototype, connect directly to test.automna.ai
-  const gatewayUrl = 'wss://test.automna.ai';
-
-  if (!isReady) {
+  if (!mounted || !token) {
     return (
       <div className="h-screen bg-gray-950 flex items-center justify-center text-white">
-        Initializing...
+        Loading...
       </div>
     );
   }
@@ -38,22 +32,10 @@ function ChatContent() {
   return (
     <div className="h-screen bg-gray-950">
       <AutomnaChat
-        gatewayUrl={gatewayUrl}
+        gatewayUrl="wss://test.automna.ai"
         authToken={token}
         sessionKey="main"
       />
     </div>
-  );
-}
-
-export default function ChatPage() {
-  return (
-    <Suspense fallback={
-      <div className="h-screen bg-gray-950 flex items-center justify-center text-white">
-        Loading...
-      </div>
-    }>
-      <ChatContent />
-    </Suspense>
   );
 }
