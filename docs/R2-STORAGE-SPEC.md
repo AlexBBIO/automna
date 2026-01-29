@@ -175,28 +175,52 @@ Future tiers:
 
 ---
 
-## Implementation Tasks
+## Implementation
 
-### Phase 1: Real-Time Message Sync
-- [ ] Worker intercepts WebSocket messages
-- [ ] Append user messages to R2 immediately
-- [ ] Append assistant responses to R2 immediately
-- [ ] Load history from R2 on chat.history request
+### MVP (Current)
 
-### Phase 2: Config Sync
-- [ ] Sync clawdbot.json changes to R2
-- [ ] Load config from R2 on container start
+**Workspace sync:** 30-second rsync loop
+```bash
+while true; do
+  rsync -a /root/clawd/ /data/moltbot/workspace/ 2>/dev/null
+  rsync -a /root/.clawdbot/ /data/moltbot/config/ 2>/dev/null
+  sleep 30
+done &
+```
 
-### Phase 3: Workspace Sync
-- [ ] Monitor workspace file changes
-- [ ] Sync to R2 on save
-- [ ] Handle large files (chunked upload)
+**Tradeoffs:**
+- Simple and reliable
+- May lose up to 30 seconds of work on crash
+- Good enough for MVP
 
-### Phase 4: Retention Enforcement
-- [ ] Track subscription status in meta.json
-- [ ] Daily cron for retention checks
-- [ ] Soft delete expired data
-- [ ] Permanent deletion after grace period
+**What this gives us:**
+- [x] Workspace persists across container restarts
+- [x] Config persists across container restarts
+- [x] Dashboard can read files from R2
+- [x] No clawdbot code changes required
+
+### Future Improvements
+
+**Phase 1: Debounced sync**
+- Watch filesystem with inotify
+- Sync 2 seconds after last change (debounced)
+- Reduces data loss window to ~2 seconds
+
+**Phase 2: Real-time message sync**
+- Worker intercepts WebSocket messages
+- Writes directly to R2 (bypasses container)
+- Zero message loss on crash
+
+**Phase 3: Bidirectional sync**
+- Dashboard can upload files to R2
+- Container picks up new files
+- Conflict resolution (last-write-wins or merge)
+
+**Phase 4: Retention enforcement**
+- Track subscription status in meta.json
+- Daily cron for retention checks
+- Soft delete expired data (90 days after cancel)
+- Permanent deletion after 30-day grace period
 
 ---
 
