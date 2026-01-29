@@ -10,8 +10,66 @@
 
 - [x] Docker installed and running
 - [x] Server has available resources (12GB RAM free)
-- [ ] Cloudflare API token or browser access
+- [x] Cloudflare API token with tunnel permissions
 - [ ] Test Anthropic API key
+
+---
+
+## Progress Log
+
+### 2026-01-29 03:56 UTC — Cloudflare Tunnel Created
+- Token tested: `tTbZgPEiICYzZd3vL9cJqgNkiWV49NG8kswERoEg`
+- Account ID: `0bb27f91691935c953044c143a47fbc3`
+- Zone ID: `ffab696c2ee55b8d42fe24641de465af`
+- **Tunnel created:** `automna-agents` (ID: `f14be931-d3a9-4d01-a883-d22bb8aecfa9`)
+- Tunnel credentials saved to `/root/.cloudflared/`
+
+### 2026-01-29 03:56 UTC — DNS Record Created
+- CNAME: `test.automna.ai` → `f14be931-d3a9-4d01-a883-d22bb8aecfa9.cfargotunnel.com`
+- Proxied through Cloudflare ✓
+
+### 2026-01-29 03:57 UTC — cloudflared Installed
+- Version: 2026.1.2
+- Location: `/usr/local/bin/cloudflared`
+
+### 2026-01-29 03:57 UTC — Tunnel Config Created
+- Config file: `/root/.cloudflared/config.yml`
+- Credentials file: `/root/.cloudflared/f14be931-d3a9-4d01-a883-d22bb8aecfa9.json`
+- Ingress: `test.automna.ai` → `http://localhost:3001`
+
+### 2026-01-29 03:57 UTC — Tunnel Running
+- Started: `cloudflared tunnel run automna-agents`
+- 4 edge connections established (PDX, SEA)
+- **Verified:** `curl https://test.automna.ai` returns 200 ✓
+
+### 2026-01-29 03:58-04:05 UTC — Docker Image Built
+- First attempt failed: missing `git` package
+- Fixed Dockerfile to include `git`
+- Build time: ~2.5 minutes (npm install clawdbot)
+- Export time: ~100 seconds
+- **Image:** `automna/clawdbot:latest` (1.09GB compressed, 3.38GB uncompressed)
+- Volume created: `agent_test_data`
+
+### 2026-01-29 04:05 UTC — Container Debugging
+- First attempts failed due to:
+  - Wrong CMD: `--foreground` flag not supported, use `gateway run`
+  - Gateway needs `mode: local` in config
+  - Config file is JSON not YAML (`clawdbot.json`)
+  - Gateway needs auth token for LAN binding
+  - Default gateway port is 18789, not 3000
+
+### 2026-01-29 04:09 UTC — SUCCESS! 🎉
+- **Container running:** `agent_test` (ID: b41154f192eb)
+- **Port mapping:** Host 3001 → Container 18789
+- **Gateway listening:** ws://0.0.0.0:18789
+- **Local test:** `curl http://127.0.0.1:3001` ✅
+- **Tunnel test:** `curl https://test.automna.ai` ✅
+
+### Key Learnings
+1. **Config is JSON**: `/root/.clawdbot/clawdbot.json` (not YAML)
+2. **Gateway port**: Default is 18789, not 3000
+3. **LAN binding requires auth**: Set `gateway.auth.token` in config
+4. **CMD**: Use `clawdbot gateway run --bind lan --allow-unconfigured`
 
 ---
 
