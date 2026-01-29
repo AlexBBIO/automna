@@ -30,7 +30,7 @@ export default function ChatPage() {
       <AutomnaChat
         gatewayUrl="wss://test.automna.ai"
         authToken={token}
-        sessionKey="main"
+        sessionKey="webchat-test"
       />
     </div>
   );
