@@ -146,20 +146,18 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         // Handle history response
         if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
           const history = msg.payload.messages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
-            // Content is already an array of parts from gateway
-            let content: Array<{ type: string; text?: string }>;
+            // Extract text from content (gateway returns array of content parts)
+            let textContent = '';
             if (Array.isArray(m.content)) {
-              // Filter to only text parts (skip thinking, tool_use, etc.)
-              content = m.content.filter((p: { type: string }) => p.type === 'text');
+              const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
+              textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
             } else if (typeof m.content === 'string') {
-              content = [{ type: 'text', text: m.content }];
-            } else {
-              content = [{ type: 'text', text: '' }];
+              textContent = m.content;
             }
             return {
               id: m.id,
               role: m.role as 'user' | 'assistant',
-              content,
+              content: [{ type: 'text' as const, text: textContent }],
               createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
             };
           });
