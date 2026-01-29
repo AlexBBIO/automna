@@ -77,6 +77,9 @@ export default function JoiPage() {
             </span>
             <span className="animate-pulse text-cyan-400">|</span>
           </div>
+          <div className="text-2xl md:text-3xl mt-4 text-gray-400 italic">
+            I can fix that.
+          </div>
         </div>
 
         {/* CTA */}
