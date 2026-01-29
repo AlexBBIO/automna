@@ -1,7 +1,19 @@
 FROM node:22-slim
 
-RUN apt-get update && apt-get install -y curl git && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Clawdbot
 RUN npm install -g clawdbot
+
+# Install Python packages for agent skills
+RUN pip3 install --break-system-packages agentmail
 
 WORKDIR /root/clawd
 RUN mkdir -p /root/.clawdbot
