@@ -323,6 +323,11 @@ Always-on is 70x more expensive. The 10s warm start is acceptable UX.
 - First boot (1-2 min): "Setting up your agent for the first time..."
 - Subsequent (10s): Brief loading state
 
+**Future pricing tiers:**
+- **Starter:** On-demand (cold start) - cheaper
+- **Pro:** Always-on (instant) - premium feature
+- **Warm pool:** Keep N containers ready for active users (optimization for scale)
+
 ## Decisions Summary
 
 | Question | Decision |
