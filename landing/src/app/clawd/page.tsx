@@ -69,6 +69,7 @@ export default function ClawdPage() {
 
           <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-[1.1] tracking-tight">
             Love{' '}
+            <span className="line-through text-gray-500 decoration-2">Clawdbot</span>{' '}
             <span className="bg-gradient-to-r from-purple-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
               Moltbot
             </span>
