@@ -82,46 +82,65 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     return id;
   }, []);
 
+  // Send connect request (called after challenge or timeout)
+  const sendConnect = useCallback((nonce?: string) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    
+    console.log('[clawdbot] Sending connect request');
+    
+    const connectParams: Record<string, unknown> = {
+      minProtocol: 3,
+      maxProtocol: 3,
+      client: {
+        id: 'clawdbot-control-ui',
+        version: 'vdev',
+        platform: typeof navigator !== 'undefined' ? navigator.platform : 'web',
+        mode: 'webchat',
+      },
+      role: 'operator',
+      scopes: ['operator.read', 'operator.write'],
+      caps: [],
+      commands: [],
+      permissions: {},
+      locale: typeof navigator !== 'undefined' ? navigator.language : 'en-US',
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'automna-chat/1.0.0',
+    };
+
+    if (config.authToken) {
+      connectParams.auth = { token: config.authToken };
+    }
+
+    wsRef.current.send(JSON.stringify({
+      type: 'req',
+      id: genId(),
+      method: 'connect',
+      params: connectParams,
+    }));
+  }, [config.authToken]);
+
+  const connectSentRef = useRef(false);
+  const connectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Connect to gateway
   useEffect(() => {
     console.log('[clawdbot] Connecting to', config.gatewayUrl);
+    connectSentRef.current = false;
     
     const ws = new WebSocket(config.gatewayUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('[clawdbot] WebSocket connected');
+      console.log('[clawdbot] WebSocket connected, waiting for challenge...');
       
-      // Send connect request with auth
-      // Match EXACT format from Clawdbot Control UI source
-      const connectParams: Record<string, unknown> = {
-        minProtocol: 3,
-        maxProtocol: 3,
-        client: {
-          id: 'clawdbot-control-ui',
-          version: 'vdev',
-          platform: typeof navigator !== 'undefined' ? navigator.platform : 'web',
-          mode: 'webchat',
-        },
-        role: 'operator',
-        scopes: ['operator.read', 'operator.write'],
-        caps: [],
-        commands: [],
-        permissions: {},
-        locale: typeof navigator !== 'undefined' ? navigator.language : 'en-US',
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'automna-chat/1.0.0',
-      };
-
-      if (config.authToken) {
-        connectParams.auth = { token: config.authToken };
-      }
-
-      ws.send(JSON.stringify({
-        type: 'req',
-        id: genId(),
-        method: 'connect',
-        params: connectParams,
-      }));
+      // Wait for challenge event, but also set a fallback timer
+      // (Control UI uses 750ms delay)
+      connectTimerRef.current = setTimeout(() => {
+        if (!connectSentRef.current) {
+          console.log('[clawdbot] No challenge received, sending connect anyway');
+          connectSentRef.current = true;
+          sendConnect();
+        }
+      }, 800);
     };
 
     ws.onmessage = (event) => {
@@ -143,9 +162,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     };
 
     return () => {
+      if (connectTimerRef.current) {
+        clearTimeout(connectTimerRef.current);
+      }
       ws.close();
     };
-  }, [config.gatewayUrl, config.authToken]);
+  }, [config.gatewayUrl, config.authToken, sendConnect]);
 
   // Handle incoming messages
   const handleMessage = useCallback((msg: { type: string; id?: string; ok?: boolean; payload?: unknown; event?: string; error?: unknown }) => {
@@ -182,6 +204,20 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     // Event (streaming, etc.)
     if (msg.type === 'event') {
       const payload = msg.payload as Record<string, unknown> | undefined;
+      
+      // Handle connect challenge
+      if (msg.event === 'connect.challenge') {
+        console.log('[clawdbot] Received connect challenge');
+        if (!connectSentRef.current) {
+          connectSentRef.current = true;
+          if (connectTimerRef.current) {
+            clearTimeout(connectTimerRef.current);
+          }
+          const nonce = payload && typeof payload.nonce === 'string' ? payload.nonce : undefined;
+          sendConnect(nonce);
+        }
+        return;
+      }
       
       if (msg.event === 'chat' && payload) {
         const { role, delta, content, status } = payload as {
@@ -246,7 +282,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         }
       }
     }
-  }, [sessionKey, wsSend]);
+  }, [sessionKey, wsSend, sendConnect]);
 
   // Send a message
   const append = useCallback(async (message: AppendMessage) => {
