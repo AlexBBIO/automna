@@ -671,22 +671,25 @@ At $29/mo Starter plan:
 6. [x] Build setup wizard (API key + agent name + integrations) ✅
 7. [x] API key validation endpoint ✅
 
-### Priority 1 (Must Do Next)
-1. [ ] Create Dockerfile for Clawdbot agent containers
-2. [ ] Set up Docker on Hetzner server (or use existing)
-3. [ ] Build provisioning API endpoint (`/api/agent/deploy`)
-4. [ ] Cloudflare Tunnel config for `{username}.automna.ai`
-5. [ ] Connect setup wizard "Deploy" step to actual container spin-up
+### Priority 1: Custom Chat UI (This Week)
+1. [x] Prototype container running (`test.automna.ai`) ✅
+2. [ ] Install assistant-ui in landing project
+3. [ ] Create ClawdbotRuntimeAdapter (WebSocket → assistant-ui)
+4. [ ] Build basic chat page component
+5. [ ] Test with prototype: streaming, history, abort
+6. [ ] Add file/image upload support
 
-### Priority 2 (Should Do)
-6. [ ] Agent status monitoring (is container running?)
-7. [ ] Dashboard shows real agent status, not placeholder
-8. [ ] Test end-to-end: signup → setup → deploy → chat works
+### Priority 2: Infrastructure (Next Week)
+7. [ ] Move dashboard to Hetzner (for WS proxy)
+8. [ ] Set up path-based routing (`/a/{userId}/`)
+9. [ ] Build provisioning API (`/api/agent/deploy`)
+10. [ ] Container spin-up on demand
+11. [ ] Agent status monitoring
 
-### Priority 3 (Nice to Have)
-9. [ ] Discord integration guide in setup wizard
-10. [ ] Telegram integration guide in setup wizard
-11. [ ] Documentation site
+### Priority 3: Polish
+12. [ ] Discord/Telegram integration guides
+13. [ ] Artifact previews (Phase 3 of chat UI)
+14. [ ] Documentation site
 
 ---
 

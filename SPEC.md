@@ -587,6 +587,24 @@ All backends use the same `INTERNAL_PROXY_SECRET`. This token is:
 **Future: Custom Domains (if needed)**
 Can add subdomain/custom domain support later as a premium feature. The proxy layer makes this possible without changing container architecture.
 
+### Custom Chat UI
+
+We build a custom chat interface using **assistant-ui** (open source, MIT) instead of embedding Clawdbot's Control UI.
+
+**Why:**
+- Clean, branded experience
+- Only show chat (hide config/cron/nodes)
+- Full control over UX
+- File/image support built-in
+- Future: artifact previews like Claude
+
+**Architecture:**
+- assistant-ui components handle UI (streaming, auto-scroll, attachments)
+- Custom ClawdbotRuntimeAdapter translates to Clawdbot WebSocket API
+- WebSocket proxied through our backend for auth
+
+**Full spec:** See `CHAT-UI-SPEC.md`
+
 ### Scaling Strategy
 
 | Users | Infrastructure | Monthly Cost |
