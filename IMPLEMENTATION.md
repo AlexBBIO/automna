@@ -16,9 +16,10 @@
 - [x] Browser automation: Browserbase account + API
 - [x] Stealth browser: Playwright + residential proxy (Smartproxy)
 - [x] GitHub repo: github.com/AlexBBIO/automna
+- [x] - [x] DNS verification for custom sending domain (mail.automna.ai)
 
 ### 🔄 In Progress
-- [ ] DNS verification for custom sending domain (mail.automna.ai)
+
 
 ---
 
