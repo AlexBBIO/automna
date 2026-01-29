@@ -216,6 +216,20 @@ Tool use and lifecycle events:
 docker run -p 3001:18789 your-clawdbot-image
 ```
 
+## React/Next.js Gotchas
+
+### Suspense breaks WebSocket
+`useSearchParams()` in Next.js can trigger Suspense, causing component remounts that close WebSocket connections immediately. 
+
+**Fix:** Use `window.location.search` directly instead of `useSearchParams()`, and avoid wrapping chat components in Suspense.
+
+### useEffect dependency arrays
+Don't include callback functions (from useCallback) in the WebSocket useEffect dependency array - they change on re-renders and will cause reconnection loops.
+
+**Fix:** Use refs for callbacks or define handlers inline in the useEffect.
+
+---
+
 ## Common Issues
 
 ### "Proxy headers detected from untrusted address"
