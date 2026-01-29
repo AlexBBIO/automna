@@ -17,9 +17,8 @@ function ChatContent() {
   
   // For prototype, connect directly to test.automna.ai
   // In production, this would be proxied through /api/ws/
-  const gatewayUrl = typeof window !== 'undefined' 
-    ? `wss://test.automna.ai`
-    : '';
+  // Always use the same URL to avoid re-renders
+  const gatewayUrl = 'wss://test.automna.ai';
 
   return (
     <div className="h-screen bg-gray-950">
