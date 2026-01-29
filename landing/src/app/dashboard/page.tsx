@@ -53,7 +53,15 @@ export default function DashboardPage() {
                   avatarBox: "w-10 h-10",
                 },
               }}
-            />
+            >
+              <UserButton.MenuItems>
+                <UserButton.Action
+                  label="Manage Subscription"
+                  labelIcon={<span>💳</span>}
+                  onClick={handleManageBilling}
+                />
+              </UserButton.MenuItems>
+            </UserButton>
           </div>
         </div>
       </nav>
@@ -64,42 +72,6 @@ export default function DashboardPage() {
           <h1 className="text-4xl font-bold mb-8">
             Welcome, {user?.firstName || 'there'}! 👋
           </h1>
-
-          {/* Plan Status Card */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <div className="text-gray-400 text-sm mb-1">Current Plan</div>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl font-bold capitalize">{plan}</span>
-                  {subscriptionStatus === 'active' && (
-                    <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
-                      Active
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-3">
-                {plan !== 'free' && (
-                  <button
-                    onClick={handleManageBilling}
-                    disabled={loadingPortal}
-                    className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors disabled:opacity-50"
-                  >
-                    {loadingPortal ? 'Loading...' : 'Manage Subscription'}
-                  </button>
-                )}
-                {plan === 'free' && (
-                  <Link
-                    href="/pricing"
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm transition-colors"
-                  >
-                    Upgrade Plan
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
 
           {/* Coming Soon Card */}
           <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-2xl p-8 text-center">
