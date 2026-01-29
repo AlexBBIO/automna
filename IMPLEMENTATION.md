@@ -34,6 +34,16 @@
 - [ ] Cloudflare Tunnel setup for agent subdomains
 - [ ] Agent deployment endpoint (actually spin up Clawdbot)
 
+### ⚠️ Known Gaps (Non-Blocking)
+| Gap | Status | Notes |
+|-----|--------|-------|
+| Browserbase context not created on signup | Deferred | Will create on-demand when agent first needs browser |
+| User DB record only on deploy | Acceptable | Users must complete setup anyway; stub record not needed |
+| No `customer.subscription.created` Stripe event | Acceptable | `checkout.session.completed` covers new subscriptions |
+| Account deletion cleanup | TODO | Need to clean up Browserbase context, cancel Stripe, delete agent |
+| Password reset flow | Handled by Clerk | Built-in, no custom work needed |
+| Email verification | Handled by Clerk | Built-in, no custom work needed |
+
 
 ---
 
@@ -481,7 +491,7 @@ For sites that block Browserbase:
 | Cloudflare | $0 | Free tier sufficient |
 | Vercel | $0 | Free tier for now |
 | Neon | $0 | Free tier (0.5GB) |
-| Clerk | $0 | Free tier (10k MAU) |
+| Clerk | $0 | Free tier (10k MAU), then $0.02/MAU |
 | Loops | $0 | Free tier (1k contacts) |
 | Agentmail | $0 | Free tier |
 | Browserbase | $20 | Developer plan |
