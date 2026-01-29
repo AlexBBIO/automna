@@ -47,21 +47,20 @@ export default function DashboardPage() {
             <span className="text-gray-400 text-sm">
               {user?.emailAddresses[0]?.emailAddress}
             </span>
+            <button
+              onClick={handleManageBilling}
+              disabled={loadingPortal}
+              className="text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50"
+            >
+              {loadingPortal ? '...' : 'Billing'}
+            </button>
             <UserButton 
               appearance={{
                 elements: {
                   avatarBox: "w-10 h-10",
                 },
               }}
-            >
-              <UserButton.MenuItems>
-                <UserButton.Action
-                  label="Manage Subscription"
-                  labelIcon={<span>💳</span>}
-                  onClick={handleManageBilling}
-                />
-              </UserButton.MenuItems>
-            </UserButton>
+            />
           </div>
         </div>
       </nav>
