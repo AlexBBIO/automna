@@ -14,7 +14,7 @@ const CreditCardIcon = () => (
 
 interface GatewayInfo {
   gatewayUrl: string;
-  authToken: string;
+  sessionKey?: string;
 }
 
 export default function DashboardPage() {
@@ -46,7 +46,7 @@ export default function DashboardPage() {
       .then(() => fetch('/api/user/gateway'))
       .then(res => res.json())
       .then(data => {
-        if (data.gatewayUrl && data.authToken) {
+        if (data.gatewayUrl) {
           setGatewayInfo(data);
         }
       })
@@ -86,8 +86,7 @@ export default function DashboardPage() {
         <div className="flex-1">
           <AutomnaChat
             gatewayUrl={gatewayInfo.gatewayUrl}
-            authToken={gatewayInfo.authToken}
-            sessionKey="main"
+            sessionKey={gatewayInfo.sessionKey || "main"}
           />
         </div>
       </div>

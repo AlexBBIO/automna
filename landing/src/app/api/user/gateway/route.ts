@@ -1,10 +1,37 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
+
+// Moltworker base URL (WebSocket endpoint)
+const MOLTWORKER_WS_URL = process.env.MOLTWORKER_WS_URL || "wss://moltbot-sandbox.alex-0bb.workers.dev/ws";
+
+// URL expiry time (1 hour)
+const URL_EXPIRY_SECONDS = 3600;
+
+/**
+ * Generate a signed URL for multi-user isolation.
+ * 
+ * The signature is HMAC-SHA256(userId.exp, secret) in base64url format.
+ * This prevents users from tampering with their userId to access other users' sandboxes.
+ */
+function generateSignedUrl(userId: string, secret: string): string {
+  const exp = Math.floor(Date.now() / 1000) + URL_EXPIRY_SECONDS;
+  const payload = `${userId}.${exp}`;
+  
+  const sig = crypto
+    .createHmac("sha256", secret)
+    .update(payload)
+    .digest("base64url");
+  
+  return `${MOLTWORKER_WS_URL}?userId=${encodeURIComponent(userId)}&exp=${exp}&sig=${sig}`;
+}
 
 /**
  * GET /api/user/gateway
- * Returns the user's gateway URL and token for WebSocket connection
+ * Returns a signed gateway URL for WebSocket connection.
+ * 
+ * The URL includes the user's Clerk ID and an HMAC signature,
+ * which the Moltworker validates to route to the correct per-user sandbox.
  */
 export async function GET() {
   try {
@@ -17,32 +44,22 @@ export async function GET() {
       );
     }
     
-    // Get user from database
-    const user = await prisma.user.findUnique({
-      where: { clerkId },
-      select: {
-        gatewayUrl: true,
-        gatewayToken: true,
-      },
-    });
-    
-    if (!user) {
+    // Check for signing secret
+    const signingSecret = process.env.MOLTBOT_SIGNING_SECRET;
+    if (!signingSecret) {
+      console.error("[api/user/gateway] MOLTBOT_SIGNING_SECRET not configured");
       return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
+        { error: "Gateway not configured" },
+        { status: 503 }
       );
     }
     
-    if (!user.gatewayUrl || !user.gatewayToken) {
-      return NextResponse.json(
-        { error: "Gateway not configured", status: "not_provisioned" },
-        { status: 404 }
-      );
-    }
+    // Generate signed URL
+    const gatewayUrl = generateSignedUrl(clerkId, signingSecret);
     
     return NextResponse.json({
-      gatewayUrl: user.gatewayUrl,
-      authToken: user.gatewayToken,
+      gatewayUrl,
+      sessionKey: "main",
     });
   } catch (error) {
     console.error("[api/user/gateway] Error:", error);

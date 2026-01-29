@@ -2,9 +2,48 @@
 
 > **Note:** Original name was "Automna" but changed to "Automna" (K spelling) to avoid trademark conflict with Agent IQ (USPTO #99399937). Domain automna.ai confirmed available 2026-01-28.
 
-**Version:** 0.1  
-**Date:** 2026-01-28  
-**Status:** Planning
+**Version:** 0.2  
+**Date:** 2026-01-29  
+**Status:** MVP In Progress
+
+---
+
+## Current Status (2026-01-29)
+
+### ✅ Working
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Landing page | ✅ Live | automna.ai on Vercel |
+| Clerk auth | ✅ Working | Sign up/sign in functional |
+| Cloudflare Moltworker | ✅ Working | moltbot-sandbox.alex-0bb.workers.dev |
+| Per-user sandboxes | ✅ Working | Isolated via Durable Objects |
+| WebSocket chat | ✅ Working | Signed URL auth → token injection |
+| R2 persistence | ✅ Configured | Secrets set, sync enabled |
+| Anthropic integration | ✅ Working | API key configured |
+
+### 🔧 Needs Work
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Dashboard UI | 🔧 Basic | Needs polish, status indicators |
+| Per-user API keys | ❌ Not started | Currently all users share one key |
+| Usage metering | ❌ Not started | No billing/limits yet |
+| Discord integration | ❌ Not started | Need setup flow |
+| Telegram integration | ❌ Not started | Need setup flow |
+
+### 🔑 Secrets Configured (moltbot-sandbox)
+- `ANTHROPIC_API_KEY` ✅
+- `MOLTBOT_GATEWAY_TOKEN` ✅
+- `CF_ACCOUNT_ID` ✅
+- `R2_ACCESS_KEY_ID` ✅
+- `R2_SECRET_ACCESS_KEY` ✅
+- `CF_ACCESS_TEAM_DOMAIN` ✅ (placeholder)
+- `CF_ACCESS_AUD` ✅ (placeholder)
+
+### 📁 Key Files
+- Worker source: `/root/clawd/projects/automna/moltworker/`
+- Landing/Dashboard: `/root/clawd/projects/automna/landing/`
+- Secrets: `/root/clawd/projects/automna/config/secrets.json`
+- Setup docs: `/root/clawd/projects/automna/docs/MOLTBOT-SANDBOX-SETUP.md`
 
 ---
 

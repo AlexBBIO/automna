@@ -4,8 +4,11 @@ import { prisma } from "@/lib/prisma";
 
 /**
  * POST /api/user/sync
- * Ensures the current Clerk user exists in our database
- * Creates them if they don't exist
+ * Ensures the current Clerk user exists in our database.
+ * Creates them if they don't exist.
+ * 
+ * Note: Gateway URLs are now generated dynamically via signed URLs,
+ * so we no longer store gatewayUrl/gatewayToken in the database.
  */
 export async function POST() {
   try {
@@ -28,41 +31,26 @@ export async function POST() {
       );
     }
     
-    // Check if this is the test user (grandathrawn)
-    const isTestUser = email === 'grandathrawn@gmail.com';
-    
-    // Cloudflare Moltworker instance (testing)
-    const MOLTWORKER_URL = 'wss://moltbot-sandbox.alex-0bb.workers.dev';
-    const MOLTWORKER_TOKEN = '7wVPDMFyx5nfHSeuWyZrb89tjV4exH8h';
-    
     // Upsert user in database
     const user = await prisma.user.upsert({
       where: { clerkId },
-      update: { 
-        email,
-        // Auto-configure gateway for test user → Cloudflare Moltworker
-        ...(isTestUser && {
-          gatewayUrl: MOLTWORKER_URL,
-          gatewayToken: MOLTWORKER_TOKEN,
-        }),
-      },
+      update: { email },
       create: {
         clerkId,
         email,
         plan: 'free',
-        // Auto-configure gateway for test user → Cloudflare Moltworker
-        ...(isTestUser && {
-          gatewayUrl: MOLTWORKER_URL,
-          gatewayToken: MOLTWORKER_TOKEN,
-        }),
       },
     });
+    
+    // Gateway is always available via signed URLs
+    // (as long as MOLTBOT_SIGNING_SECRET is configured)
+    const hasGateway = !!process.env.MOLTBOT_SIGNING_SECRET;
     
     return NextResponse.json({
       id: user.id,
       email: user.email,
       plan: user.plan,
-      hasGateway: !!(user.gatewayUrl && user.gatewayToken),
+      hasGateway,
     });
   } catch (error) {
     console.error("[api/user/sync] Error:", error);
