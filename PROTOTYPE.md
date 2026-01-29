@@ -94,12 +94,27 @@ For SaaS (Automna):
 6. **Token via URL**: Control UI accepts `?token=<token>` query param, stored in localStorage
 7. **Trusted proxies**: Set `gateway.trustedProxies` for Cloudflare tunnel IPs so client IP detection works
 
-### Auth Flow for Customers (Production)
-1. Customer logs in via Clerk (on automna.ai)
-2. Dashboard generates unique gateway token per customer (or fetches from DB)
-3. Iframe loads `https://<customer>.automna.ai/chat?session=main&token=<token>`
-4. Container config has `allowInsecureAuth: true` so token-only auth works
-5. No manual pairing step needed - customer is authenticated end-to-end
+### Auth Flow for Customers (Production) — UPDATED
+**Decision: No subdomains, use path-based routing for simpler same-origin auth**
+
+Old approach (subdomains):
+- `{user}.automna.ai` per customer
+- Cross-origin auth complexity
+- Exchange tokens needed
+
+New approach (paths):
+- `automna.ai/a/{userId}/chat` for all customers
+- Same-origin with dashboard
+- Simple Clerk cookie auth
+
+**Flow:**
+1. Customer logs in via Clerk (on automna.ai) → gets session cookie
+2. Dashboard links to `/a/{userId}/chat`
+3. Next.js middleware verifies Clerk session + user owns the agent
+4. Proxy forwards request to customer's container with internal auth
+5. No manual pairing, no tokens in URLs, no cross-origin dance
+
+**Requires:** Dashboard must run on same server as containers (Hetzner), not Vercel.
 
 ---
 
@@ -455,4 +470,73 @@ journalctl -u cloudflared -f
 
 ---
 
-*Last updated: 2026-01-29*
+## Architecture Decisions (2026-01-29)
+
+### Decision 1: No Per-User Subdomains
+**Context:** Originally planned `{username}.automna.ai` for each customer.
+
+**Problem:** Subdomains are different origins. Clerk session cookie on `automna.ai` doesn't work on `alex.automna.ai`. Requires complex exchange token flow.
+
+**Decision:** Use path-based routing: `automna.ai/a/{userId}/chat`
+
+**Benefits:**
+- Same-origin with dashboard → simple cookie auth
+- No wildcard SSL certs
+- No DNS complexity
+- Faster to implement
+
+**Trade-off:** Less "premium" feeling URLs. Can add custom domains as premium feature later.
+
+### Decision 2: Dashboard on Hetzner (Not Vercel)
+**Context:** Landing page currently on Vercel/Cloudflare Pages.
+
+**Problem:** For same-origin auth to work, dashboard must be on same domain as agent proxy. Vercel can't easily proxy WebSockets to Hetzner containers.
+
+**Decision:** Run Next.js dashboard on Hetzner, expose via Cloudflare tunnel.
+
+**Benefits:**
+- Same-origin auth works
+- WebSocket proxying works
+- All infrastructure in one place
+
+**Trade-off:** Lose Vercel's edge/CDN. Can use Cloudflare for caching static assets.
+
+### Decision 3: Token Auth for Prototype, Cookie Auth for Production
+**Context:** Need auth for Clawdbot Control UI.
+
+**Prototype (now):**
+- Use `?token=test123` in URL
+- Set `allowInsecureAuth: true` in container config
+- Quick to test, good enough for development
+
+**Production (later):**
+- Clerk session cookie on `automna.ai`
+- Middleware verifies user owns the agent
+- Internal proxy to containers
+- No tokens exposed to users
+
+---
+
+## Current Test Setup
+
+**Working URL:** `https://test.automna.ai/?token=test123`
+
+**Container:**
+- Name: `agent_test`
+- Port: 3001 (host) → 18789 (container)
+- Config: `/root/clawd/projects/automna/docker/config/clawdbot.json`
+
+**Tunnel:**
+- Name: `automna-agents`
+- Config: `/root/.cloudflared/config.yml`
+- Routes: `test.automna.ai` → `localhost:3001`
+
+**To restart:**
+```bash
+docker restart agent_test
+cloudflared tunnel run automna-agents
+```
+
+---
+
+*Last updated: 2026-01-29 04:45 UTC*

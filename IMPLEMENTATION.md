@@ -1,7 +1,7 @@
 # Automna Implementation Plan
 
-**Last Updated:** 2026-01-29 03:07 UTC  
-**Status:** Phase 1 Complete, Phase 2 In Progress (Setup Wizard Done)
+**Last Updated:** 2026-01-29 04:45 UTC  
+**Status:** Phase 1 Complete, Phase 2 Done, Phase 3 In Progress (Prototype Container Running)
 
 ---
 
@@ -29,10 +29,14 @@
 - [x] Setup wizard UI (`/dashboard/setup`) ✅
 - [x] API key validation endpoint ✅
 - [x] Encrypted storage for API keys ✅
-- [ ] Container provisioning (Hetzner + Docker)
-- [ ] Clawdbot config generation + injection
-- [ ] Cloudflare Tunnel setup for agent subdomains
-- [ ] Agent deployment endpoint (actually spin up Clawdbot)
+- [x] **Prototype container running** (`agent_test` on Hetzner) ✅
+- [x] **Cloudflare Tunnel working** (`test.automna.ai`) ✅
+- [x] **Clawdbot config tested** (JSON, port 18789, allowInsecureAuth) ✅
+- [x] **Token auth working** (`?token=test123`) ✅
+- [ ] Move dashboard to Hetzner (for same-origin auth)
+- [ ] Path-based routing (`/a/{userId}/`)
+- [ ] Container provisioning API
+- [ ] Agent deployment endpoint (spin up containers on demand)
 
 ### ⚠️ Known Gaps (Non-Blocking)
 | Gap | Status | Notes |
@@ -345,14 +349,21 @@ cpus: 1.5
 - Complex but necessary at scale
 - Consider managed K8s (Hetzner doesn't have it, may need GKE/EKS)
 
-### 3.4 Cloudflare Tunnels
+### 3.4 Cloudflare Tunnels (Updated 2026-01-29)
 
-Each agent gets a subdomain: `{username}.automna.ai`
+**Decision: No per-user subdomains. Use path-based routing.**
+
+All agents accessed via: `automna.ai/a/{userId}/chat`
+
+**Reasons:**
+- Simpler same-origin auth (Clerk cookie works automatically)
+- No wildcard SSL certs needed
+- No DNS complexity
 
 **Implementation:**
-- Run `cloudflared` daemon on host
-- Create tunnel per user OR single tunnel with routing rules
-- Ingress rules route `username.automna.ai` → container port
+- Single tunnel routes `automna.ai` → Hetzner server
+- Next.js dashboard + proxy runs on Hetzner
+- Middleware routes `/a/{userId}/*` to correct container
 
 **Config example:**
 ```yaml
@@ -360,12 +371,14 @@ tunnel: automna-agents
 credentials-file: /etc/cloudflared/creds.json
 
 ingress:
-  - hostname: alex.automna.ai
-    service: http://agent_alex:3000
-  - hostname: bob.automna.ai
-    service: http://agent_bob:3000
+  - hostname: automna.ai
+    service: http://127.0.0.1:3000  # Next.js dashboard
+  - hostname: test.automna.ai
+    service: http://127.0.0.1:3001  # Test container (prototype only)
   - service: http_status:404
 ```
+
+**Note:** Dashboard must run on Hetzner (not Vercel) for WebSocket proxying to work.
 
 ---
 
@@ -577,6 +590,7 @@ At $29/mo Starter plan:
 | Decision | Choice | Rationale | Date |
 |----------|--------|-----------|------|
 | Hosting | Vercel + Hetzner | Landing on Vercel (free), agents on Hetzner (cheap) | 2026-01-28 |
+| Hosting | Hetzner only | Dashboard needs to proxy WebSockets to containers; Vercel can't do this easily | 2026-01-29 |
 | Database | Neon Postgres | Serverless, free tier, Vercel integration | 2026-01-29 |
 | Auth | Clerk | Fast implementation, good UX (currently dev mode) | 2026-01-29 |
 | Payments | Stripe | Industry standard, reliable (currently test mode) | 2026-01-29 |
@@ -584,6 +598,9 @@ At $29/mo Starter plan:
 | Transactional email | Agentmail | Built for AI agents, simple API | 2026-01-28 |
 | Browser | Browserbase | Persistent contexts, stealth, managed | 2026-01-28 |
 | Container orchestration | Docker Compose → Swarm | Simple first, scale later | 2026-01-29 |
+| URL structure | Path-based (`/a/{userId}/`) | No subdomains - simpler same-origin cookie auth | 2026-01-29 |
+| Gateway auth | Token URL (prototype) → Cookie (production) | Quick testing now, proper auth later | 2026-01-29 |
+| Clawdbot config | JSON not YAML, port 18789 | Learned from prototype testing | 2026-01-29 |
 
 ---
 
