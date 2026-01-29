@@ -52,8 +52,6 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     append({
       role: 'user',
       content: [{ type: 'text', text: input }],
-      metadata: {},
-      createdAt: new Date(),
     });
     setInput('');
   };
