@@ -98,14 +98,15 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
               }`}
             >
               {message.content.map((part, i) => {
-                if (part.type === 'text' && 'text' in part) {
+                // Defensive: ensure we only render actual strings
+                if (part.type === 'text' && typeof part.text === 'string') {
                   return (
                     <div 
                       key={i} 
                       className="whitespace-pre-wrap break-words"
                       style={{ wordBreak: 'break-word' }}
                     >
-                      {formatMessage(part.text as string)}
+                      {part.text}
                     </div>
                   );
                 }
