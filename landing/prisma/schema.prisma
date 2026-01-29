@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                    String    @id @default(cuid())
+  clerkId               String    @unique
+  email                 String
+  
+  // Subscription
+  plan                  String    @default("free")
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  subscriptionStatus    String?
+  
+  // API Keys (encrypted)
+  anthropicKeyEncrypted String?
+  
+  // Browser context
+  browserbaseContextId  String?
+  
+  // Timestamps
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  // Relations
+  agents                Agent[]
+}
+
+model Agent {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name            String
+  personality     String?   @db.Text
+  status          String    @default("stopped") // stopped, starting, running, error
+  
+  // Container info
+  containerId     String?
+  containerHost   String?
+  
+  // Integrations (encrypted config)
+  discordConfig   String?   @db.Text
+  telegramConfig  String?   @db.Text
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastActiveAt    DateTime?
+
+  @@index([userId])
+}
