@@ -164,11 +164,43 @@ We have two viable infrastructure approaches:
 - Sandbox SDK still in beta
 - Cost at scale unclear (need to test)
 
-**Current Status:** Testing. Decision pending after validation.
+**Current Status:** ✅ APPROVED. Moltworker passed all Day 1 tests. Using Cloudflare Sandbox SDK.
 
 ---
 
-### Infrastructure (Self-Managed Approach)
+### Multi-User Isolation (Current Implementation)
+
+Each user gets fully isolated resources via Cloudflare's Sandbox SDK:
+
+```
+User A ──► wss://moltbot.../ws?userId=user_abc&token=X
+              │
+              ▼
+         getSandbox(env, "user_abc")
+              │
+              ▼
+         Isolated container + R2 storage at /users/user_abc/...
+
+User B ──► wss://moltbot.../ws?userId=user_def&token=X
+              │
+              ▼
+         getSandbox(env, "user_def")
+              │
+              ▼
+         Isolated container + R2 storage at /users/user_def/...
+```
+
+**Key Points:**
+- Single Moltworker deployment handles all users
+- Isolation via Durable Objects keyed by userId (Clerk ID)
+- R2 storage prefixed by userId for data isolation
+- Cold start ~10s warm, 1-2min cold (if container slept)
+
+**See:** `docs/multi-user-isolation.md` for full implementation spec.
+
+---
+
+### Infrastructure (Self-Managed Approach - DEPRECATED)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

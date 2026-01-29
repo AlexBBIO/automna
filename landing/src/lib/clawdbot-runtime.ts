@@ -161,7 +161,51 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         
         // Handle history response
         if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
-          const history = msg.payload.messages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
+          const wsMessages = msg.payload.messages;
+          
+          // If WebSocket history is empty, try HTTP API fallback
+          if (wsMessages.length === 0) {
+            console.log('[clawdbot] WebSocket history empty, trying HTTP API fallback');
+            const cfg = configRef.current;
+            // Convert wss:// to https:// and remove /ws path and query params
+            const httpUrl = cfg.gatewayUrl
+              .replace(/^wss:\/\//, 'https://')
+              .replace(/^ws:\/\//, 'http://')
+              .replace(/\/ws$/, '')
+              .replace(/\?.*$/, '');
+            const sessionKey = cfg.sessionKey || 'main';
+            console.log('[clawdbot] HTTP fallback URL:', `${httpUrl}/api/history?sessionKey=${sessionKey}`);
+            
+            fetch(`${httpUrl}/api/history?sessionKey=${encodeURIComponent(sessionKey)}`)
+              .then(res => res.json())
+              .then(data => {
+                if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+                  console.log(`[clawdbot] HTTP API returned ${data.messages.length} messages`);
+                  const history = data.messages.map((m: { role: string; content: unknown; timestamp?: number }, idx: number) => {
+                    let textContent = '';
+                    if (Array.isArray(m.content)) {
+                      const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
+                      textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
+                    } else if (typeof m.content === 'string') {
+                      textContent = m.content;
+                    }
+                    // Strip [message_id: ...] metadata from display
+                    textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+                    return {
+                      id: `http-${idx}`,
+                      role: m.role as 'user' | 'assistant',
+                      content: [{ type: 'text' as const, text: textContent }],
+                      createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
+                    };
+                  });
+                  if (mountedRef.current) setMessages(history);
+                }
+              })
+              .catch(err => console.error('[clawdbot] HTTP history fallback failed:', err));
+            return;
+          }
+          
+          const history = wsMessages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
             // Extract text from content (gateway returns array of content parts)
             let textContent = '';
             if (Array.isArray(m.content)) {
@@ -170,6 +214,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             } else if (typeof m.content === 'string') {
               textContent = m.content;
             }
+            // Strip [message_id: ...] metadata from display
+            textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
             return {
               id: m.id,
               role: m.role as 'user' | 'assistant',
