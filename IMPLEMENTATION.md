@@ -64,6 +64,13 @@
 - [x] Sign-up page: `/sign-up` (dark themed)
 - [x] Middleware protecting `/dashboard/*` routes
 - [x] User metadata stores plan + Stripe customer ID
+- [x] Clerk webhook → Loops.so (sync signups for email comms)
+
+**Clerk Webhook Setup:**
+1. Go to Clerk Dashboard → Webhooks
+2. Add endpoint: `https://automna.ai/api/webhooks/clerk`
+3. Select events: `user.created`, `user.updated`, `user.deleted`
+4. Copy signing secret → add to Vercel as `CLERK_WEBHOOK_SECRET`
 
 ### 1.3 Database
 
