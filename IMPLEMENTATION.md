@@ -349,33 +349,53 @@ cpus: 1.5
 - Complex but necessary at scale
 - Consider managed K8s (Hetzner doesn't have it, may need GKE/EKS)
 
-### 3.4 Cloudflare Tunnels (Updated 2026-01-29)
+### 3.4 Cloudflare Tunnels + Multi-Server Proxy (Updated 2026-01-29)
 
-**Decision: No per-user subdomains. Use path-based routing.**
+**Decision: No per-user subdomains. Use path-based routing with proxy layer.**
 
 All agents accessed via: `automna.ai/a/{userId}/chat`
 
-**Reasons:**
-- Simpler same-origin auth (Clerk cookie works automatically)
-- No wildcard SSL certs needed
-- No DNS complexity
+**Architecture:**
+- Main server (automna.ai): Dashboard + proxy layer
+- Shared containers: Same server as dashboard
+- Dedicated VMs: Separate Hetzner servers, reached via internal network
 
-**Implementation:**
-- Single tunnel routes `automna.ai` → Hetzner server
-- Next.js dashboard + proxy runs on Hetzner
-- Middleware routes `/a/{userId}/*` to correct container
+**Why this works:**
+- Auth is always same-origin (Clerk cookie on automna.ai)
+- Proxy layer routes to correct backend (local or remote)
+- Users don't see infrastructure differences
+- Can scale dedicated VMs independently
 
-**Config example:**
+**Tunnel Config (main server only):**
 ```yaml
 tunnel: automna-agents
 credentials-file: /etc/cloudflared/creds.json
 
 ingress:
   - hostname: automna.ai
-    service: http://127.0.0.1:3000  # Next.js dashboard
+    service: http://127.0.0.1:3000  # Next.js (dashboard + proxy)
   - hostname: test.automna.ai
-    service: http://127.0.0.1:3001  # Test container (prototype only)
+    service: http://127.0.0.1:3001  # Prototype test (temporary)
   - service: http_status:404
+```
+
+**Internal Network (for dedicated VMs):**
+- Option A: Hetzner private network (free, same datacenter)
+- Option B: Tailscale mesh (works across datacenters)
+- Dedicated VMs only need to be reachable from main server
+
+**Proxy Logic (simplified):**
+```typescript
+// Look up where user's agent runs
+const backend = await db.userAgent.findUnique({ userId });
+
+if (backend.backendType === 'local') {
+  // Shared: proxy to local container
+  return proxy(`http://localhost:${backend.containerPort}`);
+} else {
+  // Dedicated: proxy to remote VM
+  return proxy(`http://${backend.vmIp}:${backend.vmPort}`);
+}
 ```
 
 **Note:** Dashboard must run on Hetzner (not Vercel) for WebSocket proxying to work.

@@ -139,36 +139,48 @@ This is NOT a chatbot. Users will have their agents:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      Cloudflare                              │
-│              (DNS, SSL, DDoS, Access, Tunnels)               │
+│              (DNS, SSL, DDoS, Tunnel to main server)         │
 └─────────────────────────┬───────────────────────────────────┘
                           │
 ┌─────────────────────────▼───────────────────────────────────┐
-│                   Control Plane                              │
-│                  (Hetzner CX22 - 4GB)                        │
+│              Main Server (automna.ai)                        │
+│                  (Hetzner CX52 - 32GB)                       │
 │  ┌─────────────┐ ┌─────────────┐ ┌────────────────────────┐  │
-│  │   API       │ │  Dashboard  │ │     Provisioner        │  │
-│  │  (FastAPI)  │ │  (Next.js)  │ │  (Python + Docker SDK) │  │
+│  │  Dashboard  │ │   Proxy     │ │     Provisioner        │  │
+│  │  (Next.js)  │ │   Layer     │ │  (Docker + Hetzner API)│  │
+│  │  + Clerk    │ │             │ │                        │  │
 │  └─────────────┘ └─────────────┘ └────────────────────────┘  │
 │  ┌─────────────┐ ┌─────────────┐                             │
 │  │  Postgres   │ │   Redis     │                             │
-│  │  (Users,    │ │  (Sessions, │                             │
-│  │   Config)   │ │   Queue)    │                             │
+│  │  (Neon)     │ │  (optional) │                             │
 │  └─────────────┘ └─────────────┘                             │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│                    Agent Cluster                             │
-│               (Hetzner CX32+ - 8GB+)                         │
+│                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │                  Docker Swarm                         │   │
+│  │           Shared Containers (Starter/Pro)             │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐             │   │
 │  │  │ User A   │ │ User B   │ │ User C   │  ...        │   │
-│  │  │ Clawdbot │ │ Clawdbot │ │ Clawdbot │             │   │
-│  │  │ 512MB    │ │ 512MB    │ │ 512MB    │             │   │
+│  │  │ 2.5-4GB  │ │ 2.5-4GB  │ │ 2.5-4GB  │             │   │
 │  │  └──────────┘ └──────────┘ └──────────┘             │   │
 │  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+            Internal Network (Tailscale / Hetzner Private)
+                          │
+┌─────────────────────────▼───────────────────────────────────┐
+│             Dedicated VMs (Business/Max)                     │
+│  ┌─────────────────┐  ┌─────────────────┐                   │
+│  │  User X         │  │  User Y         │                   │
+│  │  CX32 (8GB)     │  │  CX42 (16GB)    │                   │
+│  │  Full isolation │  │  Full isolation │                   │
+│  └─────────────────┘  └─────────────────┘                   │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**Key Points:**
+- All traffic goes through main server (automna.ai)
+- Auth is same-origin (Clerk cookie)
+- Proxy routes to local containers OR remote VMs
+- Users don't see infrastructure differences
 
 ### Technology Stack
 
@@ -304,53 +316,92 @@ Future tasks → Load contextId, already authenticated
 | Secrets | HashiCorp Vault or encrypted env vars |
 | Backups | Encrypted daily snapshots to Hetzner Storage Box |
 
-### Gateway Authentication (Same-Origin Cookie)
+### Gateway Authentication (Same-Origin Cookie + Proxy)
 
-Since everything runs on `automna.ai` (no per-user subdomains), auth is simple same-origin cookies.
+All requests go through `automna.ai` (main server). Auth is same-origin cookies, then proxy to the right backend.
 
 **URL Structure:**
 ```
 automna.ai/                     # Landing page
 automna.ai/dashboard            # User dashboard  
-automna.ai/a/{userId}/chat      # Agent chat UI (proxied to container)
-automna.ai/a/{userId}/ws        # Agent WebSocket (proxied to container)
+automna.ai/a/{userId}/chat      # Agent chat UI (proxied to backend)
+automna.ai/a/{userId}/ws        # Agent WebSocket (proxied to backend)
+```
+
+**Multi-Server Architecture:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Main Server (automna.ai)                 │
+│  ┌─────────────┐  ┌─────────────────────────────────────┐  │
+│  │  Dashboard  │  │            Proxy Layer              │  │
+│  │  (Next.js)  │  │  /a/user1/* → localhost:3001        │  │
+│  │             │  │  /a/user2/* → localhost:3002        │  │
+│  │  Clerk Auth │  │  /a/user3/* → 10.0.1.5:18789 (VM)   │  │
+│  └─────────────┘  │  /a/user4/* → 10.0.1.6:18789 (VM)   │  │
+│                   └─────────────────────────────────────┘  │
+│  ┌──────────┐ ┌──────────┐                                 │
+│  │ Shared   │ │ Shared   │  ← Starter/Pro containers      │
+│  │ user1    │ │ user2    │    (same server)               │
+│  └──────────┘ └──────────┘                                 │
+└─────────────────────────────────────────────────────────────┘
+         │ Internal network (Tailscale or private Hetzner network)
+         │
+┌────────┴────────┐  ┌─────────────────┐
+│  Dedicated VM   │  │  Dedicated VM   │  ← Business/Max VMs
+│  user3 (CX32)   │  │  user4 (CX42)   │    (separate servers)
+│  Clawdbot       │  │  Clawdbot       │
+└─────────────────┘  └─────────────────┘
 ```
 
 **Auth Flow:**
 ```
 ┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│   Browser       │      │   Next.js API    │      │  User Container │
-│                 │      │   (automna.ai)   │      │   (Clawdbot)    │
+│   Browser       │      │   Main Server    │      │  User Backend   │
+│                 │      │   (automna.ai)   │      │ (local or remote)│
 └────────┬────────┘      └────────┬─────────┘      └────────┬────────┘
          │                        │                         │
          │ 1. Login via Clerk     │                         │
          │ ──────────────────────►│                         │
          │                        │                         │
-         │ 2. Clerk session cookie set                      │
+         │ 2. Clerk session cookie│                         │
          │ ◄──────────────────────│                         │
-         │   (automna.ai domain)  │                         │
          │                        │                         │
-         │ 3. Visit /a/{userId}/chat                        │
+         │ 3. Visit /a/{userId}/  │                         │
          │ ──────────────────────►│                         │
          │                        │                         │
          │                        │ 4. Verify Clerk session │
-         │                        │    Check userId match   │
+         │                        │    Look up user's backend│
          │                        │                         │
-         │                        │ 5. Proxy to container   │
+         │                        │ 5. Proxy request        │
          │                        │ ───────────────────────►│
-         │                        │   (internal auth token) │
+         │                        │   (internal auth)       │
          │                        │                         │
          │ 6. Response            │                         │
          │ ◄──────────────────────────────────────────────────
 ```
 
+**Backend Lookup:**
+```typescript
+// Database stores where each user's agent runs
+interface UserAgent {
+  userId: string;
+  tier: 'starter' | 'pro' | 'business' | 'max';
+  backendType: 'local' | 'remote';
+  // For local (shared containers):
+  containerPort?: number;  // e.g., 3001
+  // For remote (dedicated VMs):
+  vmIp?: string;           // e.g., "10.0.1.5"
+  vmPort?: number;         // e.g., 18789
+}
+```
+
 **How It Works:**
 1. User logs in via Clerk → gets session cookie on `automna.ai`
 2. User visits `/a/{userId}/chat`
-3. Next.js middleware checks Clerk session
-4. Middleware verifies logged-in user matches `{userId}` in URL
-5. Request proxied to user's container with internal auth header
-6. Container trusts requests from our proxy (internal network)
+3. Middleware verifies Clerk session + user owns the agent
+4. Look up user's backend location (local container or remote VM)
+5. Proxy request to correct backend with internal auth header
+6. User doesn't know/care if they're on shared or dedicated infra
 
 **Implementation:**
 
