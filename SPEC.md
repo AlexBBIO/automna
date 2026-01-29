@@ -317,49 +317,78 @@ Future tasks → Load contextId, already authenticated
 
 ## Business Model
 
-### Pricing Tiers (Premium Positioning)
+### Pricing Tiers
 
-**Rationale:** We offer MORE than Claude Max ($100-200/mo) — fully managed, pre-integrated, always-on. Pricing reflects this value.
+| Tier | Price | Resources | API Model | Credits |
+|------|-------|-----------|-----------|---------|
+| **Starter** | $29/mo | 2.5GB shared | BYOK | 500/mo* |
+| **Pro** | $79/mo | 4GB shared | BYOK | 2,000/mo* |
+| **Business** | $129/mo | 8GB dedicated VM | Credits | 15,000/mo |
+| **Max** | $249/mo | 16GB dedicated VM | Credits | 40,000/mo |
+| **Enterprise** | Contact us | Custom | Custom | Custom |
 
-| Tier | Price | Target | Includes |
-|------|-------|--------|----------|
-| **Starter** | $79/mo | Individuals testing agentic AI | 1 agent, web chat, 1 integration (Discord OR Telegram) |
-| **Pro** | $149/mo | Power users, solopreneurs | 1 agent, all integrations, priority support, custom skills, app hosting |
-| **Business** | $299/mo | Teams, agencies | 3 agents, shared workspace, API access, analytics, dedicated support |
-| **Enterprise** | Custom | Companies | Dedicated infra, SSO, SLA, white-glove onboarding, custom integrations |
+*BYOK tiers: Credits cover browser automation, storage, extras only. AI usage is on user's Anthropic key.
 
-**Price Justification:**
-- Claude Max: $100-200/mo for Claude Code on YOUR machine, YOU configure everything
-- Automna: Same capabilities + managed hosting + integrations + app hosting = worth $79-299
+**Shared vs Dedicated:**
+- **Shared (Starter/Pro):** Container on multi-tenant server. Cost-efficient, still isolated.
+- **Dedicated VM (Business/Max):** Own Hetzner VM. Full isolation, guaranteed resources.
 
 **Comparison to alternatives:**
 - Human VA: $15-25/hr = $2,400-4,000/mo
 - ChatGPT/Claude Pro: $20/mo but chat-only, no execution
-- Automna: $79-299/mo for full agentic capabilities
+- Automna: $29-249/mo for full agentic capabilities
+
+### Automna Credits System
+
+Credits are a universal resource covering all platform usage:
+
+| Resource | Credits |
+|----------|---------|
+| 1 AI message (Sonnet) | 1 |
+| 1 AI message (Opus / extended thinking) | 5 |
+| 1 minute browser automation | 2 |
+| 100MB storage (monthly) | 10 |
+| 1 scheduled task run | 1 |
+| 1 email sent | 1 |
+
+**Overage pricing:** $10 per 1,000 credits ($0.01/credit)
+
+**Why credits:**
+- Simple UX: "You have 8,432 credits remaining"
+- Covers multiple cost centers (API, browser, storage) in one number
+- Decouples from Anthropic pricing changes
+- Enables promos, bonuses, add-on packs
 
 ### Cost Structure (Per User)
 
-| Item | Starter | Pro | Business |
-|------|---------|-----|----------|
-| Compute | $5 | $8 | $20 |
-| Storage | $1 | $2 | $5 |
-| Bandwidth | $0.50 | $1 | $2 |
-| Support | $2 | $5 | $15 |
-| **Total Cost** | **$8.50** | **$16** | **$42** |
-| **Gross Margin** | **89%** | **89%** | **86%** |
+| Tier | Price | Infra Cost | Credit Cost* | Total Cost | Margin |
+|------|-------|------------|--------------|------------|--------|
+| Starter $29 | $29 | ~$5 | — (BYOK) | ~$5 | 83% |
+| Pro $79 | $79 | ~$9 | — (BYOK) | ~$9 | 89% |
+| Business $129 | $129 | ~$14 | ~$15 | ~$29 | 78% |
+| Max $249 | $249 | ~$27 | ~$40 | ~$67 | 73% |
 
-### Revenue Projections (Updated)
+*Credit cost assumes average usage. Heavy users generate overage revenue.
+
+**Infrastructure costs:**
+- Shared (Starter/Pro): Containers on CX52 (32GB) — €49/mo ÷ users
+- Business 8GB VM: CX32 — €13/mo
+- Max 16GB VM: CX42 — €25/mo
+
+### Revenue Projections
 
 | Month | Users | Avg Price | MRR | Costs | Profit |
 |-------|-------|-----------|-----|-------|--------|
-| 3 | 50 | $120 | $6,000 | $600 | $5,400 |
-| 6 | 150 | $130 | $19,500 | $1,800 | $17,700 |
-| 12 | 400 | $140 | $56,000 | $4,800 | $51,200 |
+| 3 | 50 | $80 | $4,000 | $500 | $3,500 |
+| 6 | 150 | $90 | $13,500 | $1,500 | $12,000 |
+| 12 | 400 | $100 | $40,000 | $5,000 | $35,000 |
 
-At $140 average (mix of tiers):
-- 100 users = $14,000 MRR
-- 500 users = $70,000 MRR
-- 1,000 users = $140,000 MRR
+At $100 average (mix of tiers):
+- 100 users = $10,000 MRR
+- 500 users = $50,000 MRR
+- 1,000 users = $100,000 MRR
+
+**Overage upside:** Business/Max users who exceed credits add incremental revenue at high margin.
 
 ### API Key Model (BYOK)
 

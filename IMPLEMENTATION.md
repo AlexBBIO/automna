@@ -263,9 +263,21 @@ Step 4: Deploy
 
 ## Phase 3: Agent Infrastructure (Week 3-4)
 
-### 3.1 Container Architecture
+### 3.1 Container/VM Architecture
 
-**Per-User Container:**
+**Tier-Based Resource Allocation:**
+
+| Tier | Type | Memory | CPU | Storage | Monthly Infra |
+|------|------|--------|-----|---------|---------------|
+| Starter $29 | Shared container | 2.5GB | 1 core | 5GB | ~$5 |
+| Pro $79 | Shared container | 4GB | 1.5 cores | 10GB | ~$9 |
+| Business $129 | Dedicated VM | 8GB | 4 cores | 40GB | ~$14 (CX32) |
+| Max $249 | Dedicated VM | 16GB | 8 cores | 80GB | ~$27 (CX42) |
+
+**Shared tiers:** Containers on multi-tenant CX52 (32GB) servers
+**Dedicated tiers:** Own Hetzner cloud VM per user
+
+**Base Dockerfile:**
 ```dockerfile
 FROM node:22-slim
 
@@ -286,11 +298,16 @@ HEALTHCHECK --interval=30s --timeout=10s \
 CMD ["clawdbot", "gateway", "start", "--foreground"]
 ```
 
-**Resource Limits:**
-- Memory: 512MB (soft), 768MB (hard)
-- CPU: 0.5 cores
-- Storage: 2GB per user
-- Network: Internal only + Cloudflare Tunnel
+**Container resource limits (shared tiers):**
+```yaml
+# Starter
+mem_limit: 2560m
+cpus: 1.0
+
+# Pro  
+mem_limit: 4096m
+cpus: 1.5
+```
 
 ### 3.2 Provisioning Flow
 
@@ -309,15 +326,20 @@ CMD ["clawdbot", "gateway", "start", "--foreground"]
 
 ### 3.3 Orchestration
 
-**Initial (< 100 users): Single Server + Docker Compose**
-- Hetzner CX32 (8GB RAM) = ~15 agents
+**Initial (< 50 shared users): Single Server + Docker Compose**
+- Hetzner CX52 (32GB RAM)
+- ~10 Starter (2.5GB) or ~7 Pro (4GB) containers
 - Simple, easy to manage
-- Manual scaling
 
-**Growth (100-500 users): Docker Swarm**
-- Multiple Hetzner servers
+**Growth (50-200 shared users): Docker Swarm**
+- Multiple CX52 servers
 - Automatic container placement
 - Built-in load balancing
+
+**Dedicated tiers (Business/Max):** 
+- Each user gets own Hetzner VM (CX32/CX42)
+- Provisioned via Hetzner API on signup
+- Full isolation, no sharing
 
 **Scale (500+ users): Kubernetes**
 - Complex but necessary at scale
@@ -509,22 +531,43 @@ For sites that block Browserbase:
 | Smartproxy | $30 | Residential, if needed |
 | **Total** | **$65** | Before users |
 
-### Variable Costs (Per User)
+### Variable Costs (Per Tier)
 
-| Item | Cost/User | Notes |
-|------|-----------|-------|
-| Compute | $3-5 | 512MB container |
-| Storage | $0.50 | 2GB volume |
-| Bandwidth | $0.50 | Cloudflare handles most |
-| Browser | $0.10-1 | Browserbase usage |
-| Email | $0 | Agentmail free tier |
-| **Total** | **$4-7** | Per user/month |
+| Tier | Price | Infra | Credits* | Total Cost | Margin |
+|------|-------|-------|----------|------------|--------|
+| Starter $29 | $29 | ~$5 | — | ~$5 | 83% |
+| Pro $79 | $79 | ~$9 | — | ~$9 | 89% |
+| Business $129 | $129 | ~$14 | ~$15 | ~$29 | 78% |
+| Max $249 | $249 | ~$27 | ~$40 | ~$67 | 73% |
+
+*Credit costs assume average usage. BYOK tiers (Starter/Pro) have minimal credit costs (browser/extras only).
+
+### Automna Credits System
+
+Credits are a universal currency covering all platform usage:
+
+| Resource | Credits |
+|----------|---------|
+| 1 AI message (Sonnet) | 1 |
+| 1 AI message (Opus/extended) | 5 |
+| 1 min browser automation | 2 |
+| 100MB storage (monthly) | 10 |
+| 1 scheduled task run | 1 |
+| 1 email sent | 1 |
+
+**Included credits by tier:**
+- Starter: 500/mo (covers browser/extras, AI is BYOK)
+- Pro: 2,000/mo (covers browser/extras, AI is BYOK)
+- Business: 15,000/mo (covers everything)
+- Max: 40,000/mo (covers everything)
+
+**Overage:** $10 per 1,000 credits ($0.01/credit)
 
 ### Break-Even Analysis
 
-At $79/mo Starter plan:
-- Gross margin: ~92% ($72.50)
-- Fixed costs covered at: 1 paying user
+At $29/mo Starter plan:
+- Gross margin: ~83% ($24)
+- Fixed costs ($65) covered at: 3 paying users
 - Profitable at: 10+ users
 
 ---
