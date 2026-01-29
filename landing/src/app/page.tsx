@@ -106,7 +106,7 @@ export default function Home() {
                 </button>
               </form>
               <p className="text-gray-500 text-sm mt-4">
-                Join {waitlistCount > 0 ? `${waitlistCount} others` : 'the waitlist'} · Starting at $30/month
+                Join {waitlistCount > 0 ? `${waitlistCount} ${waitlistCount === 1 ? 'other' : 'others'}` : 'the waitlist'} · Starting at $30/month
               </p>
             </div>
           ) : (
