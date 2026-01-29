@@ -65,11 +65,41 @@
 - **Local test:** `curl http://127.0.0.1:3001` ✅
 - **Tunnel test:** `curl https://test.automna.ai` ✅
 
+### 2026-01-29 04:15 UTC — Auth/Pairing Investigation
+- **Problem:** Control UI shows "Pairing required" 
+- **Root cause:** Clawdbot Control UI uses WebCrypto device identity for secure auth
+- **Solution:** Set `gateway.controlUi.allowInsecureAuth: true` + pass token via URL
+- **URL format:** `https://test.automna.ai/?token=<token>` (token stored in localStorage)
+- **For chat direct:** `https://test.automna.ai/chat?session=main&token=<token>`
+- **CONFIRMED WORKING:** `https://test.automna.ai/?token=test123` connects successfully ✅
+
+### Clawdbot Auth Model (from docs research)
+1. **Device pairing** (default): Uses WebCrypto to generate device identity, requires approval
+2. **Token auth**: Shared bearer token, passed via URL `?token=` or pasted in UI settings
+3. **Password auth**: Alternative to token
+4. **allowInsecureAuth**: Disables device pairing, falls back to token/password only
+
+For SaaS (Automna):
+- Use `allowInsecureAuth: true` since customers are already authenticated via Clerk
+- Generate unique token per customer container
+- Pass token in dashboard iframe URL
+- Token gets stored in browser localStorage (persists across page loads)
+
 ### Key Learnings
 1. **Config is JSON**: `/root/.clawdbot/clawdbot.json` (not YAML)
 2. **Gateway port**: Default is 18789, not 3000
 3. **LAN binding requires auth**: Set `gateway.auth.token` in config
 4. **CMD**: Use `clawdbot gateway run --bind lan --allow-unconfigured`
+5. **Device pairing bypass**: Set `gateway.controlUi.allowInsecureAuth: true` to skip WebCrypto device identity pairing (falls back to token-only auth)
+6. **Token via URL**: Control UI accepts `?token=<token>` query param, stored in localStorage
+7. **Trusted proxies**: Set `gateway.trustedProxies` for Cloudflare tunnel IPs so client IP detection works
+
+### Auth Flow for Customers (Production)
+1. Customer logs in via Clerk (on automna.ai)
+2. Dashboard generates unique gateway token per customer (or fetches from DB)
+3. Iframe loads `https://<customer>.automna.ai/chat?session=main&token=<token>`
+4. Container config has `allowInsecureAuth: true` so token-only auth works
+5. No manual pairing step needed - customer is authenticated end-to-end
 
 ---
 
