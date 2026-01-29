@@ -236,19 +236,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       }
       
       if (msg.event === 'chat' && payload) {
-        const { role, delta, content, status } = payload as {
-          role?: string;
-          delta?: string;
-          content?: string;
-          status?: string;
+        // Chat event structure:
+        // { runId, sessionKey, seq, state: "delta"|"final", message: { role, content: [{type, text}] } }
+        const { state, message } = payload as {
+          state?: string;
+          message?: {
+            role?: string;
+            content?: Array<{ type: string; text?: string }>;
+          };
         };
         
+        const role = message?.role;
+        const textContent = message?.content?.find(c => c.type === 'text')?.text || '';
+        
         if (role === 'assistant') {
-          if (status === 'streaming' && delta) {
-            // Accumulate streaming content
-            streamingMessageRef.current += delta;
+          if (state === 'delta' && textContent) {
+            // Streaming delta - update assistant message
+            streamingMessageRef.current = textContent; // Gateway sends accumulated text
             
-            // Update or add assistant message
             setMessages(prev => {
               const lastMsg = prev[prev.length - 1];
               if (lastMsg?.role === 'assistant' && lastMsg.id === 'streaming') {
@@ -275,9 +280,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             });
           }
           
-          if (status === 'complete') {
+          if (state === 'final') {
             // Finalize message with real ID
-            const finalContent = content || streamingMessageRef.current;
+            const finalContent = textContent || streamingMessageRef.current;
             setMessages(prev => {
               const lastMsg = prev[prev.length - 1];
               if (lastMsg?.role === 'assistant') {
@@ -325,6 +330,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     pendingReqId.current = wsSend('chat.send', {
       sessionKey,
       message: text,
+      idempotencyKey: genId(),
     });
   }, [sessionKey, wsSend]);
 
