@@ -93,14 +93,15 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       console.log('[clawdbot] WebSocket connected');
       
       // Send connect request with auth
+      // Use 'clawdbot-control-ui' as client ID to match expected values
       const connectParams: Record<string, unknown> = {
         minProtocol: 3,
         maxProtocol: 3,
         client: {
-          id: 'automna-chat',
+          id: 'clawdbot-control-ui',
           version: '1.0.0',
           platform: 'web',
-          mode: 'operator',
+          mode: 'webchat',
         },
         role: 'operator',
         scopes: ['operator.read', 'operator.write'],
@@ -108,7 +109,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         commands: [],
         permissions: {},
         locale: 'en-US',
-        userAgent: 'automna-chat/1.0.0',
+        userAgent: 'clawdbot-control-ui webchat automna/1.0.0',
       };
 
       if (config.authToken) {
