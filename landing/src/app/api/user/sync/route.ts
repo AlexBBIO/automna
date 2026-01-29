@@ -31,25 +31,29 @@ export async function POST() {
     // Check if this is the test user (grandathrawn)
     const isTestUser = email === 'grandathrawn@gmail.com';
     
+    // Cloudflare Moltworker instance (testing)
+    const MOLTWORKER_URL = 'wss://moltbot-sandbox.alex-0bb.workers.dev';
+    const MOLTWORKER_TOKEN = '7wVPDMFyx5nfHSeuWyZrb89tjV4exH8h';
+    
     // Upsert user in database
     const user = await prisma.user.upsert({
       where: { clerkId },
       update: { 
         email,
-        // Auto-configure gateway for test user
+        // Auto-configure gateway for test user → Cloudflare Moltworker
         ...(isTestUser && {
-          gatewayUrl: 'wss://test.automna.ai',
-          gatewayToken: 'test123',
+          gatewayUrl: MOLTWORKER_URL,
+          gatewayToken: MOLTWORKER_TOKEN,
         }),
       },
       create: {
         clerkId,
         email,
         plan: 'free',
-        // Auto-configure gateway for test user
+        // Auto-configure gateway for test user → Cloudflare Moltworker
         ...(isTestUser && {
-          gatewayUrl: 'wss://test.automna.ai',
-          gatewayToken: 'test123',
+          gatewayUrl: MOLTWORKER_URL,
+          gatewayToken: MOLTWORKER_TOKEN,
         }),
       },
     });
