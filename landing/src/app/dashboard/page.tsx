@@ -78,26 +78,27 @@ export default function DashboardPage() {
             Welcome, {user?.firstName || 'there'}! 👋
           </h1>
 
-          {/* Coming Soon Card */}
+          {/* Setup Agent Card */}
           <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-2xl p-8 text-center">
-            <div className="text-6xl mb-4">🚀</div>
-            <h2 className="text-2xl font-semibold mb-4">Your Agent is Coming Soon</h2>
+            <div className="text-6xl mb-4">🤖</div>
+            <h2 className="text-2xl font-semibold mb-4">Set Up Your Agent</h2>
             <p className="text-gray-400 mb-6 max-w-md mx-auto">
-              We&apos;re putting the finishing touches on your AI agent experience. 
-              You&apos;ll be among the first to deploy when we launch.
+              Configure your AI agent with your API key and preferences. 
+              It only takes a few minutes.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <div className="bg-gray-800/50 rounded-lg px-6 py-4">
-                <div className="text-gray-400 text-sm">Your spot</div>
-                <div className="text-2xl font-bold text-purple-400">#1</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-lg px-6 py-4">
-                <div className="text-gray-400 text-sm">Status</div>
-                <div className="text-2xl font-bold text-green-400">
-                  {plan !== 'free' ? 'Priority' : 'Waitlist'}
-                </div>
-              </div>
-            </div>
+            <Link
+              href="/dashboard/setup"
+              className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg font-semibold transition-colors"
+            >
+              Start Setup →
+            </Link>
+            <p className="mt-4 text-sm text-gray-500">
+              {plan === 'free' ? (
+                <>Need a plan? <Link href="/pricing" className="text-purple-400 hover:underline">View pricing</Link></>
+              ) : (
+                <>Plan: <span className="text-purple-400 capitalize">{plan}</span></>
+              )}
+            </p>
           </div>
 
           {/* Quick Links */}
