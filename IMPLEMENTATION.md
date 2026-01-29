@@ -456,6 +456,17 @@ For sites that block Browserbase:
 ## Phase 7: Launch Checklist
 
 ### Pre-Launch (Week 6)
+- [ ] **Clerk: Switch to Production Mode**
+  - Toggle to Production in Clerk Dashboard
+  - Get live keys (`pk_live_`, `sk_live_`)
+  - Update Vercel env vars (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY)
+  - Re-add webhook endpoint for production instance
+  - Update CLERK_WEBHOOK_SECRET with new signing secret
+- [ ] **Stripe: Switch to Live Mode**
+  - Get live keys from Stripe Dashboard
+  - Update Vercel env vars (STRIPE_SECRET_KEY, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  - Create live webhook endpoint, update STRIPE_WEBHOOK_SECRET
+  - Create live price IDs, update NEXT_PUBLIC_STRIPE_PRICE_* vars
 - [ ] Security audit
 - [ ] Load testing (50 concurrent agents)
 - [ ] Documentation (user guides)
@@ -524,8 +535,8 @@ At $79/mo Starter plan:
 |----------|--------|-----------|------|
 | Hosting | Vercel + Hetzner | Landing on Vercel (free), agents on Hetzner (cheap) | 2026-01-28 |
 | Database | Neon Postgres | Serverless, free tier, Vercel integration | 2026-01-29 |
-| Auth | Clerk | Fast implementation, good UX | 2026-01-29 |
-| Payments | Stripe | Industry standard, reliable, good Clerk integration | 2026-01-29 |
+| Auth | Clerk | Fast implementation, good UX (currently dev mode) | 2026-01-29 |
+| Payments | Stripe | Industry standard, reliable (currently test mode) | 2026-01-29 |
 | Email marketing | Loops.so | Modern, good API, free tier | 2026-01-29 |
 | Transactional email | Agentmail | Built for AI agents, simple API | 2026-01-28 |
 | Browser | Browserbase | Persistent contexts, stealth, managed | 2026-01-28 |
