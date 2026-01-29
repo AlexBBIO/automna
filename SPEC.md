@@ -96,7 +96,7 @@ This is NOT a chatbot. Users will have their agents:
 | Web chat interface | P0 | Clawdbot built-in web UI |
 | Discord integration setup | P1 | Guide user through bot token |
 | Agent status dashboard | P1 | Online/offline, last active |
-| Subdomain per user | P2 | username.automna.ai |
+| ~~Subdomain per user~~ | ~~P2~~ | Removed — using path-based routing instead |
 
 #### Non-Goals (MVP)
 - Multiple agents per account
@@ -200,7 +200,7 @@ Agents can build and deploy web apps for users. Architecture:
 User: "Build me a dashboard for my sales data"
 Agent: *builds app, saves to /apps/sales-dashboard*
 System: Auto-exposes via Cloudflare Tunnel
-Result: Live at sales-dashboard.username.automna.ai
+Result: Live at automna.ai/apps/{userId}/sales-dashboard
 ```
 
 **Implementation:**
@@ -227,14 +227,15 @@ services:
     cpus: 0.5
     environment:
       - ANTHROPIC_API_KEY=${ENCRYPTED_KEY}
-      - CLAWDBOT_WEB_PORT=3000
-      - CLAWDBOT_CONFIG=/config/clawdbot.yaml
+      - CLAWDBOT_WEB_PORT=18789
+      - CLAWDBOT_CONFIG=/config/clawdbot.json
     volumes:
       - agent_${USER_ID}_data:/root/clawd
       - agent_${USER_ID}_config:/config
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.agent_${USER_ID}.rule=Host(`${USERNAME}.automna.ai`)"
+      - "traefik.http.routers.agent_${USER_ID}.rule=PathPrefix(`/a/${USER_ID}`)"
+      - "traefik.http.middlewares.agent_${USER_ID}_strip.stripprefix.prefixes=/a/${USER_ID}"
     networks:
       - agent_network
 ```
@@ -303,192 +304,144 @@ Future tasks → Load contextId, already authenticated
 | Secrets | HashiCorp Vault or encrypted env vars |
 | Backups | Encrypted daily snapshots to Hetzner Storage Box |
 
-### Gateway Token Authentication
+### Gateway Authentication (Same-Origin Cookie)
 
-Each customer's Clawdbot container requires a gateway token to connect. Here's the secure token flow:
+Since everything runs on `automna.ai` (no per-user subdomains), auth is simple same-origin cookies.
 
-**Architecture:**
+**URL Structure:**
+```
+automna.ai/                     # Landing page
+automna.ai/dashboard            # User dashboard  
+automna.ai/a/{userId}/chat      # Agent chat UI (proxied to container)
+automna.ai/a/{userId}/ws        # Agent WebSocket (proxied to container)
+```
+
+**Auth Flow:**
 ```
 ┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│   Dashboard     │      │   Token Service  │      │  User Container │
-│   (Next.js)     │      │   (API endpoint) │      │   (Clawdbot)    │
+│   Browser       │      │   Next.js API    │      │  User Container │
+│                 │      │   (automna.ai)   │      │   (Clawdbot)    │
 └────────┬────────┘      └────────┬─────────┘      └────────┬────────┘
          │                        │                         │
-         │ 1. User loads dashboard                          │
+         │ 1. Login via Clerk     │                         │
          │ ──────────────────────►│                         │
          │                        │                         │
-         │ 2. Request fresh token │                         │
-         │   (with Clerk session) │                         │
-         │ ──────────────────────►│                         │
-         │                        │                         │
-         │                        │ 3. Generate short-lived │
-         │                        │    token (5 min TTL)    │
-         │                        │ ───────────────────────►│
-         │                        │    (store in Redis)     │
-         │                        │                         │
-         │ 4. Return signed token │                         │
+         │ 2. Clerk session cookie set                      │
          │ ◄──────────────────────│                         │
+         │   (automna.ai domain)  │                         │
          │                        │                         │
-         │ 5. Load iframe with token                        │
-         │ ─────────────────────────────────────────────────►
-         │   (POST /auth/exchange)                          │
+         │ 3. Visit /a/{userId}/chat                        │
+         │ ──────────────────────►│                         │
          │                        │                         │
-         │                        │ 6. Validate token       │
-         │                        │ ◄───────────────────────│
+         │                        │ 4. Verify Clerk session │
+         │                        │    Check userId match   │
          │                        │                         │
-         │                        │ 7. Issue session cookie │
+         │                        │ 5. Proxy to container   │
          │                        │ ───────────────────────►│
-         │                        │    (HttpOnly, 24h TTL)  │
+         │                        │   (internal auth token) │
          │                        │                         │
-         │ 8. WebSocket connects with cookie                │
-         │ ◄─────────────────────────────────────────────────
+         │ 6. Response            │                         │
+         │ ◄──────────────────────────────────────────────────
 ```
 
-**Token Types:**
-
-| Token | TTL | Storage | Purpose |
-|-------|-----|---------|---------|
-| Exchange Token | 5 min | Redis | One-time use, passed in URL/POST |
-| Session Cookie | 24 hours | Browser (HttpOnly) | Maintains WS connection |
-| Gateway Master | Permanent | Container config | Internal auth, never exposed |
+**How It Works:**
+1. User logs in via Clerk → gets session cookie on `automna.ai`
+2. User visits `/a/{userId}/chat`
+3. Next.js middleware checks Clerk session
+4. Middleware verifies logged-in user matches `{userId}` in URL
+5. Request proxied to user's container with internal auth header
+6. Container trusts requests from our proxy (internal network)
 
 **Implementation:**
 
-1. **Token Service** (API endpoint on automna.ai):
+1. **Middleware** (auth check + proxy):
 ```typescript
-// POST /api/auth/gateway-token
-export async function POST(req: Request) {
-  // Verify Clerk session
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  
-  // Get user's container info
-  const user = await db.user.findUnique({ where: { clerkId: userId } });
-  if (!user?.containerId) return Response.json({ error: 'No agent' }, { status: 404 });
-  
-  // Generate short-lived exchange token
-  const exchangeToken = crypto.randomUUID();
-  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
-  
-  // Store in Redis with user binding
-  await redis.set(`exchange:${exchangeToken}`, JSON.stringify({
-    userId: user.id,
-    containerId: user.containerId,
-    gatewayToken: user.gatewayToken, // The real token, encrypted
-    expiresAt
-  }), 'EX', 300);
-  
-  return Response.json({ 
-    exchangeToken,
-    expiresAt,
-    agentUrl: `https://${user.subdomain}.automna.ai`
-  });
-}
-```
+// middleware.ts
+import { clerkMiddleware } from '@clerk/nextjs/server';
 
-2. **Token Exchange** (endpoint on user's container):
-```typescript
-// POST /auth/exchange (proxied to container)
-export async function POST(req: Request) {
-  const { exchangeToken } = await req.json();
+export default clerkMiddleware(async (auth, req) => {
+  const path = req.nextUrl.pathname;
   
-  // Validate with token service
-  const tokenData = await redis.get(`exchange:${exchangeToken}`);
-  if (!tokenData) return Response.json({ error: 'Invalid token' }, { status: 401 });
-  
-  // Delete immediately (one-time use)
-  await redis.del(`exchange:${exchangeToken}`);
-  
-  const { gatewayToken, expiresAt } = JSON.parse(tokenData);
-  if (Date.now() > expiresAt) return Response.json({ error: 'Expired' }, { status: 401 });
-  
-  // Set HttpOnly session cookie
-  const response = Response.json({ success: true });
-  response.headers.set('Set-Cookie', 
-    `gateway_session=${signedSessionToken}; HttpOnly; Secure; SameSite=Strict; Max-Age=86400`
-  );
-  return response;
-}
-```
-
-3. **Dashboard Integration**:
-```tsx
-// Dashboard loads agent chat
-export default function AgentChat() {
-  const [agentUrl, setAgentUrl] = useState<string | null>(null);
-  
-  useEffect(() => {
-    async function initAgent() {
-      // Get fresh exchange token from our API
-      const res = await fetch('/api/auth/gateway-token', { method: 'POST' });
-      const { exchangeToken, agentUrl } = await res.json();
-      
-      // Exchange token for session cookie via hidden form POST
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = `${agentUrl}/auth/exchange`;
-      form.target = 'agent-frame';
-      
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'exchangeToken';
-      input.value = exchangeToken;
-      form.appendChild(input);
-      
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
-      
-      setAgentUrl(agentUrl);
+  // Agent routes require auth
+  if (path.startsWith('/a/')) {
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.redirect(new URL('/sign-in', req.url));
     }
-    initAgent();
-  }, []);
+    
+    // Extract userId from path: /a/{userId}/...
+    const pathUserId = path.split('/')[2];
+    
+    // Verify user can only access their own agent
+    const user = await getUser(userId);
+    if (user.id !== pathUserId) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+  }
+});
+```
+
+2. **Proxy Route** (forwards to container):
+```typescript
+// app/a/[userId]/[...path]/route.ts
+import { auth } from '@clerk/nextjs/server';
+
+export async function GET(req: Request, { params }) {
+  const { userId } = await auth();
+  const user = await db.user.findUnique({ where: { clerkId: userId } });
   
-  return (
-    <iframe 
-      name="agent-frame"
-      src={agentUrl ? `${agentUrl}/chat?session=main` : 'about:blank'}
-      className="w-full h-full"
-    />
-  );
+  // Get container URL from our records
+  const containerUrl = await getContainerUrl(user.containerId);
+  
+  // Forward request with internal auth
+  const proxyRes = await fetch(`${containerUrl}/${params.path.join('/')}`, {
+    headers: {
+      'X-Automna-Internal': process.env.INTERNAL_PROXY_SECRET,
+      'X-Automna-User': user.id,
+    }
+  });
+  
+  return proxyRes;
+}
+
+// WebSocket upgrade handled similarly
+export async function UPGRADE(req: Request, { params }) {
+  // ... WebSocket proxy logic
 }
 ```
 
-**Security Properties:**
-- ✅ Token never visible in URL/browser history
-- ✅ Exchange token expires in 5 minutes
-- ✅ Exchange token is one-time use (deleted on consumption)
-- ✅ Session cookie is HttpOnly (JS can't read it)
-- ✅ Session cookie is Secure + SameSite=Strict
-- ✅ Gateway master token never leaves container
-- ✅ Each customer has unique gateway token
-- ✅ Clerk session required to get exchange token
-
-**Clawdbot Config (per container):**
+3. **Container Config**:
 ```json
 {
   "gateway": {
+    "mode": "local",
+    "bind": "lan",
     "auth": {
       "mode": "token",
-      "token": "${GATEWAY_MASTER_TOKEN}"
+      "token": "${INTERNAL_PROXY_SECRET}"
     },
-    "controlUi": {
-      "allowInsecureAuth": true,
-      "sessionAuth": {
-        "enabled": true,
-        "cookieName": "gateway_session",
-        "secret": "${SESSION_SECRET}"
-      }
-    }
+    "trustedProxies": ["10.0.0.0/8", "172.16.0.0/12"]
   }
 }
 ```
 
-**Rotation & Revocation:**
-- Session cookies auto-expire after 24h
-- Exchange tokens auto-expire after 5 min
-- To revoke: rotate gateway master token in container config
-- On subscription cancel: destroy container (tokens become useless)
+**Security Properties:**
+- ✅ Same-origin: Clerk cookie works automatically
+- ✅ User isolation: Middleware verifies userId match
+- ✅ Internal auth: Containers only accept requests from proxy
+- ✅ No tokens in URLs: Auth is cookie-based
+- ✅ HttpOnly cookies: Clerk handles this
+- ✅ Simple: No exchange tokens, no cross-origin dance
+
+**Benefits of Path-Based:**
+- Simpler auth (same-origin cookies)
+- Easier debugging (one domain)
+- No wildcard SSL certs needed
+- No DNS complexity
+- Faster time to market
+
+**Future: Custom Domains (if needed)**
+Can add subdomain/custom domain support later as a premium feature. The proxy layer makes this possible without changing container architecture.
 
 ### Scaling Strategy
 
