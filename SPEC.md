@@ -134,7 +134,41 @@ This is NOT a chatbot. Users will have their agents:
 
 ## Technical Architecture
 
-### Infrastructure
+### Infrastructure Options
+
+We have two viable infrastructure approaches:
+
+#### Option A: Self-Managed Docker (Current Plan)
+- Docker containers on Hetzner servers
+- We manage orchestration, scaling, updates
+- Full control, predictable costs at scale
+- More ops overhead
+
+#### Option B: Cloudflare Moltworker (Under Evaluation)
+- Cloudflare released [Moltworker](https://github.com/cloudflare/moltworker) on 2026-01-29
+- Runs Clawdbot on their Sandbox SDK (managed containers)
+- Zero orchestration — they handle everything
+- Per-user isolation via `getSandbox(env, userId)`
+- See: `docs/moltworker-test-plan.md` for evaluation details
+
+**Moltworker Pros:**
+- No Docker/Kubernetes management
+- Auto-scaling built in
+- Global edge deployment
+- $5/mo base + pay-per-use
+- Cloudflare handles security, updates, networking
+
+**Moltworker Cons:**
+- 1-2 minute cold start if containers sleep
+- Cloudflare platform lock-in
+- Sandbox SDK still in beta
+- Cost at scale unclear (need to test)
+
+**Current Status:** Testing. Decision pending after validation.
+
+---
+
+### Infrastructure (Self-Managed Approach)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -954,6 +988,16 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 - Agentmail set up: automnajoi@agentmail.to (transactional email for notifications)
 - Discord bot created: Automna#4978 (App ID: 1466131766015332382)
 - Initial product spec drafted
+- Landing page + auth deployed to automna.ai (Vercel + Clerk)
+- Trial container running (agent_test on port 3001 → test.automna.ai)
+
+### 🔬 Under Investigation
+- **Cloudflare Moltworker** — Potential replacement for self-managed Docker
+  - Released 2026-01-29 by Cloudflare
+  - Runs Clawdbot on their managed Sandbox SDK
+  - Could eliminate all container orchestration work
+  - Test plan: `docs/moltworker-test-plan.md`
+  - Decision pending after 4-day validation
 
 ### 🔧 Infrastructure Ready
 | Service | Status | Notes |
