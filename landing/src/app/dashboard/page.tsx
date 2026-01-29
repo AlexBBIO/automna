@@ -2,7 +2,8 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { AutomnaChat } from "@/components/AutomnaChat";
 
 const CreditCardIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -11,12 +12,40 @@ const CreditCardIcon = () => (
   </svg>
 );
 
+interface GatewayInfo {
+  gatewayUrl: string;
+  authToken: string;
+}
+
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
   const [loadingPortal, setLoadingPortal] = useState(false);
+  const [gatewayInfo, setGatewayInfo] = useState<GatewayInfo | null>(null);
+  const [gatewayLoading, setGatewayLoading] = useState(true);
+  const [showChat, setShowChat] = useState(false);
 
   const plan = (user?.publicMetadata?.plan as string) || 'free';
-  const subscriptionStatus = user?.publicMetadata?.subscriptionStatus as string;
+
+  // Sync user and fetch gateway info on mount
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    
+    // First, ensure user exists in our database
+    fetch('/api/user/sync', { method: 'POST' })
+      .then(res => res.json())
+      .then(() => {
+        // Then fetch gateway info
+        return fetch('/api/user/gateway');
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.gatewayUrl && data.authToken) {
+          setGatewayInfo(data);
+        }
+      })
+      .catch(err => console.error('User sync/gateway fetch error:', err))
+      .finally(() => setGatewayLoading(false));
+  }, [isLoaded, user]);
 
   const handleManageBilling = async () => {
     setLoadingPortal(true);
@@ -34,10 +63,38 @@ export default function DashboardPage() {
     setLoadingPortal(false);
   };
 
-  if (!isLoaded) {
+  if (!isLoaded || gatewayLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  // Full-screen chat mode
+  if (showChat && gatewayInfo) {
+    return (
+      <div className="h-screen bg-gray-950 flex flex-col">
+        {/* Minimal nav in chat mode */}
+        <nav className="border-b border-gray-800 bg-black/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
+          <button 
+            onClick={() => setShowChat(false)}
+            className="text-gray-400 hover:text-white flex items-center gap-2"
+          >
+            ← Dashboard
+          </button>
+          <Link href="/" className="text-xl font-bold tracking-tight">
+            <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
+          </Link>
+          <UserButton />
+        </nav>
+        <div className="flex-1">
+          <AutomnaChat
+            gatewayUrl={gatewayInfo.gatewayUrl}
+            authToken={gatewayInfo.authToken}
+            sessionKey="main"
+          />
+        </div>
       </div>
     );
   }
@@ -80,28 +137,54 @@ export default function DashboardPage() {
             Welcome, {user?.firstName || 'there'}! 👋
           </h1>
 
-          {/* Setup Agent Card */}
-          <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-2xl p-8 text-center">
-            <div className="text-6xl mb-4">🤖</div>
-            <h2 className="text-2xl font-semibold mb-4">Set Up Your Agent</h2>
-            <p className="text-gray-400 mb-6 max-w-md mx-auto">
-              Configure your AI agent with your API key and preferences. 
-              It only takes a few minutes.
-            </p>
-            <Link
-              href="/dashboard/setup"
-              className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg font-semibold transition-colors"
-            >
-              Start Setup →
-            </Link>
-            <p className="mt-4 text-sm text-gray-500">
-              {plan === 'free' ? (
-                <>Need a plan? <Link href="/pricing" className="text-purple-400 hover:underline">View pricing</Link></>
-              ) : (
-                <>Plan: <span className="text-purple-400 capitalize">{plan}</span></>
-              )}
-            </p>
-          </div>
+          {/* Agent Status Card */}
+          {gatewayInfo ? (
+            <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-2xl p-8">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+                <h2 className="text-2xl font-semibold">Agent Online</h2>
+              </div>
+              <p className="text-gray-400 mb-6">
+                Your AI agent is ready and waiting. Start a conversation or configure integrations.
+              </p>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setShowChat(true)}
+                  className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg font-semibold transition-colors"
+                >
+                  💬 Open Chat
+                </button>
+                <Link
+                  href="/dashboard/setup"
+                  className="px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-semibold transition-colors"
+                >
+                  ⚙️ Settings
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-2xl p-8 text-center">
+              <div className="text-6xl mb-4">🤖</div>
+              <h2 className="text-2xl font-semibold mb-4">Set Up Your Agent</h2>
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                Configure your AI agent with your API key and preferences. 
+                It only takes a few minutes.
+              </p>
+              <Link
+                href="/dashboard/setup"
+                className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg font-semibold transition-colors"
+              >
+                Start Setup →
+              </Link>
+              <p className="mt-4 text-sm text-gray-500">
+                {plan === 'free' ? (
+                  <>Need a plan? <Link href="/pricing" className="text-purple-400 hover:underline">View pricing</Link></>
+                ) : (
+                  <>Plan: <span className="text-purple-400 capitalize">{plan}</span></>
+                )}
+              </p>
+            </div>
+          )}
 
           {/* Quick Links */}
           <div className="mt-12 grid md:grid-cols-3 gap-6">
@@ -110,11 +193,11 @@ export default function DashboardPage() {
               <h3 className="font-semibold mb-2">Documentation</h3>
               <p className="text-gray-400 text-sm">Learn what your agent can do</p>
             </div>
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-colors cursor-pointer">
+            <a href="https://discord.com/invite/clawd" target="_blank" rel="noopener noreferrer" className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-colors cursor-pointer">
               <div className="text-2xl mb-3">💬</div>
               <h3 className="font-semibold mb-2">Community</h3>
               <p className="text-gray-400 text-sm">Join our Discord server</p>
-            </div>
+            </a>
             <div className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-colors cursor-pointer">
               <div className="text-2xl mb-3">📧</div>
               <h3 className="font-semibold mb-2">Support</h3>

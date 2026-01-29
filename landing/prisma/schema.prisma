@@ -24,6 +24,10 @@ model User {
   // Browser context
   browserbaseContextId  String?
   
+  // Gateway connection (for webchat)
+  gatewayUrl            String?   // wss://test.automna.ai or user subdomain
+  gatewayToken          String?   // Token for WebSocket auth
+  
   // Timestamps
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt

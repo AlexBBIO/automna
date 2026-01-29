@@ -2,6 +2,7 @@ import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: Request) {
   // Get the Svix headers for verification
@@ -47,16 +48,30 @@ export async function POST(req: Request) {
     const primaryEmail = email_addresses?.[0]?.email_address;
 
     if (primaryEmail) {
+      // Create user in database
+      try {
+        await prisma.user.upsert({
+          where: { clerkId: id },
+          update: { email: primaryEmail },
+          create: {
+            clerkId: id,
+            email: primaryEmail,
+            plan: 'free',
+          },
+        });
+        console.log(`User created in DB: ${primaryEmail} (${id})`);
+      } catch (error) {
+        console.error('Failed to create user in DB:', error);
+      }
+
       // Add to Loops.so
       await addToLoops({
         email: primaryEmail,
         firstName: first_name || undefined,
         lastName: last_name || undefined,
         clerkId: id,
-        userGroup: 'users', // Distinguish from waitlist
+        userGroup: 'users',
       });
-      
-      console.log(`User created: ${primaryEmail} (${id})`);
     }
   }
 
@@ -65,6 +80,21 @@ export async function POST(req: Request) {
     const primaryEmail = email_addresses?.[0]?.email_address;
 
     if (primaryEmail) {
+      // Update user in database
+      try {
+        await prisma.user.upsert({
+          where: { clerkId: id },
+          update: { email: primaryEmail },
+          create: {
+            clerkId: id,
+            email: primaryEmail,
+            plan: 'free',
+          },
+        });
+      } catch (error) {
+        console.error('Failed to update user in DB:', error);
+      }
+
       // Update in Loops.so
       await addToLoops({
         email: primaryEmail,
@@ -77,10 +107,20 @@ export async function POST(req: Request) {
   }
 
   if (eventType === 'user.deleted') {
-    // Optionally unsubscribe from Loops
     const { id } = evt.data;
-    console.log(`User deleted: ${id}`);
-    // Could call Loops delete API here if needed
+    
+    // Delete user from database
+    if (id) {
+      try {
+        await prisma.user.delete({
+          where: { clerkId: id },
+        });
+        console.log(`User deleted from DB: ${id}`);
+      } catch (error) {
+        // User might not exist, that's fine
+        console.log(`User not found in DB for deletion: ${id}`);
+      }
+    }
   }
 
   return NextResponse.json({ success: true });
@@ -120,7 +160,6 @@ async function addToLoops(data: {
 
     if (!response.ok) {
       const error = await response.text();
-      // Contact already exists is fine - they may have been on waitlist
       if (!error.includes('already exists')) {
         console.error('Loops API error:', error);
       }
