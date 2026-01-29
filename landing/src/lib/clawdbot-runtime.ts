@@ -145,12 +145,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         
         // Handle history response
         if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
-          const history = msg.payload.messages.map((m: { id: string; role: string; content: string; createdAt?: string }) => ({
-            id: m.id,
-            role: m.role as 'user' | 'assistant',
-            content: [{ type: 'text', text: m.content }],
-            createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
-          }));
+          const history = msg.payload.messages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
+            // Content is already an array of parts from gateway
+            let content: Array<{ type: string; text?: string }>;
+            if (Array.isArray(m.content)) {
+              // Filter to only text parts (skip thinking, tool_use, etc.)
+              content = m.content.filter((p: { type: string }) => p.type === 'text');
+            } else if (typeof m.content === 'string') {
+              content = [{ type: 'text', text: m.content }];
+            } else {
+              content = [{ type: 'text', text: '' }];
+            }
+            return {
+              id: m.id,
+              role: m.role as 'user' | 'assistant',
+              content,
+              createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+            };
+          });
           if (mountedRef.current) setMessages(history);
           return;
         }
