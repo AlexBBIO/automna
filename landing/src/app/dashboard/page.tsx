@@ -1,7 +1,9 @@
 'use client';
 
 import { UserButton, useUser } from "@clerk/nextjs";
-import { useState } from "react";
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { AutomnaChat } from "@/components/AutomnaChat";
 
 const CreditCardIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -9,9 +11,6 @@ const CreditCardIcon = () => (
     <line x1="2" x2="22" y1="10" y2="10"/>
   </svg>
 );
-import Link from "next/link";
-import { useState, useEffect } from "react";
-import { AutomnaChat } from "@/components/AutomnaChat";
 
 interface GatewayInfo {
   gatewayUrl: string;
