@@ -303,6 +303,193 @@ Future tasks → Load contextId, already authenticated
 | Secrets | HashiCorp Vault or encrypted env vars |
 | Backups | Encrypted daily snapshots to Hetzner Storage Box |
 
+### Gateway Token Authentication
+
+Each customer's Clawdbot container requires a gateway token to connect. Here's the secure token flow:
+
+**Architecture:**
+```
+┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
+│   Dashboard     │      │   Token Service  │      │  User Container │
+│   (Next.js)     │      │   (API endpoint) │      │   (Clawdbot)    │
+└────────┬────────┘      └────────┬─────────┘      └────────┬────────┘
+         │                        │                         │
+         │ 1. User loads dashboard                          │
+         │ ──────────────────────►│                         │
+         │                        │                         │
+         │ 2. Request fresh token │                         │
+         │   (with Clerk session) │                         │
+         │ ──────────────────────►│                         │
+         │                        │                         │
+         │                        │ 3. Generate short-lived │
+         │                        │    token (5 min TTL)    │
+         │                        │ ───────────────────────►│
+         │                        │    (store in Redis)     │
+         │                        │                         │
+         │ 4. Return signed token │                         │
+         │ ◄──────────────────────│                         │
+         │                        │                         │
+         │ 5. Load iframe with token                        │
+         │ ─────────────────────────────────────────────────►
+         │   (POST /auth/exchange)                          │
+         │                        │                         │
+         │                        │ 6. Validate token       │
+         │                        │ ◄───────────────────────│
+         │                        │                         │
+         │                        │ 7. Issue session cookie │
+         │                        │ ───────────────────────►│
+         │                        │    (HttpOnly, 24h TTL)  │
+         │                        │                         │
+         │ 8. WebSocket connects with cookie                │
+         │ ◄─────────────────────────────────────────────────
+```
+
+**Token Types:**
+
+| Token | TTL | Storage | Purpose |
+|-------|-----|---------|---------|
+| Exchange Token | 5 min | Redis | One-time use, passed in URL/POST |
+| Session Cookie | 24 hours | Browser (HttpOnly) | Maintains WS connection |
+| Gateway Master | Permanent | Container config | Internal auth, never exposed |
+
+**Implementation:**
+
+1. **Token Service** (API endpoint on automna.ai):
+```typescript
+// POST /api/auth/gateway-token
+export async function POST(req: Request) {
+  // Verify Clerk session
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  
+  // Get user's container info
+  const user = await db.user.findUnique({ where: { clerkId: userId } });
+  if (!user?.containerId) return Response.json({ error: 'No agent' }, { status: 404 });
+  
+  // Generate short-lived exchange token
+  const exchangeToken = crypto.randomUUID();
+  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+  
+  // Store in Redis with user binding
+  await redis.set(`exchange:${exchangeToken}`, JSON.stringify({
+    userId: user.id,
+    containerId: user.containerId,
+    gatewayToken: user.gatewayToken, // The real token, encrypted
+    expiresAt
+  }), 'EX', 300);
+  
+  return Response.json({ 
+    exchangeToken,
+    expiresAt,
+    agentUrl: `https://${user.subdomain}.automna.ai`
+  });
+}
+```
+
+2. **Token Exchange** (endpoint on user's container):
+```typescript
+// POST /auth/exchange (proxied to container)
+export async function POST(req: Request) {
+  const { exchangeToken } = await req.json();
+  
+  // Validate with token service
+  const tokenData = await redis.get(`exchange:${exchangeToken}`);
+  if (!tokenData) return Response.json({ error: 'Invalid token' }, { status: 401 });
+  
+  // Delete immediately (one-time use)
+  await redis.del(`exchange:${exchangeToken}`);
+  
+  const { gatewayToken, expiresAt } = JSON.parse(tokenData);
+  if (Date.now() > expiresAt) return Response.json({ error: 'Expired' }, { status: 401 });
+  
+  // Set HttpOnly session cookie
+  const response = Response.json({ success: true });
+  response.headers.set('Set-Cookie', 
+    `gateway_session=${signedSessionToken}; HttpOnly; Secure; SameSite=Strict; Max-Age=86400`
+  );
+  return response;
+}
+```
+
+3. **Dashboard Integration**:
+```tsx
+// Dashboard loads agent chat
+export default function AgentChat() {
+  const [agentUrl, setAgentUrl] = useState<string | null>(null);
+  
+  useEffect(() => {
+    async function initAgent() {
+      // Get fresh exchange token from our API
+      const res = await fetch('/api/auth/gateway-token', { method: 'POST' });
+      const { exchangeToken, agentUrl } = await res.json();
+      
+      // Exchange token for session cookie via hidden form POST
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `${agentUrl}/auth/exchange`;
+      form.target = 'agent-frame';
+      
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'exchangeToken';
+      input.value = exchangeToken;
+      form.appendChild(input);
+      
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+      
+      setAgentUrl(agentUrl);
+    }
+    initAgent();
+  }, []);
+  
+  return (
+    <iframe 
+      name="agent-frame"
+      src={agentUrl ? `${agentUrl}/chat?session=main` : 'about:blank'}
+      className="w-full h-full"
+    />
+  );
+}
+```
+
+**Security Properties:**
+- ✅ Token never visible in URL/browser history
+- ✅ Exchange token expires in 5 minutes
+- ✅ Exchange token is one-time use (deleted on consumption)
+- ✅ Session cookie is HttpOnly (JS can't read it)
+- ✅ Session cookie is Secure + SameSite=Strict
+- ✅ Gateway master token never leaves container
+- ✅ Each customer has unique gateway token
+- ✅ Clerk session required to get exchange token
+
+**Clawdbot Config (per container):**
+```json
+{
+  "gateway": {
+    "auth": {
+      "mode": "token",
+      "token": "${GATEWAY_MASTER_TOKEN}"
+    },
+    "controlUi": {
+      "allowInsecureAuth": true,
+      "sessionAuth": {
+        "enabled": true,
+        "cookieName": "gateway_session",
+        "secret": "${SESSION_SECRET}"
+      }
+    }
+  }
+}
+```
+
+**Rotation & Revocation:**
+- Session cookies auto-expire after 24h
+- Exchange tokens auto-expire after 5 min
+- To revoke: rotate gateway master token in container config
+- On subscription cancel: destroy container (tokens become useless)
+
 ### Scaling Strategy
 
 | Users | Infrastructure | Monthly Cost |
