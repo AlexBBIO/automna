@@ -71,8 +71,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     connectSentRef.current = false;
     streamingTextRef.current = '';
     
-    console.log('[clawdbot] Connecting to', config.gatewayUrl);
-    const ws = new WebSocket(config.gatewayUrl);
+    // Build WebSocket URL - Moltworker expects /ws path with token in query
+    let wsUrl = config.gatewayUrl;
+    
+    // Ensure we have /ws path for Moltworker compatibility
+    if (!wsUrl.includes('/ws')) {
+      // Remove trailing slash if present
+      wsUrl = wsUrl.replace(/\/$/, '');
+      wsUrl = `${wsUrl}/ws`;
+    }
+    
+    // Add token as query parameter if provided
+    if (config.authToken) {
+      const separator = wsUrl.includes('?') ? '&' : '?';
+      wsUrl = `${wsUrl}${separator}token=${encodeURIComponent(config.authToken)}`;
+    }
+    
+    console.log('[clawdbot] Connecting to', wsUrl);
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
     
     let connectTimer: NodeJS.Timeout | null = null;
