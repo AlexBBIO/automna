@@ -1,24 +1,32 @@
 # Automna Implementation Plan
 
-**Last Updated:** 2026-01-29  
-**Status:** Phase 1 In Progress
+**Last Updated:** 2026-01-29 02:27 UTC  
+**Status:** Phase 1 Complete, Phase 2 In Progress
 
 ---
 
 ## Current Progress
 
-### ✅ Completed
+### ✅ Completed (Phase 1)
 - [x] Domain: automna.ai (Cloudflare DNS)
+- [x] Cloudflare: API token configured (`config/cloudflare.json`)
 - [x] Landing page: automna.ai (Vercel + Next.js)
-- [x] Clawdbot migration page: automna.ai/clawd
+- [x] Moltbot migration page: automna.ai/clawd (with lobster mascot)
+- [x] Pricing page: automna.ai/pricing
 - [x] Email waitlist: Loops.so integration
 - [x] Email inbox: automnajoi@agentmail.to (Agentmail)
 - [x] Browser automation: Browserbase account + API
 - [x] Stealth browser: Playwright + residential proxy (Smartproxy)
 - [x] GitHub repo: github.com/AlexBBIO/automna
-- [x] - [x] DNS verification for custom sending domain (mail.automna.ai)
+- [x] **Authentication: Clerk** (sign-in, sign-up, protected routes)
+- [x] **Payments: Stripe** (3 tiers, checkout, webhooks)
+- [x] **Billing Portal: Stripe Customer Portal** (manage subscription in user dropdown)
+- [x] **Dashboard: /dashboard** (authenticated, shows plan status)
 
-### 🔄 In Progress
+### 🔄 In Progress (Phase 2)
+- [ ] Database: Neon Postgres setup
+- [ ] User data persistence (API keys, settings)
+- [ ] Agent provisioning system
 
 
 ---
@@ -29,34 +37,27 @@
 
 | Service | Purpose | Status | Config Location |
 |---------|---------|--------|-----------------|
-| Cloudflare | DNS, SSL, DDoS, Tunnels | ✅ Done | automna.ai zone |
+| Cloudflare | DNS, SSL, DDoS, Tunnels | ✅ Done | config/cloudflare.json |
 | Vercel | Landing page hosting | ✅ Done | automna project |
 | Loops.so | Email marketing/waitlist | ✅ Done | config/loops.json |
 | Agentmail | Transactional email | ✅ Done | config/agentmail.json |
 | Browserbase | Cloud browser sessions | ✅ Done | config/browserbase.json |
-| Stripe | Payments | 🔲 TODO | - |
+| Clerk | Authentication | ✅ Done | config/clerk.json |
+| Stripe | Payments | ✅ Done | config/stripe.json |
+| Neon | Database | 🔲 TODO | - |
 | Hetzner | Agent hosting | 🔲 TODO | - |
 
-### 1.2 Authentication System
+### 1.2 Authentication System ✅ COMPLETE
 
-**Option A: Clerk (Recommended)**
-- Pros: Pre-built UI, social auth, good Next.js integration
-- Cons: $25/mo after 10k MAU
-- Implementation: 1-2 days
+**Choice:** Clerk
 
-**Option B: Auth.js (NextAuth)**
-- Pros: Free, flexible, self-hosted
-- Cons: More implementation work
-- Implementation: 3-4 days
-
-**Decision:** Use Clerk for MVP (faster), can migrate later.
-
-**Tasks:**
-- [ ] Create Clerk account
-- [ ] Add to Vercel environment
-- [ ] Implement auth pages (sign-up, sign-in)
-- [ ] Protect dashboard routes
-- [ ] Store user metadata (plan, API key encrypted)
+**Implemented:**
+- [x] Clerk account created
+- [x] Keys added to Vercel environment
+- [x] Sign-in page: `/sign-in` (dark themed)
+- [x] Sign-up page: `/sign-up` (dark themed)
+- [x] Middleware protecting `/dashboard/*` routes
+- [x] User metadata stores plan + Stripe customer ID
 
 ### 1.3 Database
 
@@ -464,6 +465,7 @@ At $79/mo Starter plan:
 | Hosting | Vercel + Hetzner | Landing on Vercel (free), agents on Hetzner (cheap) | 2026-01-28 |
 | Database | Neon Postgres | Serverless, free tier, Vercel integration | 2026-01-29 |
 | Auth | Clerk | Fast implementation, good UX | 2026-01-29 |
+| Payments | Stripe | Industry standard, reliable, good Clerk integration | 2026-01-29 |
 | Email marketing | Loops.so | Modern, good API, free tier | 2026-01-29 |
 | Transactional email | Agentmail | Built for AI agents, simple API | 2026-01-28 |
 | Browser | Browserbase | Persistent contexts, stealth, managed | 2026-01-28 |
@@ -474,21 +476,22 @@ At $79/mo Starter plan:
 ## Next Actions (This Week)
 
 ### Priority 1 (Must Do)
-1. [ ] Set up Stripe account and products
-2. [ ] Set up Neon database with Prisma
-3. [ ] Implement Clerk authentication
-4. [ ] Build basic dashboard layout
+1. [x] ~~Set up Stripe account and products~~ ✅
+2. [x] ~~Implement Clerk authentication~~ ✅
+3. [x] ~~Build basic dashboard layout~~ ✅
+4. [ ] Set up Neon database with Prisma
+5. [ ] User API key storage (encrypted)
 
 ### Priority 2 (Should Do)
-5. [ ] Build setup wizard (API key + name)
-6. [ ] Test Browserbase integration end-to-end
-7. [ ] Create Dockerfile for agent containers
-8. [ ] Set up Hetzner server
+6. [ ] Build setup wizard (API key + agent name)
+7. [ ] Test Browserbase integration end-to-end
+8. [ ] Create Dockerfile for agent containers
+9. [ ] Set up Hetzner server
 
 ### Priority 3 (Nice to Have)
-9. [ ] Discord integration guide
-10. [ ] Telegram integration guide
-11. [ ] Documentation site
+10. [ ] Discord integration guide
+11. [ ] Telegram integration guide
+12. [ ] Documentation site
 
 ---
 
@@ -498,13 +501,28 @@ At $79/mo Starter plan:
 /root/clawd/projects/automna/
 ├── SPEC.md              # Product specification
 ├── IMPLEMENTATION.md    # This file
-├── landing/             # Next.js landing page (Vercel)
+├── landing/             # Next.js app (Vercel)
 │   ├── src/app/
-│   │   ├── page.tsx     # Main landing
-│   │   ├── clawd/       # Clawdbot migration page
-│   │   └── api/         # API routes
-│   └── public/          # Static assets
-├── dashboard/           # (TODO) Dashboard app
+│   │   ├── page.tsx           # Main landing
+│   │   ├── clawd/             # Moltbot migration page
+│   │   ├── pricing/           # Pricing page
+│   │   ├── dashboard/         # User dashboard
+│   │   ├── sign-in/           # Clerk sign-in
+│   │   ├── sign-up/           # Clerk sign-up
+│   │   └── api/
+│   │       ├── waitlist/      # Loops.so integration
+│   │       ├── checkout/      # Stripe checkout
+│   │       ├── billing/portal # Stripe customer portal
+│   │       └── webhooks/stripe # Stripe webhooks
+│   └── public/
+│       └── lobster-mascot.png # Clawdbot mascot
+├── config/              # Service credentials (chmod 600)
+│   ├── cloudflare.json
+│   ├── clerk.json
+│   ├── stripe.json
+│   ├── loops.json
+│   ├── agentmail.json
+│   └── browserbase.json
 ├── provisioner/         # (TODO) Container provisioning service
 └── config/              # Service credentials
     ├── loops.json
