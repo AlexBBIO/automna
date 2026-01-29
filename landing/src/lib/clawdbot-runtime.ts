@@ -120,10 +120,18 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
   const connectSentRef = useRef(false);
   const connectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
 
   // Connect to gateway
   useEffect(() => {
+    // Skip if no gateway URL
+    if (!config.gatewayUrl) {
+      console.log('[clawdbot] No gateway URL, skipping connection');
+      return;
+    }
+    
     console.log('[clawdbot] Connecting to', config.gatewayUrl);
+    mountedRef.current = true;
     connectSentRef.current = false;
     
     const ws = new WebSocket(config.gatewayUrl);
@@ -162,6 +170,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     };
 
     return () => {
+      console.log('[clawdbot] Cleanup - closing WebSocket');
+      mountedRef.current = false;
       if (connectTimerRef.current) {
         clearTimeout(connectTimerRef.current);
       }
