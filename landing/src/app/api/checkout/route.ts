@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia',
-});
+// Initialize Stripe lazily to avoid build-time errors
+const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 // Price IDs - these will be created in Stripe dashboard
 // For now, we'll create them dynamically or use price lookup
@@ -34,6 +33,8 @@ export async function POST(request: Request) {
 
     // Check if user already has a Stripe customer ID
     let customerId = user.publicMetadata?.stripeCustomerId as string | undefined;
+
+    const stripe = getStripe();
 
     if (!customerId) {
       // Create a new customer
