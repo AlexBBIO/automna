@@ -28,14 +28,29 @@ export async function POST() {
       );
     }
     
+    // Check if this is the test user (grandathrawn)
+    const isTestUser = email === 'grandathrawn@gmail.com';
+    
     // Upsert user in database
     const user = await prisma.user.upsert({
       where: { clerkId },
-      update: { email },
+      update: { 
+        email,
+        // Auto-configure gateway for test user
+        ...(isTestUser && {
+          gatewayUrl: 'wss://test.automna.ai',
+          gatewayToken: 'test123',
+        }),
+      },
       create: {
         clerkId,
         email,
         plan: 'free',
+        // Auto-configure gateway for test user
+        ...(isTestUser && {
+          gatewayUrl: 'wss://test.automna.ai',
+          gatewayToken: 'test123',
+        }),
       },
     });
     
