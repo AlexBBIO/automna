@@ -56,29 +56,37 @@ export async function POST(request: Request) {
         email: user.emailAddresses[0]?.emailAddress || '',
         anthropicKeyEncrypted: encryptedApiKey,
       },
+      include: { agents: true },
     });
 
+    // Check if user already has an agent
+    const existingAgent = dbUser.agents?.[0];
+
     // Create or update agent
-    const agent = await prisma.agent.upsert({
-      where: {
-        id: dbUser.agents?.[0]?.id || 'new-agent',
-      },
-      update: {
-        name: agentName,
-        personality: personality || null,
-        discordConfig: encryptedDiscord,
-        telegramConfig: encryptedTelegram,
-        status: 'pending', // Ready for deployment
-      },
-      create: {
-        userId: dbUser.id,
-        name: agentName,
-        personality: personality || null,
-        discordConfig: encryptedDiscord,
-        telegramConfig: encryptedTelegram,
-        status: 'pending',
-      },
-    });
+    let agent;
+    if (existingAgent) {
+      agent = await prisma.agent.update({
+        where: { id: existingAgent.id },
+        data: {
+          name: agentName,
+          personality: personality || null,
+          discordConfig: encryptedDiscord,
+          telegramConfig: encryptedTelegram,
+          status: 'pending',
+        },
+      });
+    } else {
+      agent = await prisma.agent.create({
+        data: {
+          userId: dbUser.id,
+          name: agentName,
+          personality: personality || null,
+          discordConfig: encryptedDiscord,
+          telegramConfig: encryptedTelegram,
+          status: 'pending',
+        },
+      });
+    }
 
     // Generate Clawdbot config (for future container deployment)
     const clawdbotConfig = generateClawdbotConfig({

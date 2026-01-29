@@ -61,11 +61,13 @@ export default function DashboardPage() {
                 },
               }}
             >
-              <UserButton.Action
-                label="Manage Subscription"
-                labelIcon={<CreditCardIcon />}
-                onClick={handleManageBilling}
-              />
+              <UserButton.MenuItems>
+                <UserButton.Action
+                  label="Manage Subscription"
+                  labelIcon={<CreditCardIcon />}
+                  onClick={handleManageBilling}
+                />
+              </UserButton.MenuItems>
             </UserButton>
           </div>
         </div>
