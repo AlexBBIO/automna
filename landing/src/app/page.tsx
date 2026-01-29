@@ -1,12 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function Home() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [waitlistCount, setWaitlistCount] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/waitlist/count')
+      .then(res => res.json())
+      .then(data => setWaitlistCount(data.count || 0))
+      .catch(() => setWaitlistCount(0));
+  }, [submitted]); // Refetch after submission
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +106,7 @@ export default function Home() {
                 </button>
               </form>
               <p className="text-gray-500 text-sm mt-4">
-                Join 0 others on the waitlist · Starting at $30/month
+                Join {waitlistCount > 0 ? `${waitlistCount} others` : 'the waitlist'} · Starting at $30/month
               </p>
             </div>
           ) : (
