@@ -580,7 +580,7 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 ## Timeline
 
 ### Week 1-2: Validation
-- [ ] Register domain (automna.ai)
+- [x] Register domain (automna.ai) ✓ 2026-01-28
 - [ ] Build landing page
 - [ ] Set up waitlist (email capture)
 - [ ] Post to Reddit, HN, Twitter
@@ -612,6 +612,31 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 - [ ] Full pricing tiers
 - [ ] Referral program
 - [ ] Content marketing
+
+---
+
+## Current Status (2026-01-29)
+
+### ✅ Completed
+- Domain registered: automna.ai
+- Browserbase account created + API integrated (contexts for per-customer browser sessions)
+- Agentmail set up: automnajoi@agentmail.to (transactional email for notifications)
+- Discord bot created: Automna#4978 (App ID: 1466131766015332382)
+- Initial product spec drafted
+
+### 🔧 Infrastructure Ready
+| Service | Status | Notes |
+|---------|--------|-------|
+| Domain | ✅ Ready | automna.ai registered |
+| Browser Service | ✅ Ready | Browserbase free tier (1hr/mo) |
+| Email | ✅ Ready | Agentmail transactional |
+| Discord Bot | ✅ Created | Token stored, needs features |
+| Hetzner Server | ✅ Existing | Current server can host MVP |
+
+### 🎯 Next Steps (Priority Order)
+1. **Landing page** — Simple page with waitlist capture on Cloudflare Pages
+2. **Bot functionality** — Basic Clawdbot features in Discord bot
+3. **Waitlist validation** — Post to Reddit/HN, gauge demand before building full platform
 
 ---
 

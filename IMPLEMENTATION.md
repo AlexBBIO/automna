@@ -1,7 +1,7 @@
 # Automna Implementation Plan
 
-**Last Updated:** 2026-01-29 02:27 UTC  
-**Status:** Phase 1 Complete, Phase 2 In Progress
+**Last Updated:** 2026-01-29 03:07 UTC  
+**Status:** Phase 1 Complete, Phase 2 In Progress (Setup Wizard Done)
 
 ---
 
@@ -23,7 +23,7 @@
 - [x] **Billing Portal: Stripe Customer Portal** (manage subscription in user dropdown)
 - [x] **Dashboard: /dashboard** (authenticated, shows plan status)
 
-### 🔄 In Progress (Phase 2)
+### 🔄 In Progress (Phase 3 - Infrastructure)
 - [x] Database: Neon Postgres setup ✅
 - [x] Prisma schema (User, Agent models) ✅
 - [x] Setup wizard UI (`/dashboard/setup`) ✅
@@ -31,6 +31,8 @@
 - [x] Encrypted storage for API keys ✅
 - [ ] Container provisioning (Hetzner + Docker)
 - [ ] Clawdbot config generation + injection
+- [ ] Cloudflare Tunnel setup for agent subdomains
+- [ ] Agent deployment endpoint (actually spin up Clawdbot)
 
 
 ---
@@ -48,7 +50,7 @@
 | Browserbase | Cloud browser sessions | ✅ Done | config/browserbase.json |
 | Clerk | Authentication | ✅ Done | config/clerk.json |
 | Stripe | Payments | ✅ Done | config/stripe.json |
-| Neon | Database | 🔲 TODO | - |
+| Neon | Database | ✅ Done | Vercel env vars |
 | Hetzner | Agent hosting | 🔲 TODO | - |
 
 ### 1.2 Authentication System ✅ COMPLETE
@@ -107,11 +109,11 @@ CREATE TABLE integrations (
 ```
 
 **Tasks:**
-- [ ] Create Neon account
-- [ ] Set up database
-- [ ] Create Prisma schema
-- [ ] Add to Vercel environment
-- [ ] Run migrations
+- [x] Create Neon account ✅
+- [x] Set up database ✅
+- [x] Create Prisma schema ✅
+- [x] Add to Vercel environment ✅
+- [x] Run migrations ✅
 
 ### 1.4 Stripe Integration
 
@@ -516,23 +518,31 @@ At $79/mo Starter plan:
 
 ## Next Actions (This Week)
 
-### Priority 1 (Must Do)
-1. [x] ~~Set up Stripe account and products~~ ✅
-2. [x] ~~Implement Clerk authentication~~ ✅
-3. [x] ~~Build basic dashboard layout~~ ✅
-4. [ ] Set up Neon database with Prisma
-5. [ ] User API key storage (encrypted)
+### ✅ Completed
+1. [x] Set up Stripe account and products ✅
+2. [x] Implement Clerk authentication ✅
+3. [x] Build basic dashboard layout ✅
+4. [x] Set up Neon database with Prisma ✅
+5. [x] User API key storage (encrypted) ✅
+6. [x] Build setup wizard (API key + agent name + integrations) ✅
+7. [x] API key validation endpoint ✅
+
+### Priority 1 (Must Do Next)
+1. [ ] Create Dockerfile for Clawdbot agent containers
+2. [ ] Set up Docker on Hetzner server (or use existing)
+3. [ ] Build provisioning API endpoint (`/api/agent/deploy`)
+4. [ ] Cloudflare Tunnel config for `{username}.automna.ai`
+5. [ ] Connect setup wizard "Deploy" step to actual container spin-up
 
 ### Priority 2 (Should Do)
-6. [ ] Build setup wizard (API key + agent name)
-7. [ ] Test Browserbase integration end-to-end
-8. [ ] Create Dockerfile for agent containers
-9. [ ] Set up Hetzner server
+6. [ ] Agent status monitoring (is container running?)
+7. [ ] Dashboard shows real agent status, not placeholder
+8. [ ] Test end-to-end: signup → setup → deploy → chat works
 
 ### Priority 3 (Nice to Have)
-10. [ ] Discord integration guide
-11. [ ] Telegram integration guide
-12. [ ] Documentation site
+9. [ ] Discord integration guide in setup wizard
+10. [ ] Telegram integration guide in setup wizard
+11. [ ] Documentation site
 
 ---
 
