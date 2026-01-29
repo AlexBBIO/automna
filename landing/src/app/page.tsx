@@ -47,9 +47,12 @@ export default function Home() {
         <div className="text-2xl font-bold tracking-tight">
           <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
         </div>
-        <div className="flex gap-6 text-gray-400 text-sm">
+        <div className="flex items-center gap-6 text-gray-400 text-sm">
           <Link href="/privacy" className="hover:text-white transition">Privacy</Link>
           <Link href="/terms" className="hover:text-white transition">Terms</Link>
+          <Link href="/sign-in" className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition">
+            Sign In
+          </Link>
         </div>
       </nav>
 
