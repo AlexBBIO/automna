@@ -29,14 +29,12 @@ export default function JoiPage() {
         }, 50);
         return () => clearTimeout(timeout);
       } else {
-        // Finished typing, wait then move to next
         const timeout = setTimeout(() => {
           setIsTyping(false);
         }, 3000);
         return () => clearTimeout(timeout);
       }
     } else {
-      // Reset and move to next quote
       const timeout = setTimeout(() => {
         setDisplayedEnd('');
         setCurrentQuote((prev) => (prev + 1) % quotes.length);
@@ -50,17 +48,12 @@ export default function JoiPage() {
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-black to-cyan-900/20" />
-      
-      {/* Rain effect */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="rain" />
-      </div>
 
       {/* Main content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
         
         {/* Joi hologram image */}
-        <div className="relative w-full max-w-2xl aspect-square mb-8">
+        <div className="relative w-full max-w-2xl aspect-video mb-8">
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10" />
           <Image
             src="/joi-hero.png"
@@ -71,13 +64,6 @@ export default function JoiPage() {
               filter: 'drop-shadow(0 0 30px rgba(236, 72, 153, 0.5)) drop-shadow(0 0 60px rgba(6, 182, 212, 0.3))',
             }}
           />
-          
-          {/* Glitch lines effect */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="h-px bg-cyan-400/30 absolute w-full" style={{ top: '20%', animation: 'glitch 3s infinite' }} />
-            <div className="h-px bg-pink-400/30 absolute w-full" style={{ top: '45%', animation: 'glitch 2.5s infinite reverse' }} />
-            <div className="h-px bg-cyan-400/30 absolute w-full" style={{ top: '70%', animation: 'glitch 4s infinite' }} />
-          </div>
         </div>
 
         {/* Speech bubble / Quote area */}
@@ -85,7 +71,7 @@ export default function JoiPage() {
           <div className="text-3xl md:text-5xl font-light tracking-wide">
             <span className="text-pink-400">{quotes[currentQuote].start}</span>
           </div>
-          <div className="text-3xl md:text-5xl font-bold mt-2 min-h-[3rem]">
+          <div className="text-3xl md:text-5xl font-bold mt-2 min-h-[4rem]">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-400">
               {displayedEnd}
             </span>
@@ -114,30 +100,6 @@ export default function JoiPage() {
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes glitch {
-          0%, 100% { opacity: 0; transform: translateX(0); }
-          10% { opacity: 1; transform: translateX(-2px); }
-          20% { opacity: 0; transform: translateX(2px); }
-          30% { opacity: 1; transform: translateX(0); }
-          40% { opacity: 0; }
-        }
-        
-        .rain {
-          position: absolute;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(transparent 0%, rgba(6, 182, 212, 0.1) 50%, transparent 100%);
-          background-size: 2px 20px;
-          animation: rain 0.5s linear infinite;
-        }
-        
-        @keyframes rain {
-          0% { background-position: 0 0; }
-          100% { background-position: 0 20px; }
-        }
-      `}</style>
     </div>
   );
 }
