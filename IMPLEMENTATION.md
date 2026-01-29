@@ -24,9 +24,13 @@
 - [x] **Dashboard: /dashboard** (authenticated, shows plan status)
 
 ### 🔄 In Progress (Phase 2)
-- [ ] Database: Neon Postgres setup
-- [ ] User data persistence (API keys, settings)
-- [ ] Agent provisioning system
+- [x] Database: Neon Postgres setup ✅
+- [x] Prisma schema (User, Agent models) ✅
+- [x] Setup wizard UI (`/dashboard/setup`) ✅
+- [x] API key validation endpoint ✅
+- [x] Encrypted storage for API keys ✅
+- [ ] Container provisioning (Hetzner + Docker)
+- [ ] Clawdbot config generation + injection
 
 
 ---
@@ -183,7 +187,44 @@ Step 5: Deploy
 └── "Your agent is live!" 🎉
 ```
 
-### 2.3 Agent Chat Interface
+### 2.3 Setup Wizard ✅ IMPLEMENTED
+
+**Location:** `/dashboard/setup`
+
+**Flow:**
+```
+Step 1: API Key
+├── User enters Anthropic API key (sk-ant-...)
+├── Validated via test API call to Anthropic
+└── Encrypted with AES-256-CBC, stored in Neon
+
+Step 2: Agent Basics
+├── Agent name (required)
+├── Personality/system prompt (optional)
+└── Timezone selection
+
+Step 3: Integrations
+├── Web Chat: Always enabled
+├── Discord: Optional bot token
+└── Telegram: Optional bot token
+
+Step 4: Deploy
+├── Summary of configuration
+├── Creates User + Agent records in DB
+├── Generates Clawdbot config template
+└── Status: "pending" (awaiting container infrastructure)
+```
+
+**API Routes:**
+- `POST /api/setup/validate-key` - Tests Anthropic API key
+- `POST /api/setup/deploy` - Saves config, creates agent record
+
+**Security:**
+- API keys encrypted with AES-256-CBC
+- Encryption key stored in Vercel env (ENCRYPTION_KEY)
+- Tokens never logged or exposed
+
+### 2.4 Agent Chat Interface
 
 **Requirements:**
 - Real-time messaging (WebSocket or SSE)
