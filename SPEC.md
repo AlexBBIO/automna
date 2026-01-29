@@ -239,12 +239,65 @@ services:
       - agent_network
 ```
 
+### Browser Service (Browserbase)
+
+Agents need real browser capabilities for web automation, OAuth logins, and sites that require JavaScript. Rather than running full browsers in each container (heavy, expensive), we use **Browserbase** — a cloud browser service.
+
+**Why Browserbase:**
+- Persistent contexts (sessions) per customer
+- Customers log into Gmail/Twitter/etc once, stays logged in
+- Stealth mode + auto captcha solving included
+- Isolated per customer — no credential cross-contamination
+- Pay-per-use, no heavy browser in each container
+
+**Pricing (Jan 2026):**
+| Plan | Cost | Browser Hours | Concurrent Sessions |
+|------|------|---------------|---------------------|
+| Free | $0/mo | 1 hour | 1 |
+| Developer | $20/mo | 100 hours | 25 |
+| Startup | $99/mo | 500 hours | 100 |
+| Scale | Custom | Usage-based | 250+ |
+
+Overage: ~$0.10-0.12/browser hour
+
+**Architecture:**
+```
+User signs up → Create Browserbase context (contextId)
+First browser task → Start session with contextId, user logs in
+Future tasks → Load contextId, already authenticated
+```
+
+**Implementation:**
+- Store `contextId` per customer in our database
+- Agent calls Browserbase API when browser needed
+- Sessions persist cookies, localStorage, auth tokens
+- Contexts live indefinitely until deleted
+
+**Cost per customer:** Minimal — most users need <1 hour/month of browser time. Heavy users (lots of scraping) might use 5-10 hours. At $0.10/hour, this is $0.10-$1/month per user.
+
+**Integration with Clawdbot:**
+- Create Clawdbot skill or tool that wraps Browserbase SDK
+- Agent can: `browser_open(url)`, `browser_login(site)`, `browser_screenshot()`, etc.
+- Transparent to end user — "browse to X" just works
+
+**Security:**
+- Each customer gets isolated browser context
+- Credentials stored in Browserbase (not our database)
+- API key scoped per project
+- Can delete context on customer churn
+
+**Links:**
+- Docs: https://docs.browserbase.com
+- Contexts: https://docs.browserbase.com/features/contexts
+- Pricing: https://www.browserbase.com/pricing
+
 ### Security Model
 
 | Layer | Implementation |
 |-------|----------------|
 | API Keys | Encrypted at rest (AES-256), never logged |
 | User Isolation | Separate containers, no shared filesystems |
+| Browser Sessions | Browserbase contexts, isolated per customer |
 | Network | Internal Docker network, only exposed via Traefik |
 | Access | Cloudflare Access for admin, JWT for users |
 | Secrets | HashiCorp Vault or encrypted env vars |
