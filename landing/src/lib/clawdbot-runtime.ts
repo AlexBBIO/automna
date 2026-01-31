@@ -167,16 +167,25 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           if (wsMessages.length === 0) {
             console.log('[clawdbot] WebSocket history empty, trying HTTP API fallback');
             const cfg = configRef.current;
-            // Convert wss:// to https:// and remove /ws path and query params
-            const httpUrl = cfg.gatewayUrl
-              .replace(/^wss:\/\//, 'https://')
-              .replace(/^ws:\/\//, 'http://')
-              .replace(/\/ws$/, '')
-              .replace(/\?.*$/, '');
+            // Convert wss:// to https:// and extract auth params
+            const wsUrl = new URL(cfg.gatewayUrl);
+            const httpUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
             const sessionKey = cfg.sessionKey || 'main';
-            console.log('[clawdbot] HTTP fallback URL:', `${httpUrl}/api/history?sessionKey=${sessionKey}`);
             
-            fetch(`${httpUrl}/api/history?sessionKey=${encodeURIComponent(sessionKey)}`)
+            // Build URL with auth params from WebSocket URL
+            const historyUrl = new URL(`${httpUrl}/ws/api/history`);
+            historyUrl.searchParams.set('sessionKey', sessionKey);
+            // Pass through auth params (userId, exp, sig)
+            const userId = wsUrl.searchParams.get('userId');
+            const exp = wsUrl.searchParams.get('exp');
+            const sig = wsUrl.searchParams.get('sig');
+            if (userId) historyUrl.searchParams.set('userId', userId);
+            if (exp) historyUrl.searchParams.set('exp', exp);
+            if (sig) historyUrl.searchParams.set('sig', sig);
+            
+            console.log('[clawdbot] HTTP fallback URL:', historyUrl.toString());
+            
+            fetch(historyUrl.toString())
               .then(res => res.json())
               .then(data => {
                 if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
