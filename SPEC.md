@@ -209,33 +209,53 @@ We have two viable infrastructure approaches:
 
 ### Multi-User Isolation (Current Implementation)
 
+**✅ VERIFIED WORKING (2026-01-31)**
+
 Each user gets fully isolated resources via Cloudflare's Sandbox SDK:
 
 ```
-User A ──► wss://moltbot.../ws?userId=user_abc&token=X
-              │
-              ▼
-         getSandbox(env, "user_abc")
-              │
-              ▼
-         Isolated container + R2 storage at /users/user_abc/...
+User A (Clerk) ──► Signed URL (userId + exp + sig)
+                       │
+                       ▼
+                  Worker validates signature
+                       │
+                       ▼
+                  getSandbox(env, "user-user_abc")
+                       │
+                       ▼
+                  Isolated DO → Container → R2 at /data/moltbot/users/user_abc/
 
-User B ──► wss://moltbot.../ws?userId=user_def&token=X
-              │
-              ▼
-         getSandbox(env, "user_def")
-              │
-              ▼
-         Isolated container + R2 storage at /users/user_def/...
+User B (Clerk) ──► Signed URL (userId + exp + sig)
+                       │
+                       ▼
+                  Worker validates signature
+                       │
+                       ▼
+                  getSandbox(env, "user-user_def")
+                       │
+                       ▼
+                  Isolated DO → Container → R2 at /data/moltbot/users/user_def/
 ```
 
 **Key Points:**
 - Single Moltworker deployment handles all users
-- Isolation via Durable Objects keyed by userId (Clerk ID)
-- R2 storage prefixed by userId for data isolation
-- Cold start ~10s warm, 1-2min cold (if container slept)
+- Signed URLs (HMAC-SHA256) prevent userId tampering
+- Isolation via Durable Objects keyed by `user-{clerkUserId}` (lowercased)
+- Each DO gets its own container instance
+- R2 storage isolated at `/data/moltbot/users/{userId}/`
+- Cold start: 30-90s (container + R2 mount + gateway boot)
+- Warm: instant
 
-**See:** `docs/multi-user-isolation.md` for full implementation spec.
+**Current Limits:**
+- `max_instances: 10` (adjustable in wrangler.jsonc)
+- Container type: standard-4 (upgradeable)
+
+**⚠️ Known Issues:**
+- Deploy resets cause "code was updated" errors (~60s disruption)
+- Cold starts are slow (serverless tradeoff)
+- HTTP history fallback needs signed URL params (TODO)
+
+**📚 Full documentation:** [`docs/MULTI-USER-ISOLATION.md`](docs/MULTI-USER-ISOLATION.md)
 
 ---
 
