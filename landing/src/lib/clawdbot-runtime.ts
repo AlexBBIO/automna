@@ -160,8 +160,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         }
         
         // Handle history response
+        console.log('[clawdbot] Checking for history response:', { type: msg.type, ok: msg.ok, payloadType: typeof msg.payload, hasMessages: Array.isArray(msg.payload?.messages), msgCount: msg.payload?.messages?.length });
         if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
           const wsMessages = msg.payload.messages;
+          console.log('[clawdbot] Got WebSocket history:', wsMessages.length, 'messages');
           
           // If WebSocket history is empty, try HTTP API fallback
           if (wsMessages.length === 0) {
@@ -186,8 +188,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             console.log('[clawdbot] HTTP fallback URL:', historyUrl.toString());
             
             fetch(historyUrl.toString())
-              .then(res => res.json())
+              .then(res => {
+                console.log('[clawdbot] HTTP fallback response status:', res.status);
+                return res.json();
+              })
               .then(data => {
+                console.log('[clawdbot] HTTP fallback data:', JSON.stringify(data).slice(0, 500));
                 if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
                   console.log(`[clawdbot] HTTP API returned ${data.messages.length} messages`);
                   const history = data.messages.map((m: { role: string; content: unknown; timestamp?: number }, idx: number) => {
