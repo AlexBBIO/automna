@@ -30,6 +30,45 @@
 | Discord integration | ❌ Not started | Need setup flow in dashboard |
 | Telegram integration | ❌ Not started | Need setup flow in dashboard |
 
+### 🎯 MVP Features (2026-01-31)
+
+**See [`docs/MVP-STEPS.md`](docs/MVP-STEPS.md) for full implementation details.**
+
+| Feature | Priority | Effort | Status |
+|---------|----------|--------|--------|
+| **Load Time Optimization** | P0 | 11h | Planned |
+| └─ Keep-alive pings | P0 | 2h | |
+| └─ Optimistic UI loading | P0 | 1h | |
+| └─ Progressive loading states | P0 | 4h | |
+| └─ Prewarming on login | P1 | 4h | |
+| **History Performance** | P0 | 11h | Planned |
+| └─ Parallel HTTP fetch | P0 | 2h | |
+| └─ Lazy load old messages | P1 | 3h | |
+| └─ R2 cache for history | P1 | 6h | |
+| **File Management** | P0 | 16h | Planned |
+| └─ File tree API + UI | P0 | 6h | |
+| └─ Markdown viewer/editor | P0 | 4h | |
+| └─ Upload/download files | P0 | 4h | |
+| └─ Agent memory viewer | P1 | 2h | |
+| **Chat UI Improvements** | P0 | 12h | Planned |
+| └─ Visual polish | P0 | 3h | |
+| └─ Typing indicator | P0 | 1h | |
+| └─ Code blocks + copy | P0 | 2h | |
+| └─ Better input + actions | P1 | 4h | |
+| └─ Keyboard shortcuts | P2 | 2h | |
+| **Multiple Channels** | P1 | 9h | Planned |
+| └─ Channels API | P1 | 3h | |
+| └─ Channel sidebar UI | P1 | 4h | |
+| └─ Create/delete/switch | P1 | 2h | |
+
+**Total MVP Effort: ~59 hours (2 weeks)**
+
+**Target Metrics:**
+- Cold start: <15s (with progress indicator)
+- Warm load: <2s
+- History load: <1s
+- File tree load: <500ms
+
 ### 💳 Stripe Integration (Configured)
 
 **Products & Pricing:**
