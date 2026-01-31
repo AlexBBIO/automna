@@ -8,27 +8,57 @@
 
 ---
 
-## Current Status (2026-01-29)
+## Current Status (2026-01-31)
 
 ### ✅ Working
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Landing page | ✅ Live | automna.ai on Vercel |
 | Clerk auth | ✅ Working | Sign up/sign in functional |
+| Stripe billing | ✅ Working | Checkout, webhooks, portal all functional |
 | Cloudflare Moltworker | ✅ Working | moltbot-sandbox.alex-0bb.workers.dev |
-| Per-user sandboxes | ✅ Working | Isolated via Durable Objects |
+| Per-user sandboxes | ✅ Working | Isolated via Durable Objects + R2 paths |
 | WebSocket chat | ✅ Working | Signed URL auth → token injection |
-| R2 persistence | ✅ Configured | Secrets set, sync enabled |
+| R2 persistence | ✅ Working | Per-user paths, 30s background sync |
 | Anthropic integration | ✅ Working | API key configured |
 
 ### 🔧 Needs Work
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Dashboard UI | 🔧 Basic | Needs polish, status indicators |
-| Per-user API keys | ❌ Not started | Currently all users share one key |
-| Usage metering | ❌ Not started | No billing/limits yet |
-| Discord integration | ❌ Not started | Need setup flow |
-| Telegram integration | ❌ Not started | Need setup flow |
+| Dashboard UI | 🔧 Basic | Needs status indicators, settings |
+| Per-user API keys | ❌ Not started | Currently all users share platform key |
+| Discord integration | ❌ Not started | Need setup flow in dashboard |
+| Telegram integration | ❌ Not started | Need setup flow in dashboard |
+
+### 💳 Stripe Integration (Configured)
+
+**Products & Pricing:**
+
+| Plan | Price | Price ID | Features |
+|------|-------|----------|----------|
+| Starter | $79/mo | `price_1Sukg0LgmKPRkIsH6PMVR7BR` | 1 agent, web chat, 1 integration, 30-day memory |
+| Pro | $149/mo | `price_1SukgALgmKPRkIsHmfwtzyl6` | All integrations, browser, email inbox, unlimited memory |
+| Business | $299/mo | `price_1SukgBLgmKPRkIsHBcNE7azu` | 3 agents, team workspace, API access, analytics |
+
+**Webhook Events Handled:**
+- `checkout.session.completed` → Creates/updates user subscription
+- `customer.subscription.updated` → Updates plan in Clerk metadata
+- `customer.subscription.deleted` → Downgrades user to free
+
+**Routes:**
+- `/api/checkout` → Creates Stripe checkout session
+- `/api/billing/portal` → Redirects to Stripe billing portal
+- `/api/webhooks/stripe` → Handles Stripe events
+
+**Environment Variables (Vercel):**
+```
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+NEXT_PUBLIC_STRIPE_PRICE_STARTER=price_...
+NEXT_PUBLIC_STRIPE_PRICE_PRO=price_...
+NEXT_PUBLIC_STRIPE_PRICE_BUSINESS=price_...
+```
 
 ### 🔑 Secrets Configured (moltbot-sandbox)
 - `ANTHROPIC_API_KEY` ✅
