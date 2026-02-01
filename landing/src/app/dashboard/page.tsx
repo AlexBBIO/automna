@@ -226,11 +226,25 @@ export default function DashboardPage() {
   if (gatewayInfo) {
     return (
       <div className="h-screen bg-gray-950 flex flex-col">
-        {/* Minimal nav */}
-        <nav className="border-b border-gray-800 bg-black/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
-          <Link href="/" className="text-xl font-bold tracking-tight">
-            <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
-          </Link>
+        {/* Persistent nav header */}
+        <nav className="border-b border-gray-800 bg-black/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            {/* Mobile: Hamburger button */}
+            {sidebarHidden && (
+              <button
+                onClick={() => setSidebarHidden(false)}
+                className="p-2 -ml-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors md:hidden"
+                title="Open sidebar"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            )}
+            <Link href="/" className="text-xl font-bold tracking-tight">
+              <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
+            </Link>
+          </div>
           <div className="flex items-center gap-3">
             <UserButton>
               <UserButton.MenuItems>
@@ -243,19 +257,7 @@ export default function DashboardPage() {
             </UserButton>
           </div>
         </nav>
-        <div className="flex-1 flex relative">
-          {/* Mobile: Floating button to open sidebar */}
-          {sidebarHidden && (
-            <button
-              onClick={() => setSidebarHidden(false)}
-              className="absolute top-3 left-3 z-10 p-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg shadow-lg transition-colors md:hidden"
-              title="Open channels"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          )}
+        <div className="flex-1 flex overflow-hidden">
           
           {/* Channel sidebar - hidden on mobile by default */}
           {!sidebarHidden && (
