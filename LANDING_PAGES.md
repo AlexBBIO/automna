@@ -4,9 +4,9 @@
 
 | Page | URL | Status | Description |
 |------|-----|--------|-------------|
-| Original | [automna.ai/](https://automna.ai/) | Live | Initial landing page |
-| V2 | [automna.ai/landing2](https://automna.ai/landing2) | Live | Research-informed redesign |
-| V3 | [automna.ai/landing3](https://automna.ai/landing3) | Live | Full research implementation |
+| Main | [automna.ai/](https://automna.ai/) | **Live (V3)** | Full research implementation |
+| V2 | [automna.ai/landing2](https://automna.ai/landing2) | Archive | Research-informed redesign |
+| V3 | [automna.ai/landing3](https://automna.ai/landing3) | Archive | Same as main |
 
 ---
 
