@@ -1,3 +1,6 @@
+# Copy this into .github/workflows/test.yml
+
+```yaml
 name: Tests
 
 on:
@@ -25,7 +28,7 @@ jobs:
         run: npm ci
       
       - name: Run Landing Tests
-          working-directory: landing
+        working-directory: landing
         run: npm run test:run
       
       - name: Install Moltworker Dependencies
@@ -35,3 +38,4 @@ jobs:
       - name: Run Moltworker Tests
         working-directory: moltworker
         run: npm test
+```
