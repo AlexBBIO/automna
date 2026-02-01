@@ -5,15 +5,15 @@ import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AutomnaChat } from "@/components/AutomnaChat";
 import { ChatSkeleton } from "@/components/ChatSkeleton";
-import { ChannelSidebar } from "@/components/ChannelSidebar";
+import { ConversationSidebar } from "@/components/ConversationSidebar";
 
-interface Channel {
+interface Conversation {
   key: string;
   name: string;
   icon: string;
 }
 
-const DEFAULT_CHANNELS: Channel[] = [
+const DEFAULT_CONVERSATIONS: Conversation[] = [
   { key: 'main', name: 'General', icon: '💬' },
 ];
 
@@ -38,15 +38,15 @@ export default function DashboardPage() {
   const [loadingPortal, setLoadingPortal] = useState(false);
   const prewarmStarted = useRef(false);
   
-  // Channel state
-  const [channels, setChannels] = useState<Channel[]>(DEFAULT_CHANNELS);
-  const [currentChannel, setCurrentChannel] = useState('main');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Default collapsed, will check screen size
-  const [sidebarHidden, setSidebarHidden] = useState(true); // Fully hidden on mobile
+  // Conversation state
+  const [conversations, setConversations] = useState<Conversation[]>(DEFAULT_CONVERSATIONS);
+  const [currentConversation, setCurrentConversation] = useState('main');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarHidden, setSidebarHidden] = useState(true);
   
   // Set initial sidebar state based on screen size
   useEffect(() => {
-    const isLargeScreen = window.innerWidth >= 768; // md breakpoint
+    const isLargeScreen = window.innerWidth >= 768;
     if (isLargeScreen) {
       setSidebarHidden(false);
       setSidebarCollapsed(false);
@@ -54,11 +54,9 @@ export default function DashboardPage() {
       setSidebarHidden(true);
     }
     
-    // Handle resize
     const handleResize = () => {
       const isLarge = window.innerWidth >= 768;
       if (!isLarge && !sidebarHidden) {
-        // Screen became small, hide sidebar
         setSidebarHidden(true);
       }
     };
@@ -67,14 +65,27 @@ export default function DashboardPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, [sidebarHidden]);
 
-  // Load channels from localStorage on mount
+  // Load conversations from localStorage on mount
+  // Also migrate old 'automna-channels' key if present
   useEffect(() => {
-    const savedChannels = localStorage.getItem('automna-channels');
-    if (savedChannels) {
+    // Try new key first
+    let saved = localStorage.getItem('automna-conversations');
+    
+    // Migrate from old key if new key doesn't exist
+    if (!saved) {
+      const oldSaved = localStorage.getItem('automna-channels');
+      if (oldSaved) {
+        saved = oldSaved;
+        localStorage.setItem('automna-conversations', oldSaved);
+        localStorage.removeItem('automna-channels');
+      }
+    }
+    
+    if (saved) {
       try {
-        const parsed = JSON.parse(savedChannels);
+        const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setChannels(parsed);
+          setConversations(parsed);
         }
       } catch {
         // Ignore parse errors
@@ -82,24 +93,24 @@ export default function DashboardPage() {
     }
   }, []);
   
-  // Save channels to localStorage when they change
+  // Save conversations to localStorage when they change
   useEffect(() => {
-    localStorage.setItem('automna-channels', JSON.stringify(channels));
-  }, [channels]);
+    localStorage.setItem('automna-conversations', JSON.stringify(conversations));
+  }, [conversations]);
   
-  // Create a new channel
-  const handleCreateChannel = useCallback((name: string) => {
+  // Create a new conversation
+  const handleCreateConversation = useCallback((name: string) => {
     const key = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    if (!key || channels.some(c => c.key === key)) return;
+    if (!key || conversations.some(c => c.key === key)) return;
     
-    const newChannel: Channel = {
+    const newConversation: Conversation = {
       key,
       name,
       icon: '📝',
     };
-    setChannels(prev => [...prev, newChannel]);
-    setCurrentChannel(key);
-  }, [channels]);
+    setConversations(prev => [...prev, newConversation]);
+    setCurrentConversation(key);
+  }, [conversations]);
 
   const handleManageBilling = async () => {
     setLoadingPortal(true);
@@ -125,7 +136,6 @@ export default function DashboardPage() {
       const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
       const keepAliveUrl = new URL(`${baseUrl}/api/keepalive`);
       
-      // Pass auth params
       const userId = wsUrl.searchParams.get('userId');
       const exp = wsUrl.searchParams.get('exp');
       const sig = wsUrl.searchParams.get('sig');
@@ -158,9 +168,7 @@ export default function DashboardPage() {
         if (data.gatewayUrl) {
           setGatewayInfo(data);
           setLoadPhase('warming');
-          // Start prewarming immediately (don't wait)
           prewarmSandbox(data.gatewayUrl);
-          // Move to ready after a brief delay to show warming phase
           setTimeout(() => setLoadPhase('ready'), 500);
         } else {
           setLoadPhase('error');
@@ -176,13 +184,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!gatewayInfo?.gatewayUrl) return;
     
-    // Ping every 4 minutes while user is on dashboard
     const pingInterval = setInterval(() => {
-      // Extract base URL for keep-alive
       const wsUrl = new URL(gatewayInfo.gatewayUrl);
       const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
       
-      // Build keep-alive URL with auth params
       const keepAliveUrl = new URL(`${baseUrl}/api/keepalive`);
       const userId = wsUrl.searchParams.get('userId');
       const exp = wsUrl.searchParams.get('exp');
@@ -193,8 +198,8 @@ export default function DashboardPage() {
       
       fetch(keepAliveUrl.toString(), { method: 'GET' })
         .then(() => console.log('[keepalive] ping'))
-        .catch(() => {}); // Ignore errors
-    }, 4 * 60 * 1000); // 4 minutes
+        .catch(() => {});
+    }, 4 * 60 * 1000);
     
     return () => clearInterval(pingInterval);
   }, [gatewayInfo]);
@@ -233,10 +238,14 @@ export default function DashboardPage() {
             {sidebarHidden && (
               <button
                 onClick={() => setSidebarHidden(false)}
-                className="p-2 -ml-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors md:hidden"
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  setSidebarHidden(false);
+                }}
+                className="p-3 -ml-1 text-gray-400 hover:text-white active:text-white hover:bg-gray-800 active:bg-gray-800 rounded-lg transition-colors md:hidden touch-manipulation"
                 title="Open sidebar"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
@@ -259,37 +268,52 @@ export default function DashboardPage() {
         </nav>
         <div className="flex-1 flex overflow-hidden">
           
-          {/* Channel sidebar - hidden on mobile by default */}
-          {!sidebarHidden && (
-            <ChannelSidebar
-              currentChannel={currentChannel}
-              onChannelChange={(key) => {
-                setCurrentChannel(key);
-                // Auto-hide on mobile after selection
+          {/* Mobile backdrop - click to close */}
+          <div 
+            className={`
+              fixed inset-0 bg-black/60 z-30 md:hidden
+              transition-opacity duration-200
+              ${sidebarHidden ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+            `}
+            onClick={() => setSidebarHidden(true)}
+          />
+          
+          {/* Conversation sidebar - drawer on mobile, inline on desktop */}
+          <div className={`
+            fixed md:relative inset-y-0 left-0 z-40 md:z-0
+            transition-transform duration-200 ease-out
+            ${sidebarHidden ? '-translate-x-full pointer-events-none' : 'translate-x-0'}
+            md:translate-x-0 md:pointer-events-auto
+            ${sidebarHidden ? 'md:hidden' : ''}
+            top-[49px] md:top-0 h-[calc(100%-49px)] md:h-full
+          `}>
+            <ConversationSidebar
+              currentConversation={currentConversation}
+              onConversationChange={(key) => {
+                setCurrentConversation(key);
                 if (window.innerWidth < 768) {
                   setSidebarHidden(true);
                 }
               }}
-              channels={channels}
-              onCreateChannel={handleCreateChannel}
+              conversations={conversations}
+              onCreateConversation={handleCreateConversation}
               isCollapsed={sidebarCollapsed}
               onToggleCollapse={() => {
                 if (window.innerWidth < 768) {
-                  // On mobile, toggle collapse hides sidebar
                   setSidebarHidden(true);
                 } else {
                   setSidebarCollapsed(!sidebarCollapsed);
                 }
               }}
             />
-          )}
+          </div>
           
           {/* Chat area */}
           <div className="flex-1">
             <AutomnaChat
-              key={currentChannel} // Re-mount when channel changes
+              key={currentConversation}
               gatewayUrl={gatewayInfo.gatewayUrl}
-              sessionKey={currentChannel}
+              sessionKey={currentConversation}
             />
           </div>
         </div>

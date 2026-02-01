@@ -2,39 +2,36 @@
 
 import { useState } from 'react';
 
-interface Channel {
+interface Conversation {
   key: string;
   name: string;
   icon: string;
 }
 
-interface ChannelSidebarProps {
-  currentChannel: string;
-  onChannelChange: (key: string) => void;
-  channels: Channel[];
-  onCreateChannel: (name: string) => void;
+interface ConversationSidebarProps {
+  currentConversation: string;
+  onConversationChange: (key: string) => void;
+  conversations: Conversation[];
+  onCreateConversation: (name: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }
 
-export function ChannelSidebar({ 
-  currentChannel, 
-  onChannelChange, 
-  channels,
-  onCreateChannel,
+export function ConversationSidebar({ 
+  currentConversation, 
+  onConversationChange, 
+  conversations,
+  onCreateConversation,
   isCollapsed,
   onToggleCollapse,
-}: ChannelSidebarProps) {
+}: ConversationSidebarProps) {
   const [isCreating, setIsCreating] = useState(false);
-  const [newChannelName, setNewChannelName] = useState('');
-  
-  // Find current channel for collapsed view
-  const currentChannelData = channels.find(c => c.key === currentChannel);
+  const [newConversationName, setNewConversationName] = useState('');
 
   const handleCreate = () => {
-    if (!newChannelName.trim()) return;
-    onCreateChannel(newChannelName.trim());
-    setNewChannelName('');
+    if (!newConversationName.trim()) return;
+    onCreateConversation(newConversationName.trim());
+    setNewConversationName('');
     setIsCreating(false);
   };
 
@@ -43,14 +40,14 @@ export function ChannelSidebar({
       handleCreate();
     } else if (e.key === 'Escape') {
       setIsCreating(false);
-      setNewChannelName('');
+      setNewConversationName('');
     }
   };
 
   // Collapsed view - just show icons
   if (isCollapsed) {
     return (
-      <div className="w-14 bg-gray-900 border-r border-gray-800 flex flex-col">
+      <div className="w-14 h-full bg-gray-900 border-r border-gray-800 flex flex-col">
         {/* Expand button */}
         <button
           onClick={onToggleCollapse}
@@ -62,25 +59,25 @@ export function ChannelSidebar({
           </svg>
         </button>
 
-        {/* Channel icons */}
+        {/* Conversation icons */}
         <div className="flex-1 overflow-y-auto py-2">
-          {channels.map((channel) => (
+          {conversations.map((conv) => (
             <button
-              key={channel.key}
-              onClick={() => onChannelChange(channel.key)}
+              key={conv.key}
+              onClick={() => onConversationChange(conv.key)}
               className={`w-full p-3 flex items-center justify-center transition-colors ${
-                currentChannel === channel.key
+                currentConversation === conv.key
                   ? 'bg-purple-900/50 text-white'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
               }`}
-              title={channel.name}
+              title={conv.name}
             >
-              <span className="text-lg">{channel.icon}</span>
+              <span className="text-lg">{conv.icon}</span>
             </button>
           ))}
         </div>
 
-        {/* New channel button */}
+        {/* New conversation button */}
         <div className="p-2 border-t border-gray-800">
           <button
             onClick={() => {
@@ -88,7 +85,7 @@ export function ChannelSidebar({
               setTimeout(() => setIsCreating(true), 100);
             }}
             className="w-full p-2 flex items-center justify-center text-gray-400 hover:bg-gray-800 hover:text-gray-200 rounded-lg transition-colors"
-            title="New Channel"
+            title="New Conversation"
           >
             <span className="text-lg">+</span>
           </button>
@@ -99,10 +96,10 @@ export function ChannelSidebar({
 
   // Expanded view
   return (
-    <div className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col">
+    <div className="w-56 h-full bg-gray-900 border-r border-gray-800 flex flex-col">
       {/* Header with collapse button */}
       <div className="p-3 border-b border-gray-800 flex items-center justify-between">
-        <h2 className="font-semibold text-gray-200 text-sm">Channels</h2>
+        <h2 className="font-semibold text-gray-200 text-sm">Conversations</h2>
         <button
           onClick={onToggleCollapse}
           className="text-gray-400 hover:text-white transition-colors"
@@ -114,41 +111,41 @@ export function ChannelSidebar({
         </button>
       </div>
 
-      {/* Channel list */}
+      {/* Conversation list */}
       <div className="flex-1 overflow-y-auto py-2">
-        {channels.map((channel) => (
+        {conversations.map((conv) => (
           <button
-            key={channel.key}
-            onClick={() => onChannelChange(channel.key)}
+            key={conv.key}
+            onClick={() => onConversationChange(conv.key)}
             className={`w-full px-3 py-2 text-left flex items-center gap-2 transition-colors ${
-              currentChannel === channel.key
+              currentConversation === conv.key
                 ? 'bg-purple-900/50 text-white'
                 : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
             }`}
           >
-            <span className="text-base">{channel.icon}</span>
-            <span className="text-sm truncate">{channel.name}</span>
+            <span className="text-base">{conv.icon}</span>
+            <span className="text-sm truncate">{conv.name}</span>
           </button>
         ))}
       </div>
 
-      {/* Create new channel */}
+      {/* Create new conversation */}
       <div className="p-2 border-t border-gray-800">
         {isCreating ? (
           <div className="flex flex-col gap-2">
             <input
               type="text"
-              value={newChannelName}
-              onChange={(e) => setNewChannelName(e.target.value)}
+              value={newConversationName}
+              onChange={(e) => setNewConversationName(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Channel name..."
+              placeholder="Conversation name..."
               className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
               autoFocus
             />
             <div className="flex gap-2">
               <button
                 onClick={handleCreate}
-                disabled={!newChannelName.trim()}
+                disabled={!newConversationName.trim()}
                 className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
               >
                 Create
@@ -156,7 +153,7 @@ export function ChannelSidebar({
               <button
                 onClick={() => {
                   setIsCreating(false);
-                  setNewChannelName('');
+                  setNewConversationName('');
                 }}
                 className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded-lg transition-colors"
               >
@@ -170,7 +167,7 @@ export function ChannelSidebar({
             className="w-full px-3 py-2 text-left flex items-center gap-2 text-gray-400 hover:bg-gray-800 hover:text-gray-200 rounded-lg transition-colors"
           >
             <span className="text-lg">+</span>
-            <span className="text-sm">New Channel</span>
+            <span className="text-sm">New Conversation</span>
           </button>
         )}
       </div>

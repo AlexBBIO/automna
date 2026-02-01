@@ -221,16 +221,14 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Focus input when ready
+  // Focus input on mount
   useEffect(() => {
-    if (loadingPhase === 'ready') {
-      inputRef.current?.focus();
-    }
-  }, [loadingPhase]);
+    inputRef.current?.focus();
+  }, []);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isRunning || !isConnected) return;
+    if (!input.trim() || isRunning) return;
     
     append({
       role: 'user',
@@ -266,8 +264,6 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     inputRef.current?.focus();
   };
 
-  const isLoading = loadingPhase === 'connecting' || loadingPhase === 'loading-history';
-
   return (
     <div className="flex flex-col h-full bg-gray-950 text-white">
       {/* Header */}
@@ -280,11 +276,8 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        {/* Loading skeleton */}
-        {isLoading && <ChatSkeleton />}
-        
-        {/* Empty state */}
-        {!isLoading && messages.length === 0 && (
+        {/* Empty state - show immediately, even while loading */}
+        {messages.length === 0 && (
           <EmptyState onSuggestionClick={handleSuggestionClick} />
         )}
         
@@ -361,10 +354,9 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isConnected ? "Ask anything..." : "Connecting..."}
+              placeholder="Ask anything..."
               rows={1}
               className="flex-1 bg-transparent text-white placeholder-gray-500 focus:outline-none resize-none px-1 py-2 text-base min-h-[44px] max-h-[200px] leading-relaxed"
-              disabled={!isConnected}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -385,9 +377,9 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
             ) : (
               <button
                 type="submit"
-                disabled={!input.trim() || !isConnected}
+                disabled={!input.trim()}
                 className={`p-3 rounded-xl transition-all flex-shrink-0 ${
-                  input.trim() && isConnected
+                  input.trim()
                     ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/25'
                     : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                 }`}

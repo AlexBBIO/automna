@@ -122,6 +122,16 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     setLoadingPhase('connecting');
     setError(null);
     
+    // Safety timeout - if nothing loads in 2 seconds, allow chat anyway
+    const safetyTimeout = setTimeout(() => {
+      if (mountedRef.current && !historyLoadedRef.current) {
+        console.log('[clawdbot] Safety timeout - allowing chat');
+        historyLoadedRef.current = true;
+        setIsConnected(true);
+        setLoadingPhase('ready');
+      }
+    }, 2000);
+    
     // === PARALLEL HTTP HISTORY FETCH ===
     // Start fetching history via HTTP immediately (don't wait for WebSocket)
     const httpAbort = new AbortController();
@@ -132,10 +142,15 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     fetch(historyUrl, { signal: httpAbort.signal })
       .then(res => {
         console.log('[clawdbot] HTTP history response status:', res.status);
+        if (!res.ok) {
+          // Treat non-200 responses as empty history (new session)
+          console.log('[clawdbot] HTTP history non-200, treating as new session');
+          return { messages: [] };
+        }
         return res.json();
       })
       .then(data => {
-        console.log('[clawdbot] HTTP history data:', { keys: Object.keys(data), hasMessages: 'messages' in data, historyLoadedRef: historyLoadedRef.current });
+        console.log('[clawdbot] HTTP history data:', { keys: Object.keys(data || {}), hasMessages: 'messages' in (data || {}), historyLoadedRef: historyLoadedRef.current });
         if (!mountedRef.current) {
           console.log('[clawdbot] Component unmounted, ignoring HTTP history');
           return;
@@ -144,25 +159,35 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           console.log('[clawdbot] History already loaded (probably via WS), ignoring HTTP');
           return;
         }
-        if (data.messages && Array.isArray(data.messages)) {
+        
+        // Mark as loaded regardless of content - empty is valid for new sessions
+        historyLoadedRef.current = true;
+        
+        if (data?.messages && Array.isArray(data.messages) && data.messages.length > 0) {
           console.log(`[clawdbot] HTTP history loaded: ${data.messages.length} messages`);
-          historyLoadedRef.current = true;
-          if (data.messages.length > 0) {
-            setMessages(parseMessages(data.messages, 'http'));
-          }
-          // HTTP success means we can use the chat (even if WS failed)
-          setIsConnected(true);
-          setError(null);
-          setLoadingPhase('ready');
+          setMessages(parseMessages(data.messages, 'http'));
         } else {
-          console.warn('[clawdbot] HTTP history response missing messages array:', data);
+          console.log('[clawdbot] HTTP history empty or missing - new session');
         }
+        
+        // HTTP success means we can use the chat (even if WS failed)
+        setIsConnected(true);
+        setError(null);
+        setLoadingPhase('ready');
       })
       .catch(err => {
-        if (err.name !== 'AbortError') {
-          console.warn('[clawdbot] HTTP history fetch failed:', err.message, err);
-        } else {
+        if (err.name === 'AbortError') {
           console.log('[clawdbot] HTTP history fetch aborted (WS loaded first)');
+          return;
+        }
+        console.warn('[clawdbot] HTTP history fetch failed:', err.message);
+        
+        // Even on error, allow the chat to work - treat as new session
+        if (mountedRef.current && !historyLoadedRef.current) {
+          console.log('[clawdbot] HTTP failed but allowing chat anyway');
+          historyLoadedRef.current = true;
+          setIsConnected(true);
+          setLoadingPhase('ready');
         }
       });
     
@@ -257,37 +282,32 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           console.log('[clawdbot] Entering history handler, historyLoadedRef:', historyLoadedRef.current);
           const wsMessages = msg.payload.messages;
           
-          // Only use WebSocket history if we haven't loaded from HTTP yet
-          if (!historyLoadedRef.current && wsMessages.length > 0) {
+          // Mark as loaded - empty is valid for new channels
+          if (!historyLoadedRef.current) {
             console.log(`[clawdbot] WS history: ${wsMessages.length} messages`);
             historyLoadedRef.current = true;
             httpHistoryAbortRef.current?.abort(); // Cancel HTTP fetch
             
-            const history = wsMessages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
-              let textContent = '';
-              if (Array.isArray(m.content)) {
-                const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
-                textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
-              } else if (typeof m.content === 'string') {
-                textContent = m.content;
-              }
-              textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
-              return {
-                id: m.id,
-                role: m.role as 'user' | 'assistant',
-                content: [{ type: 'text' as const, text: textContent }],
-                createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
-              };
-            });
-            setMessages(history);
-          }
-          
-          // Only mark as loaded if we got messages
-          // If WS returns empty, let HTTP fallback provide the data
-          if (wsMessages.length > 0) {
+            if (wsMessages.length > 0) {
+              const history = wsMessages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
+                let textContent = '';
+                if (Array.isArray(m.content)) {
+                  const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
+                  textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
+                } else if (typeof m.content === 'string') {
+                  textContent = m.content;
+                }
+                textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+                return {
+                  id: m.id,
+                  role: m.role as 'user' | 'assistant',
+                  content: [{ type: 'text' as const, text: textContent }],
+                  createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+                };
+              });
+              setMessages(history);
+            }
             setLoadingPhase('ready');
-          } else {
-            console.log('[clawdbot] WS history empty, waiting for HTTP fallback');
           }
           return;
         }
@@ -371,6 +391,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     return () => {
       mountedRef.current = false;
       httpHistoryAbortRef.current?.abort();
+      clearTimeout(safetyTimeout);
       if (connectTimer) clearTimeout(connectTimer);
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close(1000, 'Component unmounted');
