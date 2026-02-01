@@ -33,7 +33,7 @@ jobs:
       
       - name: Install Moltworker Dependencies
         working-directory: moltworker
-        run: npm ci
+        run: npm install
       
       - name: Run Moltworker Tests
         working-directory: moltworker
