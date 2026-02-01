@@ -8,7 +8,7 @@
 
 ---
 
-## Current Status (2026-01-31)
+## Current Status (2026-02-01)
 
 ### ✅ Working
 | Component | Status | Notes |
@@ -18,17 +18,31 @@
 | Stripe billing | ✅ Working | Checkout, webhooks, portal all functional |
 | Cloudflare Moltworker | ✅ Working | moltbot-sandbox.alex-0bb.workers.dev |
 | Per-user sandboxes | ✅ Working | Isolated via Durable Objects + R2 paths |
-| WebSocket chat | ✅ Working | Signed URL auth → token injection |
+| WebSocket chat | ✅ Working | Fixed client ID issue (must use 'webchat') |
+| HTTP history fallback | ✅ Working | Parallel fetch, handles WS empty response |
 | R2 persistence | ✅ Working | Per-user paths, 30s background sync |
 | Anthropic integration | ✅ Working | API key configured |
+| Test suite | ✅ Working | 30 unit tests + CI on GitHub Actions |
+| Optimistic UI | ✅ Working | Chat skeleton + progress during cold start |
+| Keep-alive pings | ✅ Working | Prevents sandbox hibernation |
 
 ### 🔧 Needs Work
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Dashboard UI | 🔧 Basic | Needs status indicators, settings |
+| Dashboard UI | 🔧 Basic | Needs file management, settings |
 | Per-user API keys | ❌ Not started | Currently all users share platform key |
 | Discord integration | ❌ Not started | Need setup flow in dashboard |
 | Telegram integration | ❌ Not started | Need setup flow in dashboard |
+
+### 📝 Recent Changes (2026-02-01)
+- Fixed WebSocket client ID (must be 'webchat' not custom)
+- Fixed history race condition (WS empty → HTTP fallback)
+- Added test suite (30 unit tests for runtime + signed-url)
+- Added GitHub Actions CI (tests run on every push)
+- Forked moltworker to `AlexBBIO/automna-moltworker` for full control
+- Added ChatSkeleton component for optimistic loading
+- Added progressive loading phases (syncing → connecting → warming)
+- Added prewarming on gateway URL fetch
 
 ### 🎯 MVP Features (2026-01-31)
 
@@ -36,15 +50,15 @@
 
 | Feature | Priority | Effort | Status |
 |---------|----------|--------|--------|
-| **Load Time Optimization** | P0 | 11h | Planned |
-| └─ Keep-alive pings | P0 | 2h | |
-| └─ Optimistic UI loading | P0 | 1h | |
-| └─ Progressive loading states | P0 | 4h | |
-| └─ Prewarming on login | P1 | 4h | |
-| **History Performance** | P0 | 11h | Planned |
-| └─ Parallel HTTP fetch | P0 | 2h | |
-| └─ Lazy load old messages | P1 | 3h | |
-| └─ R2 cache for history | P1 | 6h | |
+| **Load Time Optimization** | P0 | 11h | ✅ Mostly Done |
+| └─ Keep-alive pings | P0 | 2h | ✅ Done |
+| └─ Optimistic UI loading | P0 | 1h | ✅ Done |
+| └─ Progressive loading states | P0 | 4h | ✅ Done |
+| └─ Prewarming on login | P1 | 4h | ✅ Done |
+| **History Performance** | P0 | 11h | ✅ Mostly Done |
+| └─ Parallel HTTP fetch | P0 | 2h | ✅ Done |
+| └─ Lazy load old messages | P1 | 3h | Planned |
+| └─ R2 cache for history | P1 | 6h | Planned |
 | **File Management** | P0 | 16h | Planned |
 | └─ File tree API + UI | P0 | 6h | |
 | └─ Markdown viewer/editor | P0 | 4h | |
