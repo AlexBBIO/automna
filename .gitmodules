@@ -1,0 +1,3 @@
+[submodule "moltworker"]
+	path = moltworker
+	url = https://github.com/AlexBBIO/automna-moltworker.git
