@@ -30,7 +30,6 @@ export default function JoiPage() {
         }, 50);
         return () => clearTimeout(timeout);
       } else {
-        // Finished typing, show tagline
         const timeout = setTimeout(() => {
           setShowTagline(true);
         }, 300);
@@ -64,20 +63,43 @@ export default function JoiPage() {
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-black to-cyan-900/20" />
+      
+      {/* Animated background particles/glow */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
+      </div>
 
       {/* Main content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
         
-        {/* Joi hologram image */}
-        <div className="relative w-full max-w-2xl aspect-video mb-12">
+        {/* Joi hologram image with animation */}
+        <div 
+          className="relative w-full max-w-2xl aspect-video mb-12"
+          style={{
+            animation: 'float 6s ease-in-out infinite',
+          }}
+        >
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10" />
+          
+          {/* Glow effect behind image */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div 
+              className="w-3/4 h-3/4 bg-gradient-to-r from-pink-500/20 to-cyan-500/20 rounded-full blur-3xl"
+              style={{
+                animation: 'glow 4s ease-in-out infinite',
+              }}
+            />
+          </div>
+          
           <Image
             src="/joi-hero.png"
             alt="AI Assistant"
             fill
             className="object-contain opacity-90"
             style={{
-              filter: 'drop-shadow(0 0 30px rgba(236, 72, 153, 0.5)) drop-shadow(0 0 60px rgba(6, 182, 212, 0.3))',
+              filter: 'drop-shadow(0 0 40px rgba(236, 72, 153, 0.6)) drop-shadow(0 0 80px rgba(6, 182, 212, 0.4))',
+              animation: 'breathe 4s ease-in-out infinite',
             }}
           />
         </div>
@@ -102,11 +124,21 @@ export default function JoiPage() {
         <div className="flex flex-col items-center gap-4">
           <a
             href="/"
-            className="px-8 py-4 bg-gradient-to-r from-pink-600 to-cyan-600 rounded-lg text-xl font-semibold 
-                     hover:from-pink-500 hover:to-cyan-500 transition-all duration-300
-                     shadow-lg shadow-pink-500/25 hover:shadow-pink-500/50"
+            className="group relative px-10 py-4 rounded-xl text-xl font-semibold transition-all duration-300
+                     bg-gradient-to-r from-pink-600 via-purple-600 to-cyan-600 
+                     hover:from-pink-500 hover:via-purple-500 hover:to-cyan-500
+                     hover:scale-105"
+            style={{
+              boxShadow: '0 0 30px rgba(236,72,153,0.4), 0 0 60px rgba(6,182,212,0.2)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 40px rgba(236,72,153,0.6), 0 0 80px rgba(6,182,212,0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 30px rgba(236,72,153,0.4), 0 0 60px rgba(6,182,212,0.2)';
+            }}
           >
-            Get Started
+            <span className="relative z-10">Meet Automna</span>
           </a>
           <p className="text-gray-500 text-sm">Your AI companion awaits</p>
         </div>
@@ -119,6 +151,22 @@ export default function JoiPage() {
           </div>
         </div>
       </div>
+
+      {/* Global keyframes */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        @keyframes breathe {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+        }
+        @keyframes glow {
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.1); }
+        }
+      `}} />
     </div>
   );
 }
