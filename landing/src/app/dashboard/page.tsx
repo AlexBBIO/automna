@@ -2,9 +2,20 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { AutomnaChat } from "@/components/AutomnaChat";
 import { ChatSkeleton } from "@/components/ChatSkeleton";
+import { ChannelSidebar } from "@/components/ChannelSidebar";
+
+interface Channel {
+  key: string;
+  name: string;
+  icon: string;
+}
+
+const DEFAULT_CHANNELS: Channel[] = [
+  { key: 'main', name: 'General', icon: '💬' },
+];
 
 const CreditCardIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -26,6 +37,44 @@ export default function DashboardPage() {
   const [loadPhase, setLoadPhase] = useState<LoadPhase>('init');
   const [loadingPortal, setLoadingPortal] = useState(false);
   const prewarmStarted = useRef(false);
+  
+  // Channel state
+  const [channels, setChannels] = useState<Channel[]>(DEFAULT_CHANNELS);
+  const [currentChannel, setCurrentChannel] = useState('main');
+  
+  // Load channels from localStorage on mount
+  useEffect(() => {
+    const savedChannels = localStorage.getItem('automna-channels');
+    if (savedChannels) {
+      try {
+        const parsed = JSON.parse(savedChannels);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setChannels(parsed);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }, []);
+  
+  // Save channels to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem('automna-channels', JSON.stringify(channels));
+  }, [channels]);
+  
+  // Create a new channel
+  const handleCreateChannel = useCallback((name: string) => {
+    const key = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (!key || channels.some(c => c.key === key)) return;
+    
+    const newChannel: Channel = {
+      key,
+      name,
+      icon: '📝',
+    };
+    setChannels(prev => [...prev, newChannel]);
+    setCurrentChannel(key);
+  }, [channels]);
 
   const handleManageBilling = async () => {
     setLoadingPortal(true);
@@ -169,11 +218,22 @@ export default function DashboardPage() {
             </UserButton>
           </div>
         </nav>
-        <div className="flex-1">
-          <AutomnaChat
-            gatewayUrl={gatewayInfo.gatewayUrl}
-            sessionKey={gatewayInfo.sessionKey || "main"}
+        <div className="flex-1 flex">
+          {/* Channel sidebar */}
+          <ChannelSidebar
+            currentChannel={currentChannel}
+            onChannelChange={setCurrentChannel}
+            channels={channels}
+            onCreateChannel={handleCreateChannel}
           />
+          {/* Chat area */}
+          <div className="flex-1">
+            <AutomnaChat
+              key={currentChannel} // Re-mount when channel changes
+              gatewayUrl={gatewayInfo.gatewayUrl}
+              sessionKey={currentChannel}
+            />
+          </div>
         </div>
       </div>
     );

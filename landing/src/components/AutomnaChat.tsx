@@ -12,6 +12,7 @@
  */
 
 import { useClawdbotRuntime } from '@/lib/clawdbot-runtime';
+import { MessageContent } from './MessageContent';
 import { 
   useEffect, 
   useRef, 
@@ -194,13 +195,11 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
               {message.content.map((part, i) => {
                 if (part.type === 'text' && typeof part.text === 'string') {
                   return (
-                    <div 
+                    <MessageContent 
                       key={i} 
-                      className="whitespace-pre-wrap break-words text-[15px] leading-relaxed"
-                      style={{ wordBreak: 'break-word' }}
-                    >
-                      {part.text}
-                    </div>
+                      text={part.text}
+                      isUser={message.role === 'user'}
+                    />
                   );
                 }
                 return null;
