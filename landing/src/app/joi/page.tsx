@@ -121,35 +121,19 @@ export default function JoiPage() {
         </div>
 
         {/* CTA */}
-        <div className="flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-5">
           <a
             href="/"
-            className="group relative px-10 py-4 rounded-xl text-xl font-semibold transition-all duration-300
-                     bg-gradient-to-r from-pink-600 via-purple-600 to-cyan-600 
-                     hover:from-pink-500 hover:via-purple-500 hover:to-cyan-500
-                     hover:scale-105"
-            style={{
-              boxShadow: '0 0 30px rgba(236,72,153,0.4), 0 0 60px rgba(6,182,212,0.2)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 40px rgba(236,72,153,0.6), 0 0 80px rgba(6,182,212,0.4)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 30px rgba(236,72,153,0.4), 0 0 60px rgba(6,182,212,0.2)';
-            }}
+            className="px-12 py-4 rounded-full text-lg font-medium transition-all duration-300
+                     bg-white/10 backdrop-blur-sm border border-white/20
+                     hover:bg-white/20 hover:border-white/30 hover:scale-105
+                     text-white tracking-wide"
           >
-            <span className="relative z-10">Get Started</span>
+            Meet Automna
           </a>
-          <p className="text-gray-500 text-sm">Your AI companion awaits</p>
+          <p className="text-gray-500 text-sm tracking-wide">Your AI companion awaits</p>
         </div>
 
-        {/* Automna logo */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
-          <div className="text-2xl font-bold tracking-wider">
-            <span className="text-pink-400">AUTO</span>
-            <span className="text-cyan-400">MNA</span>
-          </div>
-        </div>
       </div>
 
       {/* Global keyframes */}
