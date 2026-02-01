@@ -13,16 +13,23 @@ interface ChannelSidebarProps {
   onChannelChange: (key: string) => void;
   channels: Channel[];
   onCreateChannel: (name: string) => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 export function ChannelSidebar({ 
   currentChannel, 
   onChannelChange, 
   channels,
-  onCreateChannel 
+  onCreateChannel,
+  isCollapsed,
+  onToggleCollapse,
 }: ChannelSidebarProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  
+  // Find current channel for collapsed view
+  const currentChannelData = channels.find(c => c.key === currentChannel);
 
   const handleCreate = () => {
     if (!newChannelName.trim()) return;
@@ -40,11 +47,71 @@ export function ChannelSidebar({
     }
   };
 
+  // Collapsed view - just show icons
+  if (isCollapsed) {
+    return (
+      <div className="w-14 bg-gray-900 border-r border-gray-800 flex flex-col">
+        {/* Expand button */}
+        <button
+          onClick={onToggleCollapse}
+          className="p-3 border-b border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+          title="Expand sidebar"
+        >
+          <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        {/* Channel icons */}
+        <div className="flex-1 overflow-y-auto py-2">
+          {channels.map((channel) => (
+            <button
+              key={channel.key}
+              onClick={() => onChannelChange(channel.key)}
+              className={`w-full p-3 flex items-center justify-center transition-colors ${
+                currentChannel === channel.key
+                  ? 'bg-purple-900/50 text-white'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+              }`}
+              title={channel.name}
+            >
+              <span className="text-lg">{channel.icon}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* New channel button */}
+        <div className="p-2 border-t border-gray-800">
+          <button
+            onClick={() => {
+              onToggleCollapse();
+              setTimeout(() => setIsCreating(true), 100);
+            }}
+            className="w-full p-2 flex items-center justify-center text-gray-400 hover:bg-gray-800 hover:text-gray-200 rounded-lg transition-colors"
+            title="New Channel"
+          >
+            <span className="text-lg">+</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Expanded view
   return (
     <div className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col">
-      {/* Header */}
-      <div className="p-3 border-b border-gray-800">
+      {/* Header with collapse button */}
+      <div className="p-3 border-b border-gray-800 flex items-center justify-between">
         <h2 className="font-semibold text-gray-200 text-sm">Channels</h2>
+        <button
+          onClick={onToggleCollapse}
+          className="text-gray-400 hover:text-white transition-colors"
+          title="Collapse sidebar"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+          </svg>
+        </button>
       </div>
 
       {/* Channel list */}

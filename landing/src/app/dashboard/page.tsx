@@ -41,8 +41,9 @@ export default function DashboardPage() {
   // Channel state
   const [channels, setChannels] = useState<Channel[]>(DEFAULT_CHANNELS);
   const [currentChannel, setCurrentChannel] = useState('main');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  // Load channels from localStorage on mount
+  // Load channels and sidebar state from localStorage on mount
   useEffect(() => {
     const savedChannels = localStorage.getItem('automna-channels');
     if (savedChannels) {
@@ -55,12 +56,22 @@ export default function DashboardPage() {
         // Ignore parse errors
       }
     }
+    
+    const savedCollapsed = localStorage.getItem('automna-sidebar-collapsed');
+    if (savedCollapsed === 'true') {
+      setSidebarCollapsed(true);
+    }
   }, []);
   
   // Save channels to localStorage when they change
   useEffect(() => {
     localStorage.setItem('automna-channels', JSON.stringify(channels));
   }, [channels]);
+  
+  // Save sidebar collapsed state
+  useEffect(() => {
+    localStorage.setItem('automna-sidebar-collapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
   
   // Create a new channel
   const handleCreateChannel = useCallback((name: string) => {
@@ -225,6 +236,8 @@ export default function DashboardPage() {
             onChannelChange={setCurrentChannel}
             channels={channels}
             onCreateChannel={handleCreateChannel}
+            isCollapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           />
           {/* Chat area */}
           <div className="flex-1">
