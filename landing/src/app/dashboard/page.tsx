@@ -41,9 +41,33 @@ export default function DashboardPage() {
   // Channel state
   const [channels, setChannels] = useState<Channel[]>(DEFAULT_CHANNELS);
   const [currentChannel, setCurrentChannel] = useState('main');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Default collapsed, will check screen size
+  const [sidebarHidden, setSidebarHidden] = useState(true); // Fully hidden on mobile
   
-  // Load channels and sidebar state from localStorage on mount
+  // Set initial sidebar state based on screen size
+  useEffect(() => {
+    const isLargeScreen = window.innerWidth >= 768; // md breakpoint
+    if (isLargeScreen) {
+      setSidebarHidden(false);
+      setSidebarCollapsed(false);
+    } else {
+      setSidebarHidden(true);
+    }
+    
+    // Handle resize
+    const handleResize = () => {
+      const isLarge = window.innerWidth >= 768;
+      if (!isLarge && !sidebarHidden) {
+        // Screen became small, hide sidebar
+        setSidebarHidden(true);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarHidden]);
+
+  // Load channels from localStorage on mount
   useEffect(() => {
     const savedChannels = localStorage.getItem('automna-channels');
     if (savedChannels) {
@@ -56,22 +80,12 @@ export default function DashboardPage() {
         // Ignore parse errors
       }
     }
-    
-    const savedCollapsed = localStorage.getItem('automna-sidebar-collapsed');
-    if (savedCollapsed === 'true') {
-      setSidebarCollapsed(true);
-    }
   }, []);
   
   // Save channels to localStorage when they change
   useEffect(() => {
     localStorage.setItem('automna-channels', JSON.stringify(channels));
   }, [channels]);
-  
-  // Save sidebar collapsed state
-  useEffect(() => {
-    localStorage.setItem('automna-sidebar-collapsed', String(sidebarCollapsed));
-  }, [sidebarCollapsed]);
   
   // Create a new channel
   const handleCreateChannel = useCallback((name: string) => {
@@ -229,16 +243,45 @@ export default function DashboardPage() {
             </UserButton>
           </div>
         </nav>
-        <div className="flex-1 flex">
-          {/* Channel sidebar */}
-          <ChannelSidebar
-            currentChannel={currentChannel}
-            onChannelChange={setCurrentChannel}
-            channels={channels}
-            onCreateChannel={handleCreateChannel}
-            isCollapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          />
+        <div className="flex-1 flex relative">
+          {/* Mobile: Floating button to open sidebar */}
+          {sidebarHidden && (
+            <button
+              onClick={() => setSidebarHidden(false)}
+              className="absolute top-3 left-3 z-10 p-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg shadow-lg transition-colors md:hidden"
+              title="Open channels"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          )}
+          
+          {/* Channel sidebar - hidden on mobile by default */}
+          {!sidebarHidden && (
+            <ChannelSidebar
+              currentChannel={currentChannel}
+              onChannelChange={(key) => {
+                setCurrentChannel(key);
+                // Auto-hide on mobile after selection
+                if (window.innerWidth < 768) {
+                  setSidebarHidden(true);
+                }
+              }}
+              channels={channels}
+              onCreateChannel={handleCreateChannel}
+              isCollapsed={sidebarCollapsed}
+              onToggleCollapse={() => {
+                if (window.innerWidth < 768) {
+                  // On mobile, toggle collapse hides sidebar
+                  setSidebarHidden(true);
+                } else {
+                  setSidebarCollapsed(!sidebarCollapsed);
+                }
+              }}
+            />
+          )}
+          
           {/* Chat area */}
           <div className="flex-1">
             <AutomnaChat
