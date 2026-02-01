@@ -128,12 +128,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     httpHistoryAbortRef.current = httpAbort;
     
     const historyUrl = buildHistoryUrl(config.gatewayUrl, sessionKey);
+    console.log('[clawdbot] Starting HTTP history fetch:', historyUrl);
     fetch(historyUrl, { signal: httpAbort.signal })
-      .then(res => res.json())
+      .then(res => {
+        console.log('[clawdbot] HTTP history response status:', res.status);
+        return res.json();
+      })
       .then(data => {
-        if (!mountedRef.current || historyLoadedRef.current) return;
+        console.log('[clawdbot] HTTP history data:', { keys: Object.keys(data), hasMessages: 'messages' in data, historyLoadedRef: historyLoadedRef.current });
+        if (!mountedRef.current) {
+          console.log('[clawdbot] Component unmounted, ignoring HTTP history');
+          return;
+        }
+        if (historyLoadedRef.current) {
+          console.log('[clawdbot] History already loaded (probably via WS), ignoring HTTP');
+          return;
+        }
         if (data.messages && Array.isArray(data.messages)) {
-          console.log(`[clawdbot] HTTP history: ${data.messages.length} messages`);
+          console.log(`[clawdbot] HTTP history loaded: ${data.messages.length} messages`);
           historyLoadedRef.current = true;
           if (data.messages.length > 0) {
             setMessages(parseMessages(data.messages, 'http'));
@@ -142,11 +154,15 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           setIsConnected(true);
           setError(null);
           setLoadingPhase('ready');
+        } else {
+          console.warn('[clawdbot] HTTP history response missing messages array:', data);
         }
       })
       .catch(err => {
         if (err.name !== 'AbortError') {
-          console.warn('[clawdbot] HTTP history fetch failed:', err.message);
+          console.warn('[clawdbot] HTTP history fetch failed:', err.message, err);
+        } else {
+          console.log('[clawdbot] HTTP history fetch aborted (WS loaded first)');
         }
       });
     
@@ -232,6 +248,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         }
         
         // Handle history response from WebSocket
+        // Debug: log all 'res' messages to understand the format
+        if (msg.type === 'res') {
+          console.log('[clawdbot] Response:', msg.ok ? 'ok' : 'error', 'payload keys:', Object.keys(msg.payload || {}));
+        }
         if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
           const wsMessages = msg.payload.messages;
           
