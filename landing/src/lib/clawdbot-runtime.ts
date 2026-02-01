@@ -282,11 +282,13 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             setMessages(history);
           }
           
-          // Mark as ready even if no history
-          if (!historyLoadedRef.current) {
-            historyLoadedRef.current = true;
+          // Only mark as loaded if we got messages
+          // If WS returns empty, let HTTP fallback provide the data
+          if (wsMessages.length > 0) {
+            setLoadingPhase('ready');
+          } else {
+            console.log('[clawdbot] WS history empty, waiting for HTTP fallback');
           }
-          setLoadingPhase('ready');
           return;
         }
         
