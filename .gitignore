@@ -2,3 +2,5 @@ config/
 .vercel
 .env*.local
 config/secrets.json
+.env.production
+.env.local
