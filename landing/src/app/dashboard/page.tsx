@@ -6,6 +6,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { AutomnaChat } from "@/components/AutomnaChat";
 import { ChatSkeleton } from "@/components/ChatSkeleton";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
+import { FileProvider } from "@/lib/file-context";
+import { FileBrowser } from "@/components/FileBrowser";
+
+type TabView = 'chat' | 'files';
 
 interface Conversation {
   key: string;
@@ -55,6 +59,9 @@ export default function DashboardPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetStatus, setResetStatus] = useState<string | null>(null);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<TabView>('chat');
   
   // Set initial sidebar state based on screen size (runs once on mount)
   useEffect(() => {
@@ -446,14 +453,48 @@ export default function DashboardPage() {
             />
           </div>
           
-          {/* Chat area */}
-          <div className="flex-1">
-            <AutomnaChat
-              key={currentConversation}
-              gatewayUrl={gatewayInfo.gatewayUrl}
-              sessionKey={currentConversation}
-            />
-          </div>
+          {/* Main content area with tabs */}
+          <FileProvider gatewayUrl={gatewayInfo.gatewayUrl}>
+            <div className="flex-1 flex flex-col">
+              {/* Tab bar */}
+              <div className="flex border-b border-gray-800 bg-gray-900/30">
+                <button
+                  onClick={() => setActiveTab('chat')}
+                  className={`px-4 py-3 text-sm font-medium transition-colors ${
+                    activeTab === 'chat'
+                      ? 'text-white border-b-2 border-purple-500'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  💬 Chat
+                </button>
+                <button
+                  onClick={() => setActiveTab('files')}
+                  className={`px-4 py-3 text-sm font-medium transition-colors ${
+                    activeTab === 'files'
+                      ? 'text-white border-b-2 border-purple-500'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  📁 Files
+                </button>
+              </div>
+              
+              {/* Tab content */}
+              <div className="flex-1 overflow-hidden">
+                {activeTab === 'chat' && (
+                  <AutomnaChat
+                    key={currentConversation}
+                    gatewayUrl={gatewayInfo.gatewayUrl}
+                    sessionKey={currentConversation}
+                  />
+                )}
+                {activeTab === 'files' && (
+                  <FileBrowser isVisible={activeTab === 'files'} />
+                )}
+              </div>
+            </div>
+          </FileProvider>
         </div>
       </div>
     );
