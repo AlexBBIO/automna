@@ -392,6 +392,48 @@ This is NOT a chatbot. Users will have their agents:
 
 ---
 
+## Architecture Principles
+
+These principles guide all Automna feature development:
+
+### R2-First Design
+All persistent data goes to R2 from the start. Don't design for local filesystem then retrofit R2 later.
+
+**Why:** Cloudflare Workers are stateless. Container storage is ephemeral. R2 is the only durable layer.
+
+**Rules:**
+- Design APIs around object storage patterns (key-based, eventual consistency)
+- No local filesystem assumptions in worker code
+- Treat container `/data` as a cache, not source of truth
+- Sync to R2 on every meaningful state change
+- Load from R2 first, fall back to container only if needed
+
+**Pattern:**
+```
+Write: API → R2 → (optional) container cache
+Read:  API → R2 (fast path) → container (fallback if R2 miss)
+```
+
+### User Isolation by Default
+Every feature must consider multi-tenancy from day one.
+
+**Rules:**
+- All R2 paths include userId: `/users/{userId}/...`
+- All Durable Objects keyed by userId
+- Never share state between users
+- Validate userId from signed token, never from request body
+
+### Fail Gracefully
+Containers sleep. R2 might be slow. Design for degradation.
+
+**Rules:**
+- Always have timeout on container operations
+- Show loading states, not spinners-forever
+- Cache aggressively, invalidate carefully
+- Prefer stale data over no data (where safe)
+
+---
+
 ## Technical Architecture
 
 ### Infrastructure Options
