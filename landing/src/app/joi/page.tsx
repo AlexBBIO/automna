@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
-
 const quotes = [
   { start: "You look like you could use", end: "cutting-edge AI infrastructure", tagline: "I can provide that." },
   { start: "You look like you need", end: "a personal agent that actually works", tagline: "I can be that." },
@@ -73,33 +71,29 @@ export default function JoiPage() {
       {/* Main content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-16">
         
-        {/* Joi hologram image with animation */}
-        <div 
-          className="relative w-full max-w-2xl aspect-video mb-16"
-          style={{
-            animation: 'float 6s ease-in-out infinite',
-          }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10" />
+        {/* Joi hologram video */}
+        <div className="relative w-full max-w-3xl mb-16">
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10 pointer-events-none" />
           
-          {/* Glow effect behind image */}
-          <div className="absolute inset-0 flex items-center justify-center">
+          {/* Glow effect behind video */}
+          <div className="absolute inset-0 flex items-center justify-center -z-10">
             <div 
-              className="w-3/4 h-3/4 bg-gradient-to-r from-pink-500/20 to-cyan-500/20 rounded-full blur-3xl"
+              className="w-3/4 h-3/4 bg-gradient-to-r from-pink-500/30 to-cyan-500/30 rounded-full blur-3xl"
               style={{
                 animation: 'glow 4s ease-in-out infinite',
               }}
             />
           </div>
           
-          <Image
-            src="/joi-hero.png"
-            alt="AI Assistant"
-            fill
-            className="object-contain opacity-90"
+          <video
+            src="/joi-hero.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-auto rounded-lg"
             style={{
               filter: 'drop-shadow(0 0 40px rgba(236, 72, 153, 0.6)) drop-shadow(0 0 80px rgba(6, 182, 212, 0.4))',
-              animation: 'breathe 4s ease-in-out infinite',
             }}
           />
         </div>
