@@ -2,8 +2,9 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AutomnaChat } from "@/components/AutomnaChat";
+import { ChatSkeleton } from "@/components/ChatSkeleton";
 
 const CreditCardIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -17,11 +18,14 @@ interface GatewayInfo {
   sessionKey?: string;
 }
 
+type LoadPhase = 'init' | 'syncing' | 'fetching-gateway' | 'warming' | 'ready' | 'error';
+
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
   const [gatewayInfo, setGatewayInfo] = useState<GatewayInfo | null>(null);
-  const [gatewayLoading, setGatewayLoading] = useState(true);
+  const [loadPhase, setLoadPhase] = useState<LoadPhase>('init');
   const [loadingPortal, setLoadingPortal] = useState(false);
+  const prewarmStarted = useRef(false);
 
   const handleManageBilling = async () => {
     setLoadingPortal(true);
@@ -37,21 +41,61 @@ export default function DashboardPage() {
     setLoadingPortal(false);
   };
 
+  // Prewarm the sandbox (fire and forget)
+  const prewarmSandbox = async (gatewayUrl: string) => {
+    if (prewarmStarted.current) return;
+    prewarmStarted.current = true;
+    
+    try {
+      const wsUrl = new URL(gatewayUrl);
+      const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
+      const keepAliveUrl = new URL(`${baseUrl}/api/keepalive`);
+      
+      // Pass auth params
+      const userId = wsUrl.searchParams.get('userId');
+      const exp = wsUrl.searchParams.get('exp');
+      const sig = wsUrl.searchParams.get('sig');
+      if (userId) keepAliveUrl.searchParams.set('userId', userId);
+      if (exp) keepAliveUrl.searchParams.set('exp', exp);
+      if (sig) keepAliveUrl.searchParams.set('sig', sig);
+      
+      console.log('[prewarm] Starting sandbox warmup...');
+      await fetch(keepAliveUrl.toString());
+      console.log('[prewarm] Sandbox warmed');
+    } catch (err) {
+      console.warn('[prewarm] Failed (non-fatal):', err);
+    }
+  };
+
   // Sync user and fetch gateway info on mount
   useEffect(() => {
     if (!isLoaded || !user) return;
     
+    setLoadPhase('syncing');
+    
     fetch('/api/user/sync', { method: 'POST' })
       .then(res => res.json())
-      .then(() => fetch('/api/user/gateway'))
+      .then(() => {
+        setLoadPhase('fetching-gateway');
+        return fetch('/api/user/gateway');
+      })
       .then(res => res.json())
       .then(data => {
         if (data.gatewayUrl) {
           setGatewayInfo(data);
+          setLoadPhase('warming');
+          // Start prewarming immediately (don't wait)
+          prewarmSandbox(data.gatewayUrl);
+          // Move to ready after a brief delay to show warming phase
+          setTimeout(() => setLoadPhase('ready'), 500);
+        } else {
+          setLoadPhase('error');
         }
       })
-      .catch(err => console.error('User sync/gateway fetch error:', err))
-      .finally(() => setGatewayLoading(false));
+      .catch(err => {
+        console.error('User sync/gateway fetch error:', err);
+        setLoadPhase('error');
+      });
   }, [isLoaded, user]);
 
   // Keep-alive pings to prevent sandbox hibernation
@@ -81,10 +125,25 @@ export default function DashboardPage() {
     return () => clearInterval(pingInterval);
   }, [gatewayInfo]);
 
-  if (!isLoaded || gatewayLoading) {
+  // Show skeleton during initial loading phases
+  if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway') {
+    const phaseMessages: Record<string, string> = {
+      'init': 'Initializing...',
+      'syncing': 'Syncing account...',
+      'fetching-gateway': 'Connecting to your agent...',
+    };
+    
     return (
-      <div className="h-screen bg-gray-950 flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+      <div className="h-screen bg-gray-950 flex flex-col">
+        <nav className="border-b border-gray-800 bg-black/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
+          <Link href="/" className="text-xl font-bold tracking-tight">
+            <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
+          </Link>
+          <div className="w-8 h-8 rounded-full bg-gray-800 animate-pulse"></div>
+        </nav>
+        <div className="flex-1">
+          <ChatSkeleton phase="connecting" message={phaseMessages[loadPhase] || 'Loading...'} />
+        </div>
       </div>
     );
   }
