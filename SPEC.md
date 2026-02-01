@@ -35,17 +35,38 @@
 | Telegram integration | ❌ Not started | Need setup flow in dashboard |
 
 ### 📝 Recent Changes (2026-02-01)
+
+**Load Time & History:**
 - Fixed WebSocket client ID (must be 'webchat' not custom)
 - Fixed history race condition (WS empty → HTTP fallback)
-- Added test suite (30 unit tests for runtime + signed-url)
-- Added GitHub Actions CI (tests run on every push)
-- Forked moltworker to `AlexBBIO/automna-moltworker` for full control
-- Added ChatSkeleton component for optimistic loading
-- Added progressive loading phases (syncing → connecting → warming)
-- Added prewarming on gateway URL fetch
 - Added R2 fast path for history loading (see Architecture section)
 - Added security hardening (session key validation, path traversal prevention)
 - Added message limit (default 50, max 200) for scalability
+- Added container timeout (30s) to prevent indefinite hang
+- R2 sync on: keepalive ping (4 min), WebSocket disconnect, first history load
+
+**Chat UI:**
+- Added MessageContent component with code block parsing
+- Syntax highlighting via react-syntax-highlighter (Prism + oneDark theme)
+- Copy button on code blocks with "Copied!" feedback
+- Inline code styling (`code`)
+- Typing indicator (bouncing dots) while agent responds
+- Keyboard shortcuts: Enter (send), Shift+Enter (newline), Esc (cancel)
+
+**Multiple Channels:**
+- ChannelSidebar component with expand/collapse
+- Create new channels (stored in localStorage)
+- Switch between channels (each = different Clawdbot sessionKey)
+- Collapsed view shows just emoji icons
+- State persisted in localStorage
+
+**Infrastructure:**
+- Forked moltworker to `AlexBBIO/automna-moltworker` for full control
+- Added test suite (30+ unit tests for runtime + signed-url)
+- Added GitHub Actions CI (tests run on every push)
+- ChatSkeleton component for optimistic loading
+- Progressive loading phases (syncing → connecting → warming)
+- Prewarming on gateway URL fetch
 
 ### 🏗️ History Loading Architecture
 
@@ -123,6 +144,44 @@ moltbot-data/
 - 30 second timeout on container startup to prevent indefinite hang
 - If timeout hits, returns error instead of hanging forever
 
+### 💬 Chat UI Architecture
+
+**Components:**
+```
+Dashboard (page.tsx)
+├── ChannelSidebar
+│   ├── Channel list (from localStorage)
+│   ├── Create channel form
+│   └── Collapse/expand toggle
+└── AutomnaChat
+    ├── ConnectionStatus
+    ├── Message list
+    │   └── MessageContent (per message)
+    │       ├── Code blocks (with copy)
+    │       ├── Inline code
+    │       └── Plain text
+    ├── TypingIndicator
+    └── Input form
+```
+
+**MessageContent Parsing:**
+1. Split text on ` ```language\ncode``` ` for code blocks
+2. Split remaining text on `` `code` `` for inline code
+3. Render code blocks with Prism syntax highlighting
+4. Render inline code with monospace styling
+
+**Multiple Channels:**
+- Each channel = different Clawdbot `sessionKey`
+- Channels stored in `localStorage('automna-channels')`
+- Default channel: `main` (key) / "General" (name)
+- New channels: slugified name as key, original as display name
+- Sidebar collapse state in `localStorage('automna-sidebar-collapsed')`
+
+**Keyboard Shortcuts:**
+- `Enter` → Send message
+- `Shift+Enter` → New line
+- `Escape` → Cancel generation (stop streaming)
+
 ### 🎯 MVP Features (2026-01-31)
 
 **See [`docs/MVP-STEPS.md`](docs/MVP-STEPS.md) for full implementation details.**
@@ -143,16 +202,16 @@ moltbot-data/
 | └─ Markdown viewer/editor | P0 | 4h | |
 | └─ Upload/download files | P0 | 4h | |
 | └─ Agent memory viewer | P1 | 2h | |
-| **Chat UI Improvements** | P0 | 12h | Planned |
-| └─ Visual polish | P0 | 3h | |
-| └─ Typing indicator | P0 | 1h | |
-| └─ Code blocks + copy | P0 | 2h | |
-| └─ Better input + actions | P1 | 4h | |
-| └─ Keyboard shortcuts | P2 | 2h | |
-| **Multiple Channels** | P1 | 9h | Planned |
-| └─ Channels API | P1 | 3h | |
-| └─ Channel sidebar UI | P1 | 4h | |
-| └─ Create/delete/switch | P1 | 2h | |
+| **Chat UI Improvements** | P0 | 12h | ✅ Mostly Done |
+| └─ Visual polish | P0 | 3h | ✅ Done |
+| └─ Typing indicator | P0 | 1h | ✅ Done |
+| └─ Code blocks + copy | P0 | 2h | ✅ Done |
+| └─ Better input + actions | P1 | 4h | Planned |
+| └─ Keyboard shortcuts | P2 | 2h | ✅ Done (Enter/Shift+Enter/Esc) |
+| **Multiple Channels** | P1 | 9h | ✅ Done |
+| └─ Channels API | P1 | 3h | ✅ Done (localStorage) |
+| └─ Channel sidebar UI | P1 | 4h | ✅ Done |
+| └─ Create/delete/switch | P1 | 2h | ✅ Done (create/switch) |
 
 **Total MVP Effort: ~59 hours (2 weeks)**
 
