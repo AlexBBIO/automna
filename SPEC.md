@@ -115,8 +115,12 @@ moltbot-data/
 
 **When R2 Data Gets Synced:**
 1. After first history load from container (background sync)
-2. NOT synced by cron (cron only syncs shared/admin sandbox)
-3. Future: Could add sync on WebSocket close or after each message
+2. On every keepalive ping (every 4 minutes while user is active)
+3. NOT synced by cron (cron only syncs shared/admin sandbox)
+
+**Container Fallback Timeout:**
+- 30 second timeout on container startup to prevent indefinite hang
+- If timeout hits, returns error instead of hanging forever
 
 ### 🎯 MVP Features (2026-01-31)
 
