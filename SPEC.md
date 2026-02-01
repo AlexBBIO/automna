@@ -43,6 +43,80 @@
 - Added ChatSkeleton component for optimistic loading
 - Added progressive loading phases (syncing → connecting → warming)
 - Added prewarming on gateway URL fetch
+- Added R2 fast path for history loading (see Architecture section)
+- Added security hardening (session key validation, path traversal prevention)
+- Added message limit (default 50, max 200) for scalability
+
+### 🏗️ History Loading Architecture
+
+**Problem:** Cold start takes 8-30s because loading history requires booting the container.
+
+**Solution:** Two-path architecture with R2 caching.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    History Load Request                          │
+│                   /ws/api/history?sessionKey=main                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────┐
+              │   1. Try R2 Fast Path         │
+              │   (No container boot needed)   │
+              │   ~100-500ms                   │
+              └───────────────────────────────┘
+                              │
+            ┌─────────────────┴─────────────────┐
+            │                                   │
+            ▼                                   ▼
+    ┌───────────────┐                  ┌───────────────┐
+    │  R2 HIT ✅    │                  │  R2 MISS ❌   │
+    │  Return fast  │                  │  (First load) │
+    │  source: 'r2' │                  │               │
+    └───────────────┘                  └───────────────┘
+                                               │
+                                               ▼
+                              ┌───────────────────────────────┐
+                              │   2. Container Slow Path      │
+                              │   Boot container + read file  │
+                              │   ~8-30s (cold) / ~2s (warm)  │
+                              └───────────────────────────────┘
+                                               │
+                                               ▼
+                              ┌───────────────────────────────┐
+                              │   3. Background R2 Sync       │
+                              │   Copy data to R2 for next    │
+                              │   time (async, non-blocking)  │
+                              └───────────────────────────────┘
+```
+
+**R2 Path Structure:**
+```
+moltbot-data/
+└── users/
+    └── {userId}/
+        └── clawdbot/
+            └── agents/main/sessions/
+                ├── sessions.json
+                └── main/
+                    └── history.jsonl
+```
+
+**Security Measures:**
+- Session key sanitization (alphanumeric + dash/underscore only)
+- Path traversal prevention (validates paths stay within user directory)
+- Signed URL validation (userId from HMAC-signed token)
+- Max file size check (5MB) to prevent OOM
+
+**Scalability Measures:**
+- Message limit (default 50, configurable via `?limit=N`, max 200)
+- Returns only most recent messages when over limit
+- Background sync is non-blocking (uses `waitUntil`)
+
+**When R2 Data Gets Synced:**
+1. After first history load from container (background sync)
+2. NOT synced by cron (cron only syncs shared/admin sandbox)
+3. Future: Could add sync on WebSocket close or after each message
 
 ### 🎯 MVP Features (2026-01-31)
 
