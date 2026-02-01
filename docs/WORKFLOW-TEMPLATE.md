@@ -1,0 +1,41 @@
+# Copy this into .github/workflows/test.yml
+
+```yaml
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install Landing Dependencies
+        working-directory: landing
+        run: npm ci
+      
+      - name: Run Landing Tests
+        working-directory: landing
+        run: npm run test:run
+      
+      - name: Install Moltworker Dependencies
+        working-directory: moltworker
+        run: npm install
+      
+      - name: Run Moltworker Tests
+        working-directory: moltworker
+        run: npm test
+```
