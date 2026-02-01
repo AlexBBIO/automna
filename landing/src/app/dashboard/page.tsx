@@ -211,10 +211,13 @@ export default function DashboardPage() {
     // Don't reset isResetting on success - page will reload
   };
 
-  // Prewarm the sandbox (fire and forget)
-  const prewarmSandbox = async (gatewayUrl: string) => {
+  // Prewarm the sandbox - waits for container to be ready
+  // Returns when container is warm or after timeout (60s)
+  const prewarmSandbox = async (gatewayUrl: string): Promise<void> => {
     if (prewarmStarted.current) return;
     prewarmStarted.current = true;
+    
+    const PREWARM_TIMEOUT_MS = 60000; // 60 seconds max wait
     
     try {
       const wsUrl = new URL(gatewayUrl);
@@ -229,10 +232,23 @@ export default function DashboardPage() {
       if (sig) keepAliveUrl.searchParams.set('sig', sig);
       
       console.log('[prewarm] Starting sandbox warmup...');
-      await fetch(keepAliveUrl.toString());
-      console.log('[prewarm] Sandbox warmed');
+      
+      // Fetch with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), PREWARM_TIMEOUT_MS);
+      
+      try {
+        await fetch(keepAliveUrl.toString(), { signal: controller.signal });
+        console.log('[prewarm] Sandbox warmed');
+      } finally {
+        clearTimeout(timeoutId);
+      }
     } catch (err) {
-      console.warn('[prewarm] Failed (non-fatal):', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.warn('[prewarm] Timeout after 60s - proceeding anyway');
+      } else {
+        console.warn('[prewarm] Failed (non-fatal):', err);
+      }
     }
   };
 
@@ -249,12 +265,14 @@ export default function DashboardPage() {
         return fetch('/api/user/gateway');
       })
       .then(res => res.json())
-      .then(data => {
+      .then(async data => {
         if (data.gatewayUrl) {
           setGatewayInfo(data);
           setLoadPhase('warming');
-          prewarmSandbox(data.gatewayUrl);
-          setTimeout(() => setLoadPhase('ready'), 500);
+          // Wait for prewarm to complete before showing ready
+          // This ensures the container is warm before WebSocket connects
+          await prewarmSandbox(data.gatewayUrl);
+          setLoadPhase('ready');
         } else {
           setLoadPhase('error');
         }
@@ -289,12 +307,13 @@ export default function DashboardPage() {
     return () => clearInterval(pingInterval);
   }, [gatewayInfo]);
 
-  // Show skeleton during initial loading phases
-  if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway') {
+  // Show skeleton during initial loading phases (including warming)
+  if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway' || loadPhase === 'warming') {
     const phaseMessages: Record<string, string> = {
       'init': 'Initializing...',
       'syncing': 'Syncing account...',
       'fetching-gateway': 'Connecting to your agent...',
+      'warming': 'Starting your agent (this may take a moment)...',
     };
     
     return (
