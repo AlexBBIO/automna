@@ -54,6 +54,33 @@ export default function DashboardPage() {
       .finally(() => setGatewayLoading(false));
   }, [isLoaded, user]);
 
+  // Keep-alive pings to prevent sandbox hibernation
+  useEffect(() => {
+    if (!gatewayInfo?.gatewayUrl) return;
+    
+    // Ping every 4 minutes while user is on dashboard
+    const pingInterval = setInterval(() => {
+      // Extract base URL for keep-alive
+      const wsUrl = new URL(gatewayInfo.gatewayUrl);
+      const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
+      
+      // Build keep-alive URL with auth params
+      const keepAliveUrl = new URL(`${baseUrl}/api/keepalive`);
+      const userId = wsUrl.searchParams.get('userId');
+      const exp = wsUrl.searchParams.get('exp');
+      const sig = wsUrl.searchParams.get('sig');
+      if (userId) keepAliveUrl.searchParams.set('userId', userId);
+      if (exp) keepAliveUrl.searchParams.set('exp', exp);
+      if (sig) keepAliveUrl.searchParams.set('sig', sig);
+      
+      fetch(keepAliveUrl.toString(), { method: 'GET' })
+        .then(() => console.log('[keepalive] ping'))
+        .catch(() => {}); // Ignore errors
+    }, 4 * 60 * 1000); // 4 minutes
+    
+    return () => clearInterval(pingInterval);
+  }, [gatewayInfo]);
+
   if (!isLoaded || gatewayLoading) {
     return (
       <div className="h-screen bg-gray-950 flex items-center justify-center">

@@ -3,6 +3,10 @@
  * 
  * Connects to Clawdbot's Gateway WebSocket API.
  * Handles streaming responses and message history.
+ * 
+ * Optimizations:
+ * - Parallel HTTP history fetch (doesn't wait for WebSocket to fail)
+ * - Loading states for better UX
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -30,17 +34,60 @@ interface ClawdbotConfig {
   sessionKey?: string;
 }
 
+type LoadingPhase = 'connecting' | 'loading-history' | 'ready' | 'error';
+
 const genId = () => crypto.randomUUID();
+
+// Parse messages from API response
+function parseMessages(messages: Array<{ role: string; content: unknown; timestamp?: number }>, prefix: string): ThreadMessage[] {
+  return messages.map((m, idx) => {
+    let textContent = '';
+    if (Array.isArray(m.content)) {
+      const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
+      textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
+    } else if (typeof m.content === 'string') {
+      textContent = m.content;
+    }
+    // Strip [message_id: ...] metadata from display
+    textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+    return {
+      id: `${prefix}-${idx}`,
+      role: m.role as 'user' | 'assistant',
+      content: [{ type: 'text' as const, text: textContent }],
+      createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
+    };
+  });
+}
+
+// Build HTTP history URL from WebSocket URL
+function buildHistoryUrl(gatewayUrl: string, sessionKey: string): string {
+  const wsUrl = new URL(gatewayUrl);
+  const httpUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
+  const historyUrl = new URL(`${httpUrl}/ws/api/history`);
+  historyUrl.searchParams.set('sessionKey', sessionKey);
+  // Pass through auth params
+  const userId = wsUrl.searchParams.get('userId');
+  const exp = wsUrl.searchParams.get('exp');
+  const sig = wsUrl.searchParams.get('sig');
+  if (userId) historyUrl.searchParams.set('userId', userId);
+  if (exp) historyUrl.searchParams.set('exp', exp);
+  if (sig) historyUrl.searchParams.set('sig', sig);
+  return historyUrl.toString();
+}
 
 export function useClawdbotRuntime(config: ClawdbotConfig) {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('connecting');
+  const [error, setError] = useState<string | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
   const mountedRef = useRef(true);
   const connectSentRef = useRef(false);
   const streamingTextRef = useRef('');
+  const historyLoadedRef = useRef(false);
+  const httpHistoryAbortRef = useRef<AbortController | null>(null);
   
   // Store config in ref to avoid effect deps
   const configRef = useRef(config);
@@ -63,31 +110,52 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   // Connect to gateway
   useEffect(() => {
     if (!config.gatewayUrl) {
-      console.log('[clawdbot] No gateway URL');
+      setError('No gateway URL configured');
+      setLoadingPhase('error');
       return;
     }
     
     mountedRef.current = true;
     connectSentRef.current = false;
     streamingTextRef.current = '';
+    historyLoadedRef.current = false;
+    setLoadingPhase('connecting');
+    setError(null);
     
-    // Build WebSocket URL - Moltworker expects /ws path with token in query
+    // === PARALLEL HTTP HISTORY FETCH ===
+    // Start fetching history via HTTP immediately (don't wait for WebSocket)
+    const httpAbort = new AbortController();
+    httpHistoryAbortRef.current = httpAbort;
+    
+    const historyUrl = buildHistoryUrl(config.gatewayUrl, sessionKey);
+    fetch(historyUrl, { signal: httpAbort.signal })
+      .then(res => res.json())
+      .then(data => {
+        if (!mountedRef.current || historyLoadedRef.current) return;
+        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+          console.log(`[clawdbot] HTTP history: ${data.messages.length} messages`);
+          historyLoadedRef.current = true;
+          setMessages(parseMessages(data.messages, 'http'));
+          setLoadingPhase('ready');
+        }
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          console.warn('[clawdbot] HTTP history fetch failed:', err.message);
+        }
+      });
+    
+    // === WEBSOCKET CONNECTION ===
     let wsUrl = config.gatewayUrl;
-    
-    // Ensure we have /ws path for Moltworker compatibility
     if (!wsUrl.includes('/ws')) {
-      // Remove trailing slash if present
-      wsUrl = wsUrl.replace(/\/$/, '');
-      wsUrl = `${wsUrl}/ws`;
+      wsUrl = wsUrl.replace(/\/$/, '') + '/ws';
     }
-    
-    // Add token as query parameter if provided
     if (config.authToken) {
       const separator = wsUrl.includes('?') ? '&' : '?';
       wsUrl = `${wsUrl}${separator}token=${encodeURIComponent(config.authToken)}`;
     }
     
-    console.log('[clawdbot] Connecting to', wsUrl);
+    console.log('[clawdbot] Connecting...');
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
     
@@ -102,8 +170,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         minProtocol: 3,
         maxProtocol: 3,
         client: {
-          id: 'clawdbot-control-ui',
-          version: 'vdev',
+          id: 'automna-chat',
+          version: '1.0.0',
           platform: typeof navigator !== 'undefined' ? navigator.platform : 'web',
           mode: 'webchat',
         },
@@ -119,7 +187,6 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         connectParams.auth = { token: cfg.authToken };
       }
       
-      console.log('[clawdbot] Sending connect request');
       ws.send(JSON.stringify({
         type: 'req',
         id: genId(),
@@ -130,7 +197,6 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     ws.onopen = () => {
       console.log('[clawdbot] WebSocket opened');
-      // Wait for challenge, fallback after 800ms
       connectTimer = setTimeout(sendConnect, 800);
     };
 
@@ -142,7 +208,6 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         
         // Handle challenge
         if (msg.type === 'event' && msg.event === 'connect.challenge') {
-          console.log('[clawdbot] Got challenge');
           if (connectTimer) clearTimeout(connectTimer);
           sendConnect();
           return;
@@ -150,105 +215,61 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         
         // Handle connect response
         if (msg.type === 'res' && msg.ok && msg.payload?.type === 'hello-ok') {
-          console.log('[clawdbot] Connected successfully');
-          if (mountedRef.current) {
-            setIsConnected(true);
-            // Load history
+          console.log('[clawdbot] Connected');
+          setIsConnected(true);
+          
+          // Request history from WebSocket too (might be faster if already loaded)
+          if (!historyLoadedRef.current) {
+            setLoadingPhase('loading-history');
             wsSend('chat.history', { sessionKey: configRef.current.sessionKey || 'main' });
           }
           return;
         }
         
-        // Handle history response
-        console.log('[clawdbot] Checking for history response:', { type: msg.type, ok: msg.ok, payloadType: typeof msg.payload, hasMessages: Array.isArray(msg.payload?.messages), msgCount: msg.payload?.messages?.length });
+        // Handle history response from WebSocket
         if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
           const wsMessages = msg.payload.messages;
-          console.log('[clawdbot] Got WebSocket history:', wsMessages.length, 'messages');
           
-          // If WebSocket history is empty, try HTTP API fallback
-          if (wsMessages.length === 0) {
-            console.log('[clawdbot] WebSocket history empty, trying HTTP API fallback');
-            const cfg = configRef.current;
-            // Convert wss:// to https:// and extract auth params
-            const wsUrl = new URL(cfg.gatewayUrl);
-            const httpUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
-            const sessionKey = cfg.sessionKey || 'main';
+          // Only use WebSocket history if we haven't loaded from HTTP yet
+          if (!historyLoadedRef.current && wsMessages.length > 0) {
+            console.log(`[clawdbot] WS history: ${wsMessages.length} messages`);
+            historyLoadedRef.current = true;
+            httpHistoryAbortRef.current?.abort(); // Cancel HTTP fetch
             
-            // Build URL with auth params from WebSocket URL
-            const historyUrl = new URL(`${httpUrl}/ws/api/history`);
-            historyUrl.searchParams.set('sessionKey', sessionKey);
-            // Pass through auth params (userId, exp, sig)
-            const userId = wsUrl.searchParams.get('userId');
-            const exp = wsUrl.searchParams.get('exp');
-            const sig = wsUrl.searchParams.get('sig');
-            if (userId) historyUrl.searchParams.set('userId', userId);
-            if (exp) historyUrl.searchParams.set('exp', exp);
-            if (sig) historyUrl.searchParams.set('sig', sig);
-            
-            console.log('[clawdbot] HTTP fallback URL:', historyUrl.toString());
-            
-            fetch(historyUrl.toString())
-              .then(res => {
-                console.log('[clawdbot] HTTP fallback response status:', res.status);
-                return res.json();
-              })
-              .then(data => {
-                console.log('[clawdbot] HTTP fallback data:', JSON.stringify(data).slice(0, 500));
-                if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-                  console.log(`[clawdbot] HTTP API returned ${data.messages.length} messages`);
-                  const history = data.messages.map((m: { role: string; content: unknown; timestamp?: number }, idx: number) => {
-                    let textContent = '';
-                    if (Array.isArray(m.content)) {
-                      const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
-                      textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
-                    } else if (typeof m.content === 'string') {
-                      textContent = m.content;
-                    }
-                    // Strip [message_id: ...] metadata from display
-                    textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
-                    return {
-                      id: `http-${idx}`,
-                      role: m.role as 'user' | 'assistant',
-                      content: [{ type: 'text' as const, text: textContent }],
-                      createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
-                    };
-                  });
-                  if (mountedRef.current) setMessages(history);
-                }
-              })
-              .catch(err => console.error('[clawdbot] HTTP history fallback failed:', err));
-            return;
+            const history = wsMessages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
+              let textContent = '';
+              if (Array.isArray(m.content)) {
+                const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
+                textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
+              } else if (typeof m.content === 'string') {
+                textContent = m.content;
+              }
+              textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+              return {
+                id: m.id,
+                role: m.role as 'user' | 'assistant',
+                content: [{ type: 'text' as const, text: textContent }],
+                createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+              };
+            });
+            setMessages(history);
           }
           
-          const history = wsMessages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
-            // Extract text from content (gateway returns array of content parts)
-            let textContent = '';
-            if (Array.isArray(m.content)) {
-              const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
-              textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
-            } else if (typeof m.content === 'string') {
-              textContent = m.content;
-            }
-            // Strip [message_id: ...] metadata from display
-            textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
-            return {
-              id: m.id,
-              role: m.role as 'user' | 'assistant',
-              content: [{ type: 'text' as const, text: textContent }],
-              createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
-            };
-          });
-          if (mountedRef.current) setMessages(history);
+          // Mark as ready even if no history
+          if (!historyLoadedRef.current) {
+            historyLoadedRef.current = true;
+          }
+          setLoadingPhase('ready');
           return;
         }
         
         // Handle chat.send ack
         if (msg.type === 'res' && msg.ok && (msg.payload?.status === 'started' || msg.payload?.status === 'in_flight')) {
-          if (mountedRef.current) setIsRunning(true);
+          setIsRunning(true);
           return;
         }
         
-        // Handle chat events
+        // Handle chat events (streaming)
         if (msg.type === 'event' && msg.event === 'chat') {
           const { state, message } = msg.payload || {};
           const role = message?.role;
@@ -257,30 +278,26 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           if (role === 'assistant') {
             if (state === 'delta' && textContent) {
               streamingTextRef.current = textContent;
-              if (mountedRef.current) {
-                setMessages(prev => {
-                  const last = prev[prev.length - 1];
-                  if (last?.role === 'assistant' && last.id === 'streaming') {
-                    return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
-                  }
-                  return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() }];
-                });
-              }
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last?.role === 'assistant' && last.id === 'streaming') {
+                  return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
+                }
+                return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() }];
+              });
             }
             
             if (state === 'final') {
               const finalText = textContent || streamingTextRef.current;
               streamingTextRef.current = '';
-              if (mountedRef.current) {
-                setMessages(prev => {
-                  const last = prev[prev.length - 1];
-                  if (last?.role === 'assistant') {
-                    return [...prev.slice(0, -1), { ...last, id: genId(), content: [{ type: 'text', text: finalText }] }];
-                  }
-                  return prev;
-                });
-                setIsRunning(false);
-              }
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last?.role === 'assistant') {
+                  return [...prev.slice(0, -1), { ...last, id: genId(), content: [{ type: 'text', text: finalText }] }];
+                }
+                return prev;
+              });
+              setIsRunning(false);
             }
           }
         }
@@ -288,7 +305,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         // Handle errors
         if (msg.type === 'res' && !msg.ok) {
           console.error('[clawdbot] Error:', msg.error);
-          if (mountedRef.current) setIsRunning(false);
+          setIsRunning(false);
+          if (msg.error?.message) {
+            setError(msg.error.message);
+          }
         }
         
       } catch (e) {
@@ -296,18 +316,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       }
     };
 
-    ws.onerror = (error) => {
-      console.error('[clawdbot] WebSocket error:', error);
+    ws.onerror = () => {
+      console.error('[clawdbot] WebSocket error');
+      setError('Connection failed');
+      setLoadingPhase('error');
     };
 
     ws.onclose = (event) => {
       console.log('[clawdbot] WebSocket closed:', event.code);
-      if (mountedRef.current) setIsConnected(false);
+      setIsConnected(false);
+      if (event.code !== 1000 && loadingPhase !== 'ready') {
+        setError('Connection closed unexpectedly');
+        setLoadingPhase('error');
+      }
     };
 
     return () => {
-      console.log('[clawdbot] Cleanup');
       mountedRef.current = false;
+      httpHistoryAbortRef.current?.abort();
       if (connectTimer) clearTimeout(connectTimer);
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close(1000, 'Component unmounted');
@@ -344,5 +370,5 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     setIsRunning(false);
   }, [wsSend]);
 
-  return { messages, isRunning, isConnected, append, cancel };
+  return { messages, isRunning, isConnected, loadingPhase, error, append, cancel };
 }
