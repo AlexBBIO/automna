@@ -138,7 +138,7 @@ export default function JoiPage() {
               e.currentTarget.style.boxShadow = '0 0 30px rgba(236,72,153,0.4), 0 0 60px rgba(6,182,212,0.2)';
             }}
           >
-            <span className="relative z-10">Meet Automna</span>
+            <span className="relative z-10">Get Started</span>
           </a>
           <p className="text-gray-500 text-sm">Your AI companion awaits</p>
         </div>
