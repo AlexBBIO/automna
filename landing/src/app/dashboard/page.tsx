@@ -44,7 +44,7 @@ export default function DashboardPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [sidebarHidden, setSidebarHidden] = useState(true);
   
-  // Set initial sidebar state based on screen size
+  // Set initial sidebar state based on screen size (runs once on mount)
   useEffect(() => {
     const isLargeScreen = window.innerWidth >= 768;
     if (isLargeScreen) {
@@ -53,17 +53,30 @@ export default function DashboardPage() {
     } else {
       setSidebarHidden(true);
     }
+  }, []);
+  
+  // Handle resize: auto-hide sidebar when shrinking from large to small
+  // (but don't prevent user from opening it on mobile)
+  useEffect(() => {
+    let wasLarge = window.innerWidth >= 768;
     
     const handleResize = () => {
       const isLarge = window.innerWidth >= 768;
-      if (!isLarge && !sidebarHidden) {
+      // Only auto-hide when transitioning FROM large TO small
+      if (wasLarge && !isLarge) {
         setSidebarHidden(true);
       }
+      // Auto-show when transitioning FROM small TO large
+      if (!wasLarge && isLarge) {
+        setSidebarHidden(false);
+        setSidebarCollapsed(false);
+      }
+      wasLarge = isLarge;
     };
     
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [sidebarHidden]);
+  }, []);
 
   // Load conversations from localStorage on mount
   // Also migrate old 'automna-channels' key if present
