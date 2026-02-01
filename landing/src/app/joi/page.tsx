@@ -71,11 +71,11 @@ export default function JoiPage() {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-16">
         
         {/* Joi hologram image with animation */}
         <div 
-          className="relative w-full max-w-2xl aspect-video mb-12"
+          className="relative w-full max-w-2xl aspect-video mb-16"
           style={{
             animation: 'float 6s ease-in-out infinite',
           }}
@@ -105,7 +105,7 @@ export default function JoiPage() {
         </div>
 
         {/* Speech bubble / Quote area */}
-        <div className="text-center max-w-2xl mb-12">
+        <div className="text-center max-w-2xl mb-16">
           <div className="text-3xl md:text-5xl font-light tracking-wide mb-3">
             <span className="text-pink-400">{quotes[currentQuote].start}</span>
           </div>
@@ -121,17 +121,26 @@ export default function JoiPage() {
         </div>
 
         {/* CTA */}
-        <div className="flex flex-col items-center gap-5">
+        <div className="flex flex-col items-center gap-6 mb-8">
           <a
             href="/"
-            className="px-12 py-4 rounded-full text-lg font-medium transition-all duration-300
-                     bg-white/10 backdrop-blur-sm border border-white/20
-                     hover:bg-white/20 hover:border-white/30 hover:scale-105
-                     text-white tracking-wide"
+            className="group relative inline-flex items-center justify-center"
           >
-            Meet Automna
+            {/* Glow effect */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-pink-500 to-cyan-500 blur-lg opacity-50 group-hover:opacity-75 transition-opacity duration-300" />
+            
+            {/* Button */}
+            <div className="relative px-10 py-4 rounded-full bg-gradient-to-r from-pink-600 to-cyan-600 
+                          text-lg font-semibold tracking-wide
+                          border border-white/20
+                          shadow-lg shadow-pink-500/25
+                          group-hover:shadow-xl group-hover:shadow-pink-500/40
+                          group-hover:scale-105 transition-all duration-300">
+              Meet Automna
+            </div>
           </a>
-          <p className="text-gray-500 text-sm tracking-wide">Your AI companion awaits</p>
+          
+          <p className="text-gray-400 text-sm tracking-widest uppercase">Your AI companion awaits</p>
         </div>
 
       </div>
