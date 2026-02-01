@@ -138,7 +138,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           if (data.messages.length > 0) {
             setMessages(parseMessages(data.messages, 'http'));
           }
-          // HTTP success clears any WebSocket errors
+          // HTTP success means we can use the chat (even if WS failed)
+          setIsConnected(true);
           setError(null);
           setLoadingPhase('ready');
         }
@@ -353,8 +354,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     };
   }, [config.gatewayUrl, config.authToken, sessionKey, wsSend]);
 
-  // Send message
-  const append = useCallback((message: AppendMessage) => {
+  // Send message (with HTTP fallback)
+  const append = useCallback(async (message: AppendMessage) => {
     const text = message.content.find(p => p.type === 'text')?.text?.trim();
     if (!text) return;
 
@@ -369,11 +370,66 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     streamingTextRef.current = '';
     setIsRunning(true);
 
-    wsSend('chat.send', {
-      sessionKey: configRef.current.sessionKey || 'main',
-      message: text,
-      idempotencyKey: genId(),
-    });
+    const cfg = configRef.current;
+    const ws = wsRef.current;
+    const sessionKey = cfg.sessionKey || 'main';
+    
+    // Try WebSocket first if connected
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      wsSend('chat.send', {
+        sessionKey,
+        message: text,
+        idempotencyKey: genId(),
+      });
+      return;
+    }
+    
+    // Fall back to HTTP
+    console.log('[clawdbot] WebSocket not available, using HTTP fallback');
+    try {
+      const wsUrl = new URL(cfg.gatewayUrl);
+      const httpUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
+      const sendUrl = new URL(`${httpUrl}/api/chat/send`);
+      
+      // Pass through auth params
+      const userId = wsUrl.searchParams.get('userId');
+      const exp = wsUrl.searchParams.get('exp');
+      const sig = wsUrl.searchParams.get('sig');
+      if (userId) sendUrl.searchParams.set('userId', userId);
+      if (exp) sendUrl.searchParams.set('exp', exp);
+      if (sig) sendUrl.searchParams.set('sig', sig);
+      
+      const response = await fetch(sendUrl.toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, sessionKey }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      
+      // HTTP send doesn't stream, so we need to poll for response
+      // For now, just show a placeholder and reload history after a delay
+      setTimeout(async () => {
+        const historyUrl = buildHistoryUrl(cfg.gatewayUrl, sessionKey);
+        try {
+          const historyRes = await fetch(historyUrl);
+          const historyData = await historyRes.json();
+          if (historyData.messages && Array.isArray(historyData.messages)) {
+            setMessages(parseMessages(historyData.messages, 'poll'));
+          }
+        } catch (e) {
+          console.error('[clawdbot] Failed to poll history:', e);
+        }
+        setIsRunning(false);
+      }, 3000);
+    } catch (err) {
+      console.error('[clawdbot] HTTP send failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to send message');
+      setIsRunning(false);
+    }
   }, [wsSend]);
 
   // Cancel
