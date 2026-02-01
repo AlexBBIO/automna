@@ -132,10 +132,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       .then(res => res.json())
       .then(data => {
         if (!mountedRef.current || historyLoadedRef.current) return;
-        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+        if (data.messages && Array.isArray(data.messages)) {
           console.log(`[clawdbot] HTTP history: ${data.messages.length} messages`);
           historyLoadedRef.current = true;
-          setMessages(parseMessages(data.messages, 'http'));
+          if (data.messages.length > 0) {
+            setMessages(parseMessages(data.messages, 'http'));
+          }
+          // HTTP success clears any WebSocket errors
+          setError(null);
           setLoadingPhase('ready');
         }
       })
@@ -318,16 +322,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     ws.onerror = () => {
       console.error('[clawdbot] WebSocket error');
-      setError('Connection failed');
-      setLoadingPhase('error');
+      // Don't set error immediately - HTTP fallback might still work
     };
 
     ws.onclose = (event) => {
       console.log('[clawdbot] WebSocket closed:', event.code);
       setIsConnected(false);
-      if (event.code !== 1000 && loadingPhase !== 'ready') {
-        setError('Connection closed unexpectedly');
-        setLoadingPhase('error');
+      
+      // Only show error if:
+      // 1. Not a clean close (1000)
+      // 2. Not already in ready state
+      // 3. Wait a bit to see if HTTP fallback succeeds
+      if (event.code !== 1000) {
+        setTimeout(() => {
+          if (mountedRef.current && !historyLoadedRef.current) {
+            setError('Connection failed. Retrying...');
+            setLoadingPhase('error');
+          }
+        }, 3000); // Give HTTP fallback 3 seconds
       }
     };
 
