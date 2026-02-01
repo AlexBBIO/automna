@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 const quotes = [
-  { start: "You look like you could use", end: "cutting-edge AI infrastructure", tagline: "I can provide that." },
-  { start: "You look like you need", end: "a personal agent that actually works", tagline: "I can be that." },
-  { start: "You look lonely", end: "like you need some company", tagline: "I can fix that." },
+  { start: "You look like you could use", end: "some cutting-edge AI infrastructure", tagline: "I can provide that." },
+  { start: "You seem like you need", end: "a personal agent that actually works", tagline: "I can be that." },
+  { start: "You look lonely...", end: "want some company?", tagline: "I can fix that." },
   { start: "You seem tired of", end: "browsing the web yourself", tagline: "I can automate that." },
-  { start: "You look exhausted from", end: "doing repetitive tasks", tagline: "I can handle that." },
+  { start: "You look exhausted from", end: "doing repetitive tasks all day", tagline: "I can handle that." },
   { start: "You look like you deserve", end: "an AI that remembers everything", tagline: "I can do that." },
   { start: "You seem ready for", end: "the future of personal computing", tagline: "I can show you." },
-  { start: "You look like you need", end: "genetic solutions... I mean, AI solutions", tagline: "I can help with that." },
+  { start: "You look like you need some", end: "genetic solutions... I mean, AI solutions", tagline: "I can help with that." },
 ];
 
 export default function JoiPage() {
@@ -98,18 +98,18 @@ export default function JoiPage() {
           />
         </div>
 
-        {/* Speech bubble / Quote area */}
-        <div className="text-center max-w-2xl mb-16">
+        {/* Speech bubble / Quote area - fixed height to prevent layout shift */}
+        <div className="text-center max-w-2xl mb-16 h-[280px] md:h-[320px] flex flex-col justify-center">
           <div className="text-3xl md:text-5xl font-light tracking-wide mb-3">
             <span className="text-pink-400">{quotes[currentQuote].start}</span>
           </div>
-          <div className="text-3xl md:text-5xl font-bold min-h-[4rem]">
+          <div className="text-3xl md:text-5xl font-bold h-[80px] md:h-[120px] flex items-center justify-center">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-400">
               {displayedEnd}
             </span>
             {isTyping && <span className="animate-pulse text-cyan-400">|</span>}
           </div>
-          <div className={`text-2xl md:text-3xl mt-4 text-gray-300 italic transition-opacity duration-300 ${showTagline ? 'opacity-100' : 'opacity-0'}`}>
+          <div className={`text-2xl md:text-3xl mt-4 text-gray-300 italic transition-opacity duration-300 h-[40px] ${showTagline ? 'opacity-100' : 'opacity-0'}`}>
             {quotes[currentQuote].tagline}
           </div>
         </div>
