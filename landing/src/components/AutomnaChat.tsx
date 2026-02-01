@@ -1,14 +1,16 @@
 'use client';
 
 /**
- * AutomnaChat
+ * AutomnaChat - Polished Chat Interface
  * 
- * Chat interface component using Clawdbot backend.
- * Features:
- * - Optimistic loading states
- * - Typing indicators
- * - Message streaming
- * - Keyboard shortcuts
+ * UI Improvements (2026-02-01):
+ * - Assistant avatar with Automna branding
+ * - Visible timestamps (subtle)
+ * - Message actions on hover (Copy, Retry)
+ * - Fade-in animations for messages
+ * - Improved empty state with suggestions
+ * - Larger, more inviting input area
+ * - Better colors and spacing
  */
 
 import { useClawdbotRuntime } from '@/lib/clawdbot-runtime';
@@ -22,50 +24,59 @@ import {
 } from 'react';
 
 interface AutomnaChatProps {
-  /** WebSocket URL to gateway */
   gatewayUrl: string;
-  /** Auth token */
   authToken?: string;
-  /** Session key */
   sessionKey?: string;
 }
 
-// Loading skeleton for messages
+// Assistant avatar component
+function AssistantAvatar() {
+  return (
+    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 shadow-lg">
+      <span className="text-white text-sm font-bold">A</span>
+    </div>
+  );
+}
+
+// Loading skeleton with animation
 function ChatSkeleton() {
   return (
-    <div className="space-y-4 animate-pulse">
+    <div className="space-y-6 animate-pulse">
       <div className="flex justify-end">
-        <div className="bg-purple-900/30 rounded-2xl h-10 w-48" />
+        <div className="bg-purple-900/20 rounded-2xl h-12 w-52" />
       </div>
-      <div className="flex justify-start">
-        <div className="bg-gray-800/50 rounded-2xl h-16 w-64" />
+      <div className="flex gap-3 items-start">
+        <div className="w-8 h-8 rounded-full bg-gray-800" />
+        <div className="bg-gray-800/50 rounded-2xl h-20 w-72" />
       </div>
       <div className="flex justify-end">
-        <div className="bg-purple-900/30 rounded-2xl h-10 w-32" />
+        <div className="bg-purple-900/20 rounded-2xl h-12 w-36" />
       </div>
-      <div className="flex justify-start">
-        <div className="bg-gray-800/50 rounded-2xl h-24 w-72" />
+      <div className="flex gap-3 items-start">
+        <div className="w-8 h-8 rounded-full bg-gray-800" />
+        <div className="bg-gray-800/50 rounded-2xl h-28 w-80" />
       </div>
     </div>
   );
 }
 
-// Typing indicator dots
+// Typing indicator with pulse animation
 function TypingIndicator() {
   return (
-    <div className="flex justify-start">
-      <div className="bg-gray-800 rounded-2xl px-4 py-3">
-        <div className="flex gap-1">
-          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+    <div className="flex gap-3 items-start animate-fadeIn">
+      <AssistantAvatar />
+      <div className="bg-gray-800/80 rounded-2xl px-4 py-3 shadow-sm">
+        <div className="flex gap-1.5">
+          <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
       </div>
     </div>
   );
 }
 
-// Connection status indicator
+// Connection status
 function ConnectionStatus({ phase, error }: { phase: string; error: string | null }) {
   if (phase === 'error') {
     return (
@@ -89,7 +100,7 @@ function ConnectionStatus({ phase, error }: { phase: string; error: string | nul
     return (
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-        <span className="text-sm text-blue-400">Loading history...</span>
+        <span className="text-sm text-blue-400">Loading...</span>
       </div>
     );
   }
@@ -97,7 +108,85 @@ function ConnectionStatus({ phase, error }: { phase: string; error: string | nul
   return (
     <div className="flex items-center gap-2">
       <div className="w-2 h-2 rounded-full bg-green-500" />
-      <span className="text-sm text-gray-400">Connected</span>
+      <span className="text-sm text-gray-500">Online</span>
+    </div>
+  );
+}
+
+// Message actions (hover)
+function MessageActions({ 
+  onCopy, 
+  onRetry, 
+  showRetry,
+  copied 
+}: { 
+  onCopy: () => void; 
+  onRetry?: () => void;
+  showRetry?: boolean;
+  copied: boolean;
+}) {
+  return (
+    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+      <button
+        onClick={onCopy}
+        className="p-1 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 rounded transition-colors"
+        title="Copy message"
+      >
+        {copied ? (
+          <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        )}
+      </button>
+      {showRetry && onRetry && (
+        <button
+          onClick={onRetry}
+          className="p-1 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 rounded transition-colors"
+          title="Regenerate response"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Empty state with suggestions
+function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
+  const suggestions = [
+    { icon: '💻', text: 'Write some code', prompt: 'Help me write a function that...' },
+    { icon: '🔍', text: 'Research a topic', prompt: 'Research and summarize...' },
+    { icon: '✍️', text: 'Help with writing', prompt: 'Help me write a...' },
+    { icon: '🧠', text: 'Brainstorm ideas', prompt: 'Help me brainstorm ideas for...' },
+  ];
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center px-4 animate-fadeIn">
+      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mb-6 shadow-lg">
+        <span className="text-3xl">✨</span>
+      </div>
+      <h2 className="text-xl font-semibold text-white mb-2">Hey there!</h2>
+      <p className="text-gray-400 mb-8 max-w-md">
+        I'm your AI assistant. Ask me anything or try one of these:
+      </p>
+      <div className="grid grid-cols-2 gap-3 max-w-md w-full">
+        {suggestions.map((s, i) => (
+          <button
+            key={i}
+            onClick={() => onSuggestionClick(s.prompt)}
+            className="flex items-center gap-3 p-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-purple-500/50 rounded-xl text-left transition-all group"
+          >
+            <span className="text-2xl">{s.icon}</span>
+            <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{s.text}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -105,6 +194,14 @@ function ConnectionStatus({ phase, error }: { phase: string; error: string | nul
 // Format timestamp
 function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// Get message text for copying
+function getMessageText(content: Array<{ type: string; text?: string }>): string {
+  return content
+    .filter(p => p.type === 'text' && typeof p.text === 'string')
+    .map(p => p.text)
+    .join('\n');
 }
 
 export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatProps) {
@@ -115,6 +212,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
   });
 
   const [input, setInput] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -139,18 +237,33 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
       content: [{ type: 'text', text: input }],
     });
     setInput('');
+    
+    // Reset textarea height
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter to send, Shift+Enter for new line
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
-    // Escape to cancel generation
     if (e.key === 'Escape' && isRunning) {
       cancel();
     }
+  };
+
+  const handleCopy = async (messageId: string, content: Array<{ type: string; text?: string }>) => {
+    const text = getMessageText(content);
+    await navigator.clipboard.writeText(text);
+    setCopiedId(messageId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleSuggestionClick = (prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
   };
 
   const isLoading = loadingPhase === 'connecting' || loadingPhase === 'loading-history';
@@ -158,122 +271,137 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
   return (
     <div className="flex flex-col h-full bg-gray-950 text-white">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800/50 bg-gray-900/30">
         <ConnectionStatus phase={loadingPhase} error={error} />
-        <span className="text-xs text-gray-500 font-medium">
+        <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
           {sessionKey === 'main' ? 'General' : sessionKey}
         </span>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6">
         {/* Loading skeleton */}
         {isLoading && <ChatSkeleton />}
         
         {/* Empty state */}
         {!isLoading && messages.length === 0 && (
-          <div className="text-center text-gray-500 py-12">
-            <div className="text-4xl mb-4">✨</div>
-            <p className="text-lg font-medium mb-2">Ready to help!</p>
-            <p className="text-sm">Send a message to start chatting with your agent.</p>
-          </div>
+          <EmptyState onSuggestionClick={handleSuggestionClick} />
         )}
         
         {/* Messages */}
-        {messages.map((message, index) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
-          >
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${
-                message.role === 'user'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-800 text-gray-100'
-              }`}
-            >
-              {message.content.map((part, i) => {
-                if (part.type === 'text' && typeof part.text === 'string') {
-                  return (
-                    <MessageContent 
-                      key={i} 
-                      text={part.text}
-                      isUser={message.role === 'user'}
+        {messages.length > 0 && (
+          <div className="space-y-6 max-w-4xl mx-auto">
+            {messages.map((message, index) => (
+              <div
+                key={message.id}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'gap-3 items-start'} group animate-fadeIn`}
+                style={{ animationDelay: `${Math.min(index * 50, 200)}ms` }}
+              >
+                {/* Assistant avatar */}
+                {message.role === 'assistant' && <AssistantAvatar />}
+                
+                <div className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  {/* Message bubble */}
+                  <div
+                    className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 shadow-sm ${
+                      message.role === 'user'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-800/80 text-gray-100'
+                    }`}
+                  >
+                    {message.content.map((part, i) => {
+                      if (part.type === 'text' && typeof part.text === 'string') {
+                        return (
+                          <MessageContent 
+                            key={i} 
+                            text={part.text}
+                            isUser={message.role === 'user'}
+                          />
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                  
+                  {/* Timestamp and actions */}
+                  <div className="flex items-center gap-2 mt-1 px-1">
+                    <span className={`text-xs ${
+                      message.role === 'user' ? 'text-gray-500' : 'text-gray-600'
+                    }`}>
+                      {formatTime(message.createdAt)}
+                    </span>
+                    <MessageActions
+                      onCopy={() => handleCopy(message.id, message.content as Array<{ type: string; text?: string }>)}
+                      showRetry={message.role === 'assistant' && index === messages.length - 1}
+                      copied={copiedId === message.id}
                     />
-                  );
-                }
-                return null;
-              })}
-              {/* Timestamp on hover */}
-              <div className={`text-xs mt-1 opacity-0 group-hover:opacity-60 transition-opacity ${
-                message.role === 'user' ? 'text-purple-200' : 'text-gray-400'
-              }`}>
-                {formatTime(message.createdAt)}
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
+
+            {/* Typing indicator */}
+            {isRunning && (messages.length === 0 || messages[messages.length - 1]?.role !== 'assistant') && (
+              <TypingIndicator />
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
-        ))}
-
-        {/* Typing indicator */}
-        {isRunning && (messages.length === 0 || messages[messages.length - 1]?.role !== 'assistant') && (
-          <TypingIndicator />
         )}
-
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-gray-800 bg-gray-900/30">
-        <form onSubmit={handleSubmit}>
-          <div className="flex items-end gap-2 bg-gray-800 rounded-xl p-2">
+      {/* Input area */}
+      <div className="p-4 border-t border-gray-800/50 bg-gray-900/50">
+        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+          <div className={`flex items-end gap-3 bg-gray-800/80 rounded-2xl p-3 border-2 transition-colors ${
+            input.trim() ? 'border-purple-500/50' : 'border-transparent'
+          }`}>
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isConnected ? "Message your agent..." : "Connecting..."}
+              placeholder={isConnected ? "Ask anything..." : "Connecting..."}
               rows={1}
-              className="flex-1 bg-transparent text-white placeholder-gray-500 focus:outline-none resize-none px-2 py-1 text-[15px] min-h-[36px] max-h-[120px]"
+              className="flex-1 bg-transparent text-white placeholder-gray-500 focus:outline-none resize-none px-1 py-2 text-base min-h-[44px] max-h-[200px] leading-relaxed"
               disabled={!isConnected}
-              style={{
-                height: 'auto',
-                overflowY: input.split('\n').length > 3 ? 'auto' : 'hidden'
-              }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
-                target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                target.style.height = Math.min(target.scrollHeight, 200) + 'px';
               }}
             />
             {isRunning ? (
               <button
                 type="button"
                 onClick={cancel}
-                className="p-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors flex-shrink-0"
-                title="Stop generation (Esc)"
+                className="p-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl transition-colors flex-shrink-0"
+                title="Stop (Esc)"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <rect x="6" y="6" width="12" height="12" strokeWidth="2" />
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
                 </svg>
               </button>
             ) : (
               <button
                 type="submit"
                 disabled={!input.trim() || !isConnected}
-                className="p-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex-shrink-0"
-                title="Send message (Enter)"
+                className={`p-3 rounded-xl transition-all flex-shrink-0 ${
+                  input.trim() && isConnected
+                    ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/25'
+                    : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                }`}
+                title="Send (Enter)"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M12 5l7 7-7 7" />
                 </svg>
               </button>
             )}
           </div>
-          {isRunning && (
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              Press Esc to stop
-            </p>
-          )}
+          <p className="text-xs text-gray-600 mt-2 text-center">
+            {isRunning ? 'Press Esc to stop' : 'Enter to send, Shift+Enter for new line'}
+          </p>
         </form>
       </div>
     </div>
