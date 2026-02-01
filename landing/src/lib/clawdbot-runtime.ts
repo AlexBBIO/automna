@@ -251,8 +251,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         // Debug: log all 'res' messages to understand the format
         if (msg.type === 'res') {
           console.log('[clawdbot] Response:', msg.ok ? 'ok' : 'error', 'payload keys:', Object.keys(msg.payload || {}));
+          console.log('[clawdbot] messages is array?', Array.isArray(msg.payload?.messages), 'length:', msg.payload?.messages?.length);
         }
         if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
+          console.log('[clawdbot] Entering history handler, historyLoadedRef:', historyLoadedRef.current);
           const wsMessages = msg.payload.messages;
           
           // Only use WebSocket history if we haven't loaded from HTTP yet
