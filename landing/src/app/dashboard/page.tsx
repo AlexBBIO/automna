@@ -54,6 +54,7 @@ export default function DashboardPage() {
   // Reset account state
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [resetStatus, setResetStatus] = useState<string | null>(null);
   
   // Set initial sidebar state based on screen size (runs once on mount)
   useEffect(() => {
@@ -155,6 +156,8 @@ export default function DashboardPage() {
     if (!gatewayInfo?.gatewayUrl) return;
     
     setIsResetting(true);
+    setResetStatus('Connecting to your agent...');
+    
     try {
       const wsUrl = new URL(gatewayInfo.gatewayUrl);
       const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
@@ -168,25 +171,37 @@ export default function DashboardPage() {
       if (exp) resetUrl.searchParams.set('exp', exp);
       if (sig) resetUrl.searchParams.set('sig', sig);
       
+      setResetStatus('Clearing your conversations...');
+      
       const response = await fetch(resetUrl.toString(), { method: 'POST' });
       const data = await response.json();
       
       if (data.success) {
+        setResetStatus('Cleaning up local data...');
         // Clear local storage
         localStorage.removeItem('automna-conversations');
-        setShowResetConfirm(false);
+        
+        setResetStatus('Restarting your agent...');
+        // Give the gateway a moment to restart
+        await new Promise(r => setTimeout(r, 2000));
+        
+        setResetStatus('Done! Refreshing...');
+        await new Promise(r => setTimeout(r, 500));
+        
         // Reload to get fresh state
         window.location.reload();
       } else {
         console.error('Reset failed:', data);
+        setResetStatus(null);
         alert('Failed to reset account. Please try again.');
       }
     } catch (error) {
       console.error('Reset error:', error);
-      alert('Failed to reset account. Please try again.');
-    } finally {
+      setResetStatus(null);
       setIsResetting(false);
+      alert('Failed to reset account. Please try again.');
     }
+    // Don't reset isResetting on success - page will reload
   };
 
   // Prewarm the sandbox (fire and forget)
@@ -339,47 +354,53 @@ export default function DashboardPage() {
         {showResetConfirm && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div className="bg-gray-900 rounded-2xl p-6 max-w-md w-full border border-gray-700 shadow-2xl">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
+              {isResetting ? (
+                // Progress view
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-purple-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Resetting Account</h3>
+                  <p className="text-purple-300 text-sm animate-pulse">{resetStatus || 'Please wait...'}</p>
+                  <p className="text-gray-500 text-xs mt-4">Don&apos;t close this window</p>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Reset Account?</h3>
-                  <p className="text-sm text-gray-400">This cannot be undone</p>
-                </div>
-              </div>
-              <p className="text-gray-300 text-sm mb-6">
-                This will permanently delete all your conversations, custom settings, and agent data. 
-                Your account will be reset to a fresh state.
-              </p>
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => setShowResetConfirm(false)}
-                  className="px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                  disabled={isResetting}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleResetAccount}
-                  disabled={isResetting}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isResetting ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              ) : (
+                // Confirmation view
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
-                      Resetting...
-                    </>
-                  ) : (
-                    'Reset Everything'
-                  )}
-                </button>
-              </div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Reset Account?</h3>
+                      <p className="text-sm text-gray-400">This cannot be undone</p>
+                    </div>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-6">
+                    This will permanently delete all your conversations, custom settings, and agent data. 
+                    Your account will be reset to a fresh state.
+                  </p>
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      onClick={() => setShowResetConfirm(false)}
+                      className="px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleResetAccount}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+                    >
+                      Reset Everything
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
