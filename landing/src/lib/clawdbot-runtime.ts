@@ -175,7 +175,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         minProtocol: 3,
         maxProtocol: 3,
         client: {
-          id: 'automna-chat',
+          id: 'webchat',  // Must use valid Clawdbot client ID
           version: '1.0.0',
           platform: typeof navigator !== 'undefined' ? navigator.platform : 'web',
           mode: 'webchat',
