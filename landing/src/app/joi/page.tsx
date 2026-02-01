@@ -4,20 +4,21 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
 const quotes = [
-  { start: "You look like you could use", end: "cutting-edge AI infrastructure" },
-  { start: "You look like you need", end: "a personal agent that actually works" },
-  { start: "You look lonely", end: "let me keep you company" },
-  { start: "You seem like you want", end: "an agent that browses the web for you" },
-  { start: "You look tired of", end: "doing repetitive tasks yourself" },
-  { start: "You look like you deserve", end: "an AI that remembers everything" },
-  { start: "You seem ready for", end: "the future of personal computing" },
-  { start: "You look like you need", end: "genetic solutions... I mean, AI solutions" },
+  { start: "You look like you could use", end: "cutting-edge AI infrastructure", tagline: "I can provide that." },
+  { start: "You look like you need", end: "a personal agent that actually works", tagline: "I can be that." },
+  { start: "You look lonely", end: "like you need some company", tagline: "I can fix that." },
+  { start: "You seem tired of", end: "browsing the web yourself", tagline: "I can automate that." },
+  { start: "You look exhausted from", end: "doing repetitive tasks", tagline: "I can handle that." },
+  { start: "You look like you deserve", end: "an AI that remembers everything", tagline: "I can do that." },
+  { start: "You seem ready for", end: "the future of personal computing", tagline: "I can show you." },
+  { start: "You look like you need", end: "genetic solutions... I mean, AI solutions", tagline: "I can help with that." },
 ];
 
 export default function JoiPage() {
   const [currentQuote, setCurrentQuote] = useState(0);
   const [isTyping, setIsTyping] = useState(true);
   const [displayedEnd, setDisplayedEnd] = useState('');
+  const [showTagline, setShowTagline] = useState(false);
 
   useEffect(() => {
     const quote = quotes[currentQuote];
@@ -29,20 +30,35 @@ export default function JoiPage() {
         }, 50);
         return () => clearTimeout(timeout);
       } else {
+        // Finished typing, show tagline
         const timeout = setTimeout(() => {
-          setIsTyping(false);
-        }, 3000);
+          setShowTagline(true);
+        }, 300);
         return () => clearTimeout(timeout);
       }
-    } else {
+    }
+  }, [currentQuote, displayedEnd, isTyping]);
+
+  useEffect(() => {
+    if (showTagline) {
+      const timeout = setTimeout(() => {
+        setShowTagline(false);
+        setIsTyping(false);
+      }, 2500);
+      return () => clearTimeout(timeout);
+    }
+  }, [showTagline]);
+
+  useEffect(() => {
+    if (!isTyping && !showTagline) {
       const timeout = setTimeout(() => {
         setDisplayedEnd('');
         setCurrentQuote((prev) => (prev + 1) % quotes.length);
         setIsTyping(true);
-      }, 500);
+      }, 300);
       return () => clearTimeout(timeout);
     }
-  }, [currentQuote, displayedEnd, isTyping]);
+  }, [isTyping, showTagline]);
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
@@ -75,7 +91,10 @@ export default function JoiPage() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-400">
               {displayedEnd}
             </span>
-            <span className="animate-pulse text-cyan-400">|</span>
+            {isTyping && <span className="animate-pulse text-cyan-400">|</span>}
+          </div>
+          <div className={`text-2xl md:text-3xl mt-4 text-gray-300 italic transition-opacity duration-300 ${showTagline ? 'opacity-100' : 'opacity-0'}`}>
+            {quotes[currentQuote].tagline}
           </div>
         </div>
 
