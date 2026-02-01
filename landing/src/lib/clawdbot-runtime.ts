@@ -483,5 +483,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     setIsRunning(false);
   }, [wsSend]);
 
-  return { messages, isRunning, isConnected, loadingPhase, error, append, cancel };
+  // Clear local history (called after API clear succeeds)
+  const clearHistory = useCallback(() => {
+    setMessages([]);
+  }, []);
+
+  return { messages, isRunning, isConnected, loadingPhase, error, append, cancel, clearHistory };
 }
