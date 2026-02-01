@@ -24,6 +24,13 @@ const CreditCardIcon = () => (
   </svg>
 );
 
+const ResetIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+    <path d="M3 3v5h5"/>
+  </svg>
+);
+
 interface GatewayInfo {
   gatewayUrl: string;
   sessionKey?: string;
@@ -43,6 +50,10 @@ export default function DashboardPage() {
   const [currentConversation, setCurrentConversation] = useState('main');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [sidebarHidden, setSidebarHidden] = useState(true);
+  
+  // Reset account state
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   
   // Set initial sidebar state based on screen size (runs once on mount)
   useEffect(() => {
@@ -137,6 +148,45 @@ export default function DashboardPage() {
       console.error('Billing portal error:', error);
     }
     setLoadingPortal(false);
+  };
+
+  // Reset account - clears all data and starts fresh
+  const handleResetAccount = async () => {
+    if (!gatewayInfo?.gatewayUrl) return;
+    
+    setIsResetting(true);
+    try {
+      const wsUrl = new URL(gatewayInfo.gatewayUrl);
+      const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
+      const resetUrl = new URL(`${baseUrl}/api/reset-workspace`);
+      
+      // Copy auth params
+      const userId = wsUrl.searchParams.get('userId');
+      const exp = wsUrl.searchParams.get('exp');
+      const sig = wsUrl.searchParams.get('sig');
+      if (userId) resetUrl.searchParams.set('userId', userId);
+      if (exp) resetUrl.searchParams.set('exp', exp);
+      if (sig) resetUrl.searchParams.set('sig', sig);
+      
+      const response = await fetch(resetUrl.toString(), { method: 'POST' });
+      const data = await response.json();
+      
+      if (data.success) {
+        // Clear local storage
+        localStorage.removeItem('automna-conversations');
+        setShowResetConfirm(false);
+        // Reload to get fresh state
+        window.location.reload();
+      } else {
+        console.error('Reset failed:', data);
+        alert('Failed to reset account. Please try again.');
+      }
+    } catch (error) {
+      console.error('Reset error:', error);
+      alert('Failed to reset account. Please try again.');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   // Prewarm the sandbox (fire and forget)
@@ -275,10 +325,64 @@ export default function DashboardPage() {
                   labelIcon={<CreditCardIcon />}
                   onClick={handleManageBilling}
                 />
+                <UserButton.Action
+                  label="Reset Account"
+                  labelIcon={<ResetIcon />}
+                  onClick={() => setShowResetConfirm(true)}
+                />
               </UserButton.MenuItems>
             </UserButton>
           </div>
         </nav>
+        
+        {/* Reset confirmation modal */}
+        {showResetConfirm && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 rounded-2xl p-6 max-w-md w-full border border-gray-700 shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Reset Account?</h3>
+                  <p className="text-sm text-gray-400">This cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-gray-300 text-sm mb-6">
+                This will permanently delete all your conversations, custom settings, and agent data. 
+                Your account will be reset to a fresh state.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  disabled={isResetting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleResetAccount}
+                  disabled={isResetting}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isResetting ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      Resetting...
+                    </>
+                  ) : (
+                    'Reset Everything'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex-1 flex overflow-hidden">
           
           {/* Mobile backdrop - click to close */}

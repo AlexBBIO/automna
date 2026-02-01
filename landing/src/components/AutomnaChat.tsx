@@ -205,7 +205,7 @@ function getMessageText(content: Array<{ type: string; text?: string }>): string
 }
 
 export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatProps) {
-  const { messages, isRunning, isConnected, loadingPhase, error, append, cancel, clearHistory } = useClawdbotRuntime({
+  const { messages, isRunning, isConnected, loadingPhase, error, append, cancel } = useClawdbotRuntime({
     gatewayUrl,
     authToken,
     sessionKey,
@@ -213,48 +213,8 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
 
   const [input, setInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  
-  // Clear all history (calls API + clears local state)
-  const handleClearHistory = async () => {
-    setIsClearing(true);
-    try {
-      // Build the reset URL using the gateway URL
-      const wsUrl = new URL(gatewayUrl);
-      const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
-      const resetUrl = new URL(`${baseUrl}/api/reset-workspace`);
-      
-      // Copy auth params from gateway URL
-      const userId = wsUrl.searchParams.get('userId');
-      const exp = wsUrl.searchParams.get('exp');
-      const sig = wsUrl.searchParams.get('sig');
-      if (userId) resetUrl.searchParams.set('userId', userId);
-      if (exp) resetUrl.searchParams.set('exp', exp);
-      if (sig) resetUrl.searchParams.set('sig', sig);
-      
-      const response = await fetch(resetUrl.toString(), { method: 'POST' });
-      const data = await response.json();
-      
-      if (data.success) {
-        // Clear local messages
-        clearHistory?.();
-        setShowClearConfirm(false);
-        // Reload to get fresh state
-        window.location.reload();
-      } else {
-        console.error('Clear failed:', data);
-        alert('Failed to clear history. Please try again.');
-      }
-    } catch (err) {
-      console.error('Clear error:', err);
-      alert('Failed to clear history. Please try again.');
-    } finally {
-      setIsClearing(false);
-    }
-  };
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -313,46 +273,10 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
           <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
             {sessionKey === 'main' ? 'General' : sessionKey}
           </span>
-          <button
-            onClick={() => setShowClearConfirm(true)}
-            className="p-1.5 text-gray-500 hover:text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
-            title="Clear history"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
         </div>
       </div>
       
       {/* Clear confirmation modal */}
-      {showClearConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-2xl p-6 max-w-sm w-full border border-gray-700 shadow-xl">
-            <h3 className="text-lg font-semibold text-white mb-2">Clear all history?</h3>
-            <p className="text-gray-400 text-sm mb-6">
-              This will permanently delete all your conversations. This action cannot be undone.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowClearConfirm(false)}
-                className="px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                disabled={isClearing}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleClearHistory}
-                disabled={isClearing}
-                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors disabled:opacity-50"
-              >
-                {isClearing ? 'Clearing...' : 'Clear All'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
         {/* Empty state - show immediately, even while loading */}

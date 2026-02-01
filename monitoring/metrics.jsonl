@@ -2,3 +2,6 @@
 {"timestamp":"2026-01-31T23:45:58Z","healthy":true,"cold_start":false,"http_latency_ms":85,"ws_latency_ms":85,"api_latency_ms":88,"error":""}
 {"timestamp":"2026-02-01T00:02:39Z","healthy":true,"cold_start":false,"http_latency_ms":206,"ws_latency_ms":123,"api_latency_ms":84,"error":""}
 {"timestamp":"2026-02-01T04:04:18Z","healthy":true,"cold_start":false,"http_latency_ms":190,"ws_latency_ms":160,"api_latency_ms":86,"error":""}
+{"timestamp":"2026-02-01T08:00:04Z","healthy":true,"cold_start":false,"http_latency_ms":329,"ws_latency_ms":145,"api_latency_ms":80,"error":""}
+{"timestamp":"2026-02-01T12:00:04Z","healthy":true,"cold_start":false,"http_latency_ms":150,"ws_latency_ms":83,"api_latency_ms":82,"error":""}
+{"timestamp":"2026-02-01T16:04:42Z","healthy":true,"cold_start":false,"http_latency_ms":239,"ws_latency_ms":135,"api_latency_ms":82,"error":""}
