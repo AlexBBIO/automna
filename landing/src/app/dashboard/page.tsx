@@ -124,68 +124,10 @@ export default function DashboardPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Fetch conversations from gateway when ready
-  // Merge with local conversations to preserve user-created ones that haven't had messages yet
-  useEffect(() => {
-    if (loadPhase !== 'ready' || !gatewayInfo) return;
-    
-    const fetchSessions = async () => {
-      try {
-        const response = await fetch('/api/user/sessions');
-        const data = await response.json();
-        
-        if (data.sessions && Array.isArray(data.sessions)) {
-          const gatewaySessions = new Map<string, { key: string; name?: string }>();
-          for (const s of data.sessions) {
-            gatewaySessions.set(s.key, s);
-          }
-          
-          // Merge: keep local conversations that aren't on gateway yet
-          // Update local ones with gateway data if they exist there
-          setConversations(prev => {
-            const merged = new Map<string, Conversation>();
-            
-            // First, add all local conversations
-            for (const conv of prev) {
-              merged.set(conv.key, conv);
-            }
-            
-            // Then, add/update with gateway sessions
-            for (const [key, session] of gatewaySessions) {
-              if (merged.has(key)) {
-                // Update existing with gateway name if different
-                const existing = merged.get(key)!;
-                merged.set(key, {
-                  ...existing,
-                  name: session.name || existing.name,
-                });
-              } else {
-                // Add new session from gateway
-                merged.set(key, {
-                  key,
-                  name: session.name || (key === 'main' ? 'General' : key),
-                  icon: key === 'main' ? '💬' : '📝',
-                });
-              }
-            }
-            
-            // Ensure main exists
-            if (!merged.has('main')) {
-              merged.set('main', { key: 'main', name: 'General', icon: '💬' });
-            }
-            
-            return Array.from(merged.values());
-          });
-        }
-      } catch (err) {
-        console.warn('[dashboard] Failed to fetch sessions:', err);
-        // Keep existing conversations on error
-      }
-    };
-    
-    fetchSessions();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadPhase, gatewayInfo]); // Don't include currentConversation to avoid refetch loop
+  // NOTE: Gateway sessions fetch disabled - OpenClaw doesn't have a session list API
+  // Conversations are localStorage-only for now. When you create a conversation and
+  // send messages, it's stored on the gateway, but we can't list them yet.
+  // TODO: Add session listing to OpenClaw or read from filesystem
   
   // Save conversations to localStorage when they change (for local convos before first message)
   useEffect(() => {
