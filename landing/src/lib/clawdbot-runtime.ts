@@ -87,6 +87,13 @@ function extractTokenFromUrl(url: string): string | undefined {
   }
 }
 
+// Canonicalize session key to match OpenClaw's internal format
+// Our background fixer converts all session keys to "agent:main:{key}" format
+function canonicalizeSessionKey(key: string): string {
+  if (key.startsWith('agent:main:')) return key;
+  return `agent:main:${key}`;
+}
+
 export function useClawdbotRuntime(config: ClawdbotConfig) {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -105,7 +112,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const configRef = useRef(config);
   configRef.current = config;
   
-  const sessionKey = config.sessionKey || 'main';
+  const rawSessionKey = config.sessionKey || 'main';
+  const sessionKey = canonicalizeSessionKey(rawSessionKey);
 
   // Send WebSocket message
   const wsSend = useCallback((method: string, params: Record<string, unknown>) => {
@@ -285,7 +293,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           // Request history from WebSocket too (might be faster if already loaded)
           if (!historyLoadedRef.current) {
             setLoadingPhase('loading-history');
-            wsSend('chat.history', { sessionKey: configRef.current.sessionKey || 'main' });
+            wsSend('chat.history', { sessionKey: canonicalizeSessionKey(configRef.current.sessionKey || 'main') });
           }
           return;
         }
@@ -448,7 +456,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     const cfg = configRef.current;
     const ws = wsRef.current;
-    const sessionKey = cfg.sessionKey || 'main';
+    const sessionKey = canonicalizeSessionKey(cfg.sessionKey || 'main');
     
     // Try WebSocket first if connected
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -510,7 +518,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
   // Cancel
   const cancel = useCallback(() => {
-    wsSend('chat.abort', { sessionKey: configRef.current.sessionKey || 'main' });
+    wsSend('chat.abort', { sessionKey: canonicalizeSessionKey(configRef.current.sessionKey || 'main') });
     setIsRunning(false);
   }, [wsSend]);
 
