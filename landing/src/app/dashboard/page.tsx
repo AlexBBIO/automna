@@ -55,7 +55,14 @@ export default function DashboardPage() {
   
   // Conversation state
   const [conversations, setConversations] = useState<Conversation[]>(DEFAULT_CONVERSATIONS);
-  const [currentConversation, setCurrentConversation] = useState('main');
+  const [currentConversation, setCurrentConversation] = useState(() => {
+    // Restore last active conversation from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('automna-current-conversation');
+      return saved || 'main';
+    }
+    return 'main';
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [sidebarHidden, setSidebarHidden] = useState(true);
   
@@ -138,6 +145,16 @@ export default function DashboardPage() {
     
     fetchSessions();
   }, [loadPhase, gatewayInfo, currentConversation]);
+  
+  // Save conversations to localStorage when they change (for local convos before first message)
+  useEffect(() => {
+    localStorage.setItem('automna-conversations', JSON.stringify(conversations));
+  }, [conversations]);
+
+  // Save current conversation to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('automna-current-conversation', currentConversation);
+  }, [currentConversation]);
   
   // Create a new conversation
   const handleCreateConversation = useCallback((name: string) => {
