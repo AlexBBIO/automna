@@ -1,8 +1,14 @@
 /**
  * User Machine Provisioning API
  * 
- * Creates a Fly.io machine for a user if they don't have one.
- * Stores machine info in Turso database.
+ * Creates a dedicated Fly.io app + machine for each user.
+ * Each user gets their own isolated environment with:
+ * - Dedicated Fly app (automna-u-{shortId})
+ * - Persistent volume for data
+ * - Running OpenClaw instance
+ * 
+ * This provides true user isolation - each user connects to their own
+ * fly.dev URL with no shared state.
  */
 
 import { auth } from "@clerk/nextjs/server";
@@ -12,33 +18,41 @@ import { machines, machineEvents } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
-const FLY_APP_NAME = process.env.FLY_APP_NAME || "automna-gateway";
+const FLY_ORG_ID = process.env.FLY_ORG_ID; // Must be the actual org ID, not slug
 const FLY_REGION = process.env.FLY_REGION || "sjc";
 const FLY_API_BASE = "https://api.machines.dev/v1";
+// Use community OpenClaw image from GHCR
+const OPENCLAW_IMAGE = process.env.OPENCLAW_IMAGE || "ghcr.io/phioranex/openclaw-docker:latest";
 
-// Machine configuration
-const MACHINE_CONFIG = {
-  image: "registry.fly.io/automna-gateway:latest",
-  guest: {
-    cpu_kind: "shared",
-    cpus: 1,
-    memory_mb: 2048,
-  },
-  services: [
-    {
-      ports: [
-        { port: 443, handlers: ["tls", "http"] },
-        { port: 80, handlers: ["http"] },
-      ],
-      protocol: "tcp",
-      internal_port: 18789,
+/**
+ * Get the personal organization ID from Fly API
+ */
+async function getPersonalOrgId(): Promise<string> {
+  if (FLY_ORG_ID) return FLY_ORG_ID;
+  
+  const response = await fetch("https://api.fly.io/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${FLY_API_TOKEN}`,
+      "Content-Type": "application/json",
     },
-  ],
-  env: {
-    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
-    MOLTBOT_GATEWAY_TOKEN: process.env.FLY_GATEWAY_TOKEN || "",
-  },
-};
+    body: JSON.stringify({
+      query: "{ personalOrganization { id } }",
+    }),
+  });
+  
+  const data = await response.json();
+  if (data.errors) {
+    throw new Error(`Failed to get org ID: ${JSON.stringify(data.errors)}`);
+  }
+  return data.data.personalOrganization.id;
+}
+
+interface FlyApp {
+  id: string;
+  name: string;
+  organization: { slug: string };
+}
 
 interface FlyMachine {
   id: string;
@@ -56,20 +70,101 @@ interface FlyVolume {
   size_gb: number;
 }
 
-// Create a Fly volume for the user
-async function createVolume(userId: string): Promise<FlyVolume> {
-  const volumeName = `data-${userId.replace("user_", "").substring(0, 20)}`;
-  
-  const response = await fetch(`${FLY_API_BASE}/apps/${FLY_APP_NAME}/volumes`, {
+/**
+ * Generate a short, URL-safe ID from Clerk userId
+ * Clerk IDs are like "user_2abc123def456" - we take the last 12 chars
+ */
+function shortUserId(clerkId: string): string {
+  // Remove "user_" prefix and take last 12 chars (or all if shorter)
+  const clean = clerkId.replace("user_", "");
+  return clean.slice(-12).toLowerCase();
+}
+
+/**
+ * Create a new Fly app for the user
+ */
+async function createApp(appName: string, orgId: string): Promise<FlyApp> {
+  const response = await fetch("https://api.fly.io/graphql", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${FLY_API_TOKEN}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      name: volumeName,
+      query: `
+        mutation($input: CreateAppInput!) {
+          createApp(input: $input) {
+            app {
+              id
+              name
+              organization { slug }
+            }
+          }
+        }
+      `,
+      variables: {
+        input: {
+          name: appName,
+          organizationId: orgId,
+        },
+      },
+    }),
+  });
+
+  const data = await response.json();
+  if (data.errors) {
+    throw new Error(`Failed to create app: ${JSON.stringify(data.errors)}`);
+  }
+  return data.data.createApp.app;
+}
+
+/**
+ * Set secrets for a Fly app
+ */
+async function setAppSecrets(appName: string, secrets: Record<string, string>): Promise<void> {
+  const response = await fetch("https://api.fly.io/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${FLY_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: `
+        mutation($input: SetSecretsInput!) {
+          setSecrets(input: $input) {
+            app { id }
+          }
+        }
+      `,
+      variables: {
+        input: {
+          appId: appName,
+          secrets: Object.entries(secrets).map(([key, value]) => ({ key, value })),
+        },
+      },
+    }),
+  });
+
+  const data = await response.json();
+  if (data.errors) {
+    throw new Error(`Failed to set secrets: ${JSON.stringify(data.errors)}`);
+  }
+}
+
+/**
+ * Create a volume in the app
+ */
+async function createVolume(appName: string): Promise<FlyVolume> {
+  const response = await fetch(`${FLY_API_BASE}/apps/${appName}/volumes`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${FLY_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: "openclaw_data",
       region: FLY_REGION,
-      size_gb: 1, // Start with 1GB
+      size_gb: 1,
       encrypted: true,
     }),
   });
@@ -82,32 +177,50 @@ async function createVolume(userId: string): Promise<FlyVolume> {
   return response.json();
 }
 
-// Create a Fly machine for the user
-async function createMachine(userId: string, volumeId: string): Promise<FlyMachine> {
-  const machineName = `user-${userId.replace("user_", "").substring(0, 20)}`;
+/**
+ * Create and start a machine in the app
+ */
+async function createMachine(appName: string, volumeId: string): Promise<FlyMachine> {
+  const gatewayToken = process.env.FLY_GATEWAY_TOKEN || crypto.randomUUID();
   
   const config = {
-    ...MACHINE_CONFIG,
+    image: OPENCLAW_IMAGE,
+    guest: {
+      cpu_kind: "shared",
+      cpus: 1,
+      memory_mb: 2048,
+    },
+    services: [
+      {
+        ports: [
+          { port: 443, handlers: ["tls", "http"] },
+          { port: 80, handlers: ["http"] },
+        ],
+        protocol: "tcp",
+        internal_port: 18789,
+      },
+    ],
     env: {
-      ...MACHINE_CONFIG.env,
-      MOLTBOT_USER_ID: userId,
+      OPENCLAW_GATEWAY_TOKEN: gatewayToken,
+      OPENCLAW_GATEWAY_MODE: "local",
+      OPENCLAW_GATEWAY_BIND: "lan",
     },
     mounts: [
       {
         volume: volumeId,
-        path: "/data",
+        path: "/home/node/.openclaw",
       },
     ],
   };
 
-  const response = await fetch(`${FLY_API_BASE}/apps/${FLY_APP_NAME}/machines`, {
+  const response = await fetch(`${FLY_API_BASE}/apps/${appName}/machines`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${FLY_API_TOKEN}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      name: machineName,
+      name: "openclaw",
       region: FLY_REGION,
       config,
     }),
@@ -121,34 +234,15 @@ async function createMachine(userId: string, volumeId: string): Promise<FlyMachi
   return response.json();
 }
 
-// Start a stopped machine
-async function startMachine(machineId: string): Promise<void> {
-  const response = await fetch(
-    `${FLY_API_BASE}/apps/${FLY_APP_NAME}/machines/${machineId}/start`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${FLY_API_TOKEN}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to start machine: ${error}`);
-  }
-}
-
-// Get machine status
-async function getMachineStatus(machineId: string): Promise<FlyMachine | null> {
-  const response = await fetch(
-    `${FLY_API_BASE}/apps/${FLY_APP_NAME}/machines/${machineId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${FLY_API_TOKEN}`,
-      },
-    }
-  );
+/**
+ * Get machine status
+ */
+async function getMachineStatus(appName: string, machineId: string): Promise<FlyMachine | null> {
+  const response = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}`, {
+    headers: {
+      Authorization: `Bearer ${FLY_API_TOKEN}`,
+    },
+  });
 
   if (response.status === 404) {
     return null;
@@ -162,22 +256,52 @@ async function getMachineStatus(machineId: string): Promise<FlyMachine | null> {
   return response.json();
 }
 
-// Wait for machine to be ready
-async function waitForMachine(machineId: string, timeoutMs = 60000): Promise<FlyMachine> {
+/**
+ * Start a stopped machine
+ */
+async function startMachine(appName: string, machineId: string): Promise<void> {
+  const response = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}/start`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${FLY_API_TOKEN}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to start machine: ${error}`);
+  }
+}
+
+/**
+ * Wait for machine to be ready
+ */
+async function waitForMachine(appName: string, machineId: string, timeoutMs = 120000): Promise<FlyMachine> {
   const start = Date.now();
   
   while (Date.now() - start < timeoutMs) {
-    const machine = await getMachineStatus(machineId);
+    const machine = await getMachineStatus(appName, machineId);
     
     if (machine && machine.state === "started") {
       return machine;
     }
     
-    // Wait 2 seconds before checking again
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 3000));
   }
   
   throw new Error("Timeout waiting for machine to start");
+}
+
+/**
+ * Check if an app exists
+ */
+async function appExists(appName: string): Promise<boolean> {
+  const response = await fetch(`${FLY_API_BASE}/apps/${appName}`, {
+    headers: {
+      Authorization: `Bearer ${FLY_API_TOKEN}`,
+    },
+  });
+  return response.ok;
 }
 
 export async function POST() {
@@ -195,34 +319,32 @@ export async function POST() {
       );
     }
 
-    // Check if user already has a machine
+    // Check if user already has a machine record
     const existingMachine = await db.query.machines.findFirst({
       where: eq(machines.userId, userId),
     });
 
-    if (existingMachine) {
-      // Check if machine still exists and is running
-      const flyMachine = await getMachineStatus(existingMachine.id);
+    if (existingMachine && existingMachine.appName) {
+      // User has an app - check if machine is running
+      const flyMachine = await getMachineStatus(existingMachine.appName, existingMachine.id);
       
       if (!flyMachine) {
-        // Machine was deleted externally, clean up database
+        // Machine was deleted, clean up and recreate
+        console.log(`[provision] Machine ${existingMachine.id} not found, will recreate`);
         await db.delete(machines).where(eq(machines.id, existingMachine.id));
-        // Fall through to create new machine
       } else if (flyMachine.state === "stopped") {
         // Start the stopped machine
-        await startMachine(existingMachine.id);
-        const startedMachine = await waitForMachine(existingMachine.id);
+        console.log(`[provision] Starting stopped machine ${existingMachine.id}`);
+        await startMachine(existingMachine.appName, existingMachine.id);
+        const startedMachine = await waitForMachine(existingMachine.appName, existingMachine.id);
         
-        // Log event
         await db.insert(machineEvents).values({
           machineId: existingMachine.id,
           eventType: "started",
           details: JSON.stringify({ triggeredBy: "provision-api" }),
         });
         
-        // Update last active
-        await db
-          .update(machines)
+        await db.update(machines)
           .set({ 
             lastActiveAt: new Date(),
             status: "started",
@@ -231,65 +353,96 @@ export async function POST() {
           .where(eq(machines.id, existingMachine.id));
         
         return NextResponse.json({
+          appName: existingMachine.appName,
           machineId: existingMachine.id,
           status: "started",
-          ipAddress: startedMachine.private_ip,
+          gatewayUrl: `wss://${existingMachine.appName}.fly.dev/ws`,
           region: startedMachine.region,
           created: false,
         });
       } else {
         // Machine exists and is running
+        console.log(`[provision] Machine ${existingMachine.id} already running`);
         return NextResponse.json({
+          appName: existingMachine.appName,
           machineId: existingMachine.id,
           status: flyMachine.state,
-          ipAddress: flyMachine.private_ip,
+          gatewayUrl: `wss://${existingMachine.appName}.fly.dev/ws`,
           region: flyMachine.region,
           created: false,
         });
       }
     }
 
-    // Create new machine for user
-    console.log(`[provision] Creating machine for user ${userId}`);
+    // Create new app + machine for user
+    const shortId = shortUserId(userId);
+    const appName = `automna-u-${shortId}`;
     
-    // Step 1: Create volume
-    const volume = await createVolume(userId);
-    console.log(`[provision] Created volume ${volume.id}`);
-    
-    // Step 2: Create machine with volume attached
-    const machine = await createMachine(userId, volume.id);
-    console.log(`[provision] Created machine ${machine.id}`);
-    
-    // Step 3: Wait for machine to be ready
-    const readyMachine = await waitForMachine(machine.id);
-    console.log(`[provision] Machine ${machine.id} is ready`);
-    
-    // Step 4: Store in database
+    console.log(`[provision] Creating new app ${appName} for user ${userId}`);
+
+    // Get org ID for app creation
+    const orgId = await getPersonalOrgId();
+    console.log(`[provision] Using org ID: ${orgId}`);
+
+    // Step 1: Create app (if doesn't exist)
+    if (!(await appExists(appName))) {
+      console.log(`[provision] Creating Fly app: ${appName}`);
+      await createApp(appName, orgId);
+    } else {
+      console.log(`[provision] App ${appName} already exists`);
+    }
+
+    // Step 2: Set secrets
+    const gatewayToken = crypto.randomUUID();
+    console.log(`[provision] Setting secrets for ${appName}`);
+    await setAppSecrets(appName, {
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+      OPENCLAW_GATEWAY_TOKEN: gatewayToken,
+    });
+
+    // Step 3: Create volume
+    console.log(`[provision] Creating volume for ${appName}`);
+    const volume = await createVolume(appName);
+
+    // Step 4: Create machine
+    console.log(`[provision] Creating machine for ${appName}`);
+    const machine = await createMachine(appName, volume.id);
+
+    // Step 5: Wait for machine to be ready
+    console.log(`[provision] Waiting for machine ${machine.id} to start`);
+    const readyMachine = await waitForMachine(appName, machine.id);
+
+    // Step 6: Store in database
     await db.insert(machines).values({
       id: machine.id,
       userId,
+      appName,
       region: FLY_REGION,
       volumeId: volume.id,
       status: "started",
       ipAddress: readyMachine.private_ip,
+      gatewayToken,
       lastActiveAt: new Date(),
     });
-    
-    // Log event
+
     await db.insert(machineEvents).values({
       machineId: machine.id,
       eventType: "created",
       details: JSON.stringify({
+        appName,
         volumeId: volume.id,
         region: FLY_REGION,
       }),
     });
 
+    console.log(`[provision] Successfully created ${appName} with machine ${machine.id}`);
+
     return NextResponse.json({
+      appName,
       machineId: machine.id,
       volumeId: volume.id,
       status: "started",
-      ipAddress: readyMachine.private_ip,
+      gatewayUrl: `wss://${appName}.fly.dev/ws`,
       region: FLY_REGION,
       created: true,
     });
@@ -315,12 +468,12 @@ export async function GET() {
       where: eq(machines.userId, userId),
     });
 
-    if (!existingMachine) {
+    if (!existingMachine || !existingMachine.appName) {
       return NextResponse.json({ hasMachine: false });
     }
 
     // Check current status
-    const flyMachine = await getMachineStatus(existingMachine.id);
+    const flyMachine = await getMachineStatus(existingMachine.appName, existingMachine.id);
     
     if (!flyMachine) {
       // Machine was deleted externally
@@ -330,9 +483,10 @@ export async function GET() {
 
     return NextResponse.json({
       hasMachine: true,
+      appName: existingMachine.appName,
       machineId: existingMachine.id,
       status: flyMachine.state,
-      ipAddress: flyMachine.private_ip,
+      gatewayUrl: `wss://${existingMachine.appName}.fly.dev/ws`,
       region: flyMachine.region,
       volumeId: existingMachine.volumeId,
     });

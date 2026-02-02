@@ -1,5 +1,5 @@
 # Automna Gateway - Fly.io
-# Runs Clawdbot with persistent storage
+# Runs OpenClaw with persistent storage
 
 FROM node:22-slim
 
@@ -11,17 +11,17 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pnpm and clawdbot
-RUN npm install -g pnpm clawdbot@2026.1.24-3
+# Install pnpm and openclaw (pinned to stable version)
+RUN npm install -g pnpm openclaw@2026.1.30
 
 # Create directories
-RUN mkdir -p /root/.clawdbot \
+RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd \
     && mkdir -p /data
 
 # Copy startup script and config
 COPY start.sh /usr/local/bin/start.sh
-COPY clawdbot.json.template /root/.clawdbot/clawdbot.json.template
+COPY openclaw.json.template /root/.openclaw/openclaw.json.template
 
 RUN chmod +x /usr/local/bin/start.sh
 

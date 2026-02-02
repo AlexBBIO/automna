@@ -38,14 +38,18 @@ const ResetIcon = () => (
 interface GatewayInfo {
   gatewayUrl: string;
   sessionKey?: string;
+  appName?: string;
+  machineId?: string;
+  userId?: string;
 }
 
-type LoadPhase = 'init' | 'syncing' | 'fetching-gateway' | 'warming' | 'ready' | 'error';
+type LoadPhase = 'init' | 'syncing' | 'fetching-gateway' | 'provisioning' | 'warming' | 'ready' | 'error';
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
   const [gatewayInfo, setGatewayInfo] = useState<GatewayInfo | null>(null);
   const [loadPhase, setLoadPhase] = useState<LoadPhase>('init');
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
   const prewarmStarted = useRef(false);
   
@@ -255,32 +259,74 @@ export default function DashboardPage() {
   };
 
   // Sync user and fetch gateway info on mount
+  // If user doesn't have a machine yet, provision one first
   useEffect(() => {
     if (!isLoaded || !user) return;
     
-    setLoadPhase('syncing');
-    
-    fetch('/api/user/sync', { method: 'POST' })
-      .then(res => res.json())
-      .then(() => {
+    const initializeGateway = async () => {
+      try {
+        setLoadPhase('syncing');
+        
+        // Sync user to database
+        await fetch('/api/user/sync', { method: 'POST' });
+        
         setLoadPhase('fetching-gateway');
-        return fetch('/api/user/gateway');
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.gatewayUrl) {
-          setGatewayInfo(data);
+        
+        // Try to get gateway URL
+        let gatewayRes = await fetch('/api/user/gateway');
+        let gatewayData = await gatewayRes.json();
+        
+        console.log('[dashboard] Gateway response:', {
+          hasGatewayUrl: !!gatewayData.gatewayUrl,
+          needsProvisioning: gatewayData.needsProvisioning,
+          appName: gatewayData.appName,
+          error: gatewayData.error,
+        });
+        
+        // If user needs provisioning, do it now
+        if (gatewayData.needsProvisioning) {
+          console.log('[dashboard] Provisioning new machine...');
+          setLoadPhase('provisioning');
+          
+          const provisionRes = await fetch('/api/user/provision', { method: 'POST' });
+          const provisionData = await provisionRes.json();
+          
+          console.log('[dashboard] Provision response:', provisionData);
+          
+          if (provisionData.error) {
+            console.error('[dashboard] Provisioning failed:', provisionData.error);
+            setLoadError(provisionData.error);
+            setLoadPhase('error');
+            return;
+          }
+          
+          // Retry getting gateway URL after provisioning
+          setLoadPhase('fetching-gateway');
+          gatewayRes = await fetch('/api/user/gateway');
+          gatewayData = await gatewayRes.json();
+          
+          console.log('[dashboard] Gateway response after provisioning:', {
+            hasGatewayUrl: !!gatewayData.gatewayUrl,
+            appName: gatewayData.appName,
+          });
+        }
+        
+        if (gatewayData.gatewayUrl) {
+          setGatewayInfo(gatewayData);
           setLoadPhase('ready');
           // Prewarm in background - don't block UI
-          prewarmSandbox(data.gatewayUrl);
+          prewarmSandbox(gatewayData.gatewayUrl);
         } else {
+          console.error('[dashboard] No gatewayUrl in response:', gatewayData);
           setLoadPhase('error');
         }
-      })
-      .catch(err => {
+      } catch (err) {
         console.error('User sync/gateway fetch error:', err);
         setLoadPhase('error');
-      });
+      }
+    };
+    
+    initializeGateway();
   }, [isLoaded, user]);
 
   // Keep-alive pings to prevent sandbox hibernation
@@ -308,12 +354,42 @@ export default function DashboardPage() {
     return () => clearInterval(pingInterval);
   }, [gatewayInfo]);
 
+  // Show error state
+  if (loadPhase === 'error') {
+    return (
+      <div className="h-screen bg-gray-950 flex flex-col">
+        <nav className="border-b border-gray-800 bg-black/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
+          <Link href="/" className="text-xl font-bold tracking-tight">
+            <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
+          </Link>
+          <UserButton />
+        </nav>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center max-w-md">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h2 className="text-xl font-semibold text-white mb-2">Setup Failed</h2>
+            <p className="text-gray-400 mb-4">
+              {loadError || 'Something went wrong while setting up your agent.'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-white transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Show skeleton only during essential loading phases (not warming - let that happen in background)
-  if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway') {
+  if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway' || loadPhase === 'provisioning') {
     const phaseMessages: Record<string, string> = {
       'init': 'Initializing...',
       'syncing': 'Syncing account...',
       'fetching-gateway': 'Connecting to your agent...',
+      'provisioning': 'Creating your agent (this may take 1-2 minutes)...',
     };
     
     return (

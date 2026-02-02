@@ -1,14 +1,15 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * POST /api/user/sync
- * Ensures the current Clerk user exists in our database.
+ * Ensures the current Clerk user exists in our Turso database.
  * Creates them if they don't exist.
  * 
- * Note: Gateway URLs are now generated dynamically via signed URLs,
- * so we no longer store gatewayUrl/gatewayToken in the database.
+ * This syncs to Turso (Drizzle) which is used for machine provisioning.
  */
 export async function POST() {
   try {
@@ -23,39 +24,54 @@ export async function POST() {
     
     const clerkUser = await currentUser();
     const email = clerkUser?.emailAddresses[0]?.emailAddress;
+    const name = clerkUser?.firstName 
+      ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim()
+      : undefined;
     
-    if (!email) {
-      return NextResponse.json(
-        { error: "No email found" },
-        { status: 400 }
-      );
-    }
-    
-    // Upsert user in database
-    const user = await prisma.user.upsert({
-      where: { clerkId },
-      update: { email },
-      create: {
-        clerkId,
-        email,
-        plan: 'free',
-      },
+    // Check if user exists in Turso
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.id, clerkId),
     });
     
-    // Gateway is always available via signed URLs
-    // (as long as MOLTBOT_SIGNING_SECRET is configured)
-    const hasGateway = !!process.env.MOLTBOT_SIGNING_SECRET;
+    if (existingUser) {
+      // Update existing user
+      await db.update(users)
+        .set({ 
+          email, 
+          name,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, clerkId));
+      
+      console.log(`[api/user/sync] Updated user ${clerkId}`);
+      
+      return NextResponse.json({
+        id: clerkId,
+        email,
+        name,
+        created: false,
+      });
+    }
+    
+    // Create new user
+    await db.insert(users).values({
+      id: clerkId,
+      email,
+      name,
+    });
+    
+    console.log(`[api/user/sync] Created user ${clerkId}`);
     
     return NextResponse.json({
-      id: user.id,
-      email: user.email,
-      plan: user.plan,
-      hasGateway,
+      id: clerkId,
+      email,
+      name,
+      created: true,
     });
   } catch (error) {
     console.error("[api/user/sync] Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error instanceof Error ? error.message : "Internal server error" },
       { status: 500 }
     );
   }

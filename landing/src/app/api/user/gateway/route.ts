@@ -1,23 +1,19 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { db, machines } from "@/lib/db";
+import { db } from "@/lib/db";
+import { machines } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-// Fallback to shared gateway for MVP (until multi-tenant is ready)
-const FLY_GATEWAY_WS_URL = process.env.FLY_GATEWAY_WS_URL || "wss://automna-gateway.fly.dev/ws";
-const FLY_GATEWAY_HTTP_URL = process.env.FLY_GATEWAY_HTTP_URL || "https://automna-gateway.fly.dev";
-const MULTI_TENANT_ENABLED = process.env.MULTI_TENANT_ENABLED === "true";
 
 /**
  * GET /api/user/gateway
  * Returns the gateway URL for WebSocket connection.
  * 
- * Multi-tenant mode (MULTI_TENANT_ENABLED=true):
- * - Looks up user's machine in Turso
- * - Returns URL to user's specific Fly machine
+ * Per-user Fly app architecture:
+ * - Each user has their own Fly app (automna-u-{shortId})
+ * - Direct WebSocket connection to user's app: wss://{appName}.fly.dev/ws
+ * - No session namespacing needed - entire app is user-isolated
  * 
- * MVP mode (default):
- * - Returns shared gateway URL
+ * If user doesn't have an app yet, returns needsProvisioning: true
  */
 export async function GET() {
   try {
@@ -30,51 +26,46 @@ export async function GET() {
       );
     }
     
-    // Get gateway token
-    const gatewayToken = process.env.FLY_GATEWAY_TOKEN;
+    // Look up user's machine/app in database
+    const userMachine = await db.query.machines.findFirst({
+      where: eq(machines.userId, clerkId),
+    });
+    
+    if (!userMachine || !userMachine.appName) {
+      console.log(`[api/user/gateway] No app found for user ${clerkId}, needs provisioning`);
+      return NextResponse.json({
+        error: "Machine not provisioned",
+        needsProvisioning: true,
+      }, { status: 404 });
+    }
+    
+    // Get the gateway token for this user's app
+    const gatewayToken = userMachine.gatewayToken;
     if (!gatewayToken) {
-      console.error("[api/user/gateway] FLY_GATEWAY_TOKEN not configured");
+      console.error(`[api/user/gateway] No gateway token for user ${clerkId}`);
       return NextResponse.json(
-        { error: "Gateway not configured" },
-        { status: 503 }
+        { error: "Gateway token not found" },
+        { status: 500 }
       );
     }
     
-    // Multi-tenant mode: look up user's machine
-    if (MULTI_TENANT_ENABLED) {
-      const userMachine = await db.query.machines.findFirst({
-        where: eq(machines.userId, clerkId),
-      });
-      
-      if (!userMachine) {
-        // User needs to be provisioned first
-        return NextResponse.json(
-          { error: "Machine not provisioned", needsProvisioning: true },
-          { status: 404 }
-        );
-      }
-      
-      // Build URL to user's specific machine
-      // Fly machines are accessible at {machine-id}.vm.{app-name}.internal:port
-      // For external access, we use the app's fly.dev domain with machine routing
-      const machineGatewayUrl = `wss://${userMachine.id}.automna-agents.fly.dev/ws?token=${encodeURIComponent(gatewayToken)}&clientId=webchat`;
-      const machineHttpUrl = `https://${userMachine.id}.automna-agents.fly.dev?token=${encodeURIComponent(gatewayToken)}`;
-      
-      return NextResponse.json({
-        gatewayUrl: machineGatewayUrl,
-        httpUrl: machineHttpUrl,
-        sessionKey: "main",
-        machineId: userMachine.id,
-      });
-    }
+    // Build URLs for user's dedicated app
+    const appDomain = `${userMachine.appName}.fly.dev`;
+    const gatewayUrl = `wss://${appDomain}/ws?token=${encodeURIComponent(gatewayToken)}&clientId=webchat`;
+    const httpUrl = `https://${appDomain}?token=${encodeURIComponent(gatewayToken)}`;
     
-    // MVP mode: shared gateway
-    const gatewayUrl = `${FLY_GATEWAY_WS_URL}?token=${encodeURIComponent(gatewayToken)}&clientId=webchat`;
+    console.log(`[api/user/gateway] User ${clerkId} -> ${userMachine.appName}`);
     
     return NextResponse.json({
       gatewayUrl,
-      httpUrl: `${FLY_GATEWAY_HTTP_URL}?token=${encodeURIComponent(gatewayToken)}`,
+      httpUrl,
+      appName: userMachine.appName,
+      machineId: userMachine.id,
+      machineStatus: userMachine.status,
+      region: userMachine.region,
+      // No session prefix needed - entire app is user-isolated
       sessionKey: "main",
+      userId: clerkId,
     });
   } catch (error) {
     console.error("[api/user/gateway] Error:", error);

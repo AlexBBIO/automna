@@ -19,16 +19,19 @@ export const users = sqliteTable("users", {
 export const machines = sqliteTable("machines", {
   id: text("id").primaryKey(), // Fly machine ID
   userId: text("user_id").notNull().unique().references(() => users.id),
+  appName: text("app_name"), // Fly app name (automna-u-xxx)
   region: text("region").notNull(), // e.g., 'sjc'
   volumeId: text("volume_id"),
   status: text("status").default("created"), // created, started, stopped, destroyed
   ipAddress: text("ip_address"),
+  gatewayToken: text("gateway_token"), // Per-user gateway auth token
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   lastActiveAt: integer("last_active_at", { mode: "timestamp" }),
 }, (table) => ({
   userIdIdx: index("idx_machines_user_id").on(table.userId),
   statusIdx: index("idx_machines_status").on(table.status),
+  appNameIdx: index("idx_machines_app_name").on(table.appName),
 }));
 
 // Machine events - audit log

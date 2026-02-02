@@ -3,15 +3,15 @@
 
 set -e
 
-CONFIG_DIR="/root/.clawdbot"
-CONFIG_FILE="$CONFIG_DIR/clawdbot.json"
+CONFIG_DIR="/root/.openclaw"
+CONFIG_FILE="$CONFIG_DIR/openclaw.json"
 WORKSPACE_DIR="/root/clawd"
 DATA_DIR="/data"
 
 echo "[startup] Starting Automna Gateway..."
 
 # Restore from persistent volume if available
-if [ -d "$DATA_DIR/config" ] && [ -f "$DATA_DIR/config/clawdbot.json" ]; then
+if [ -d "$DATA_DIR/config" ] && [ -f "$DATA_DIR/config/openclaw.json" ]; then
     echo "[startup] Restoring config from volume..."
     cp -a "$DATA_DIR/config/." "$CONFIG_DIR/"
 fi
@@ -30,8 +30,8 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 if true; then
     
-    if [ -f "$CONFIG_DIR/clawdbot.json.template" ]; then
-        cp "$CONFIG_DIR/clawdbot.json.template" "$CONFIG_FILE"
+    if [ -f "$CONFIG_DIR/openclaw.json.template" ]; then
+        cp "$CONFIG_DIR/openclaw.json.template" "$CONFIG_FILE"
     else
         # Create minimal config
         cat > "$CONFIG_FILE" << 'EOFCONFIG'
@@ -59,7 +59,7 @@ echo "[startup] Updating config from environment..."
 node << 'EOFNODE'
 const fs = require('fs');
 
-const configPath = '/root/.clawdbot/clawdbot.json';
+const configPath = '/root/.openclaw/openclaw.json';
 console.log('Updating config at:', configPath);
 let config = {};
 
@@ -80,16 +80,16 @@ config.gateway.mode = 'local';
 config.gateway.bind = 'lan';
 
 // Use token auth
-if (process.env.MOLTBOT_GATEWAY_TOKEN) {
+if (process.env.OPENCLAW_GATEWAY_TOKEN) {
     config.gateway.auth = {
         mode: 'token',
-        token: process.env.MOLTBOT_GATEWAY_TOKEN
+        token: process.env.OPENCLAW_GATEWAY_TOKEN
     };
     console.log('Gateway token configured');
 }
 
 // Auto-pair webchat client by creating a pre-approved device entry
-const devicesDir = '/root/.clawdbot/devices';
+const devicesDir = '/root/.openclaw/devices';
 const pairedPath = devicesDir + '/paired.json';
 const webchatDeviceId = 'webchat-automna';
 
@@ -112,7 +112,7 @@ paired[webchatDeviceId] = {
     platform: 'web',
     role: 'operator',
     pairedAt: Date.now(),
-    token: process.env.MOLTBOT_GATEWAY_TOKEN || 'webchat'
+    token: process.env.OPENCLAW_GATEWAY_TOKEN || 'webchat'
 };
 
 fss.writeFileSync(pairedPath, JSON.stringify(paired, null, 2));
@@ -134,7 +134,7 @@ EOFNODE
 if [ ! -f "$WORKSPACE_DIR/AGENTS.md" ]; then
     echo "[startup] Initializing workspace..."
     cd "$WORKSPACE_DIR"
-    clawdbot setup --non-interactive 2>/dev/null || true
+    openclaw setup --non-interactive 2>/dev/null || true
 fi
 
 # Start background sync to persistent volume
@@ -148,9 +148,9 @@ fi
     done
 ) &
 
-# Export Anthropic API key for Clawdbot
+# Export Anthropic API key for OpenClaw
 export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
 
 # Start the gateway
-echo "[startup] Starting Clawdbot gateway..."
-exec clawdbot gateway
+echo "[startup] Starting OpenClaw gateway..."
+exec openclaw gateway
