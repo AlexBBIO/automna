@@ -4,6 +4,7 @@ import crypto from "crypto";
 
 // Moltworker base URL (WebSocket endpoint)
 const MOLTWORKER_WS_URL = process.env.MOLTWORKER_WS_URL || "wss://moltbot-sandbox.alex-0bb.workers.dev/ws";
+const MOLTWORKER_HTTP_URL = process.env.MOLTWORKER_HTTP_URL || "https://moltbot-sandbox.alex-0bb.workers.dev";
 
 // URL expiry time (1 hour)
 const URL_EXPIRY_SECONDS = 3600;
@@ -24,6 +25,25 @@ function generateSignedUrl(userId: string, secret: string): string {
     .digest("base64url");
   
   return `${MOLTWORKER_WS_URL}?userId=${encodeURIComponent(userId)}&exp=${exp}&sig=${sig}`;
+}
+
+/**
+ * Trigger a prewarm request to the Moltworker (fire and forget).
+ * This boots the container and caches the workspace directory in R2.
+ */
+function triggerPrewarm(userId: string, secret: string): void {
+  const exp = Math.floor(Date.now() / 1000) + 300; // 5 min expiry for prewarm
+  const payload = `${userId}.${exp}`;
+  const sig = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
+  
+  const prewarmUrl = `${MOLTWORKER_HTTP_URL}/api/keepalive?userId=${encodeURIComponent(userId)}&exp=${exp}&sig=${sig}`;
+  
+  // Fire and forget - don't await
+  fetch(prewarmUrl).catch(() => {
+    // Ignore errors - prewarm is best-effort
+  });
+  
+  console.log(`[api/user/gateway] Triggered prewarm for user ${userId}`);
 }
 
 /**
@@ -56,6 +76,9 @@ export async function GET() {
     
     // Generate signed URL
     const gatewayUrl = generateSignedUrl(clerkId, signingSecret);
+    
+    // Trigger prewarm in background (boots container + caches workspace dir)
+    triggerPrewarm(clerkId, signingSecret);
     
     return NextResponse.json({
       gatewayUrl,
