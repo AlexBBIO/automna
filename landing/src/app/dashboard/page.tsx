@@ -54,7 +54,23 @@ export default function DashboardPage() {
   const prewarmStarted = useRef(false);
   
   // Conversation state
-  const [conversations, setConversations] = useState<Conversation[]>(DEFAULT_CONVERSATIONS);
+  const [conversations, setConversations] = useState<Conversation[]>(() => {
+    // Load from localStorage on initial render
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('automna-conversations');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+    return DEFAULT_CONVERSATIONS;
+  });
   const [currentConversation, setCurrentConversation] = useState(() => {
     // Restore last active conversation from localStorage
     if (typeof window !== 'undefined') {
