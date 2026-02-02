@@ -121,13 +121,13 @@ function parseLsOutput(output: string, basePath: string): Array<{
     // Parse: drwxr-xr-x 2 node node 4096 2026-02-02 17:30 dirname
     // Or:   -rw-r--r-- 1 node node 2048 2026-02-02 15:00 filename.md
     const parts = line.split(/\s+/);
-    if (parts.length < 9) continue;
+    if (parts.length < 8) continue;
     
     const permissions = parts[0];
     const size = parseInt(parts[4], 10) || 0;
     const date = parts[5]; // 2026-02-02
     const time = parts[6]; // 17:30
-    const name = parts.slice(8).join(' ');
+    const name = parts.slice(7).join(' ');
     
     // Skip . and ..
     if (name === '.' || name === '..') continue;
