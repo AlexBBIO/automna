@@ -1,47 +1,85 @@
 #!/bin/sh
 # Automna Entrypoint Script
-# Fixes OpenClaw session key mismatch, then starts gateway
+# Fixes OpenClaw session key mismatch with background monitor
 #
-# The bug: OpenClaw stores webchat sessions with key "main"
-# but looks them up with canonical key "agent:main:main"
-# This script normalizes the keys on every boot.
-
-set -e
+# The bug: OpenClaw stores webchat sessions with key "main", "work", etc.
+# but looks them up with canonical key "agent:main:main", "agent:main:work", etc.
+# This script runs a background fixer that monitors and corrects keys.
 
 OPENCLAW_DIR="${OPENCLAW_HOME:-/home/node/.openclaw}"
 SESSIONS_DIR="$OPENCLAW_DIR/agents/main/sessions"
-CANONICAL_KEY="agent:main:main"
 SESSIONS_FILE="$SESSIONS_DIR/sessions.json"
 
-echo "[automna] Checking session structure..."
-
-# Create directories if they don't exist
-mkdir -p "$SESSIONS_DIR/$CANONICAL_KEY"
-
-# If sessions.json doesn't exist, create it with canonical key
-if [ ! -f "$SESSIONS_FILE" ]; then
-    echo "[automna] Creating sessions.json with canonical key"
-    echo "{\"$CANONICAL_KEY\":{}}" > "$SESSIONS_FILE"
-fi
-
-# If sessions.json has "main" key but not canonical key, fix it
-if grep -q '"main"' "$SESSIONS_FILE" 2>/dev/null && ! grep -q "\"$CANONICAL_KEY\"" "$SESSIONS_FILE" 2>/dev/null; then
-    echo "[automna] Fixing session key: main -> $CANONICAL_KEY"
-    sed -i "s/\"main\"/\"$CANONICAL_KEY\"/g" "$SESSIONS_FILE"
+# Function to fix session keys
+fix_session_keys() {
+    [ ! -f "$SESSIONS_FILE" ] && return
     
-    # Also move the session directory if it exists with wrong name
-    if [ -d "$SESSIONS_DIR/main" ] && [ ! -d "$SESSIONS_DIR/$CANONICAL_KEY" ]; then
-        echo "[automna] Moving session directory"
-        mv "$SESSIONS_DIR/main" "$SESSIONS_DIR/$CANONICAL_KEY"
+    # Check if any non-canonical keys exist (keys without "agent:main:" prefix that have data)
+    # We look for keys like "main", "work" etc. that should be "agent:main:main", "agent:main:work"
+    if grep -qE '"[^"]+":.*"sessionId"' "$SESSIONS_FILE" 2>/dev/null; then
+        # Use node to properly fix the JSON (more reliable than sed for complex JSON)
+        node -e "
+            const fs = require('fs');
+            const file = '$SESSIONS_FILE';
+            try {
+                const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+                let changed = false;
+                const fixed = {};
+                
+                for (const [key, value] of Object.entries(data)) {
+                    // Skip already canonical keys
+                    if (key.startsWith('agent:main:')) {
+                        fixed[key] = value;
+                        continue;
+                    }
+                    
+                    // Skip empty sessions (our pre-created ones)
+                    if (!value.sessionId) {
+                        continue;
+                    }
+                    
+                    // Convert to canonical form
+                    const canonicalKey = 'agent:main:' + key;
+                    
+                    // Only fix if canonical key doesn't already exist with data
+                    if (!fixed[canonicalKey] || !fixed[canonicalKey].sessionId) {
+                        fixed[canonicalKey] = value;
+                        changed = true;
+                        console.log('[automna] Fixed key: ' + key + ' -> ' + canonicalKey);
+                    }
+                }
+                
+                if (changed) {
+                    fs.writeFileSync(file, JSON.stringify(fixed, null, 2));
+                }
+            } catch (e) {
+                // Ignore errors (file might be being written)
+            }
+        " 2>/dev/null
     fi
-fi
+}
 
-# Create empty history file if it doesn't exist
-if [ ! -f "$SESSIONS_DIR/$CANONICAL_KEY/history.jsonl" ]; then
-    touch "$SESSIONS_DIR/$CANONICAL_KEY/history.jsonl"
-fi
+# Background fixer loop
+run_fixer() {
+    echo "[automna] Starting session key fixer (background)"
+    while true; do
+        sleep 3
+        fix_session_keys
+    done
+}
 
-echo "[automna] Session structure ready, starting gateway..."
+# Create directories
+mkdir -p "$SESSIONS_DIR"
 
-# Execute the original command (gateway with all args passed to this script)
+# Initial fix
+echo "[automna] Initial session key check..."
+fix_session_keys
+
+# Start background fixer
+run_fixer &
+FIXER_PID=$!
+
+echo "[automna] Session fixer running (PID: $FIXER_PID), starting gateway..."
+
+# Execute the gateway (pass through all args)
 exec node /app/dist/index.js "$@"
