@@ -56,23 +56,28 @@ async function gatewayRpc(
     const sendConnect = () => {
       ws.send(JSON.stringify({
         type: 'req',
+        id: `connect-${Date.now()}`,
         method: 'connect',
-        payload: {
+        params: {
           minProtocol: 3,
           maxProtocol: 3,
           client: {
-            id: 'sessions-api',
+            id: 'gateway-client',
             version: '1.0.0',
             platform: 'server',
-            mode: 'api',
+            mode: 'backend',
           },
+          auth: { token },
+          role: 'operator',
+          scopes: ['operator.read', 'operator.write'],
+          caps: [],
         },
       }));
     };
     
     const sendRpc = () => {
       ws.send(JSON.stringify({
-        jsonrpc: '2.0',
+        type: 'req',
         id: requestId,
         method,
         params,
