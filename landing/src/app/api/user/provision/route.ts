@@ -236,36 +236,19 @@ async function createVolume(appName: string): Promise<FlyVolume> {
 }
 
 /**
- * Build the initialization + gateway start command
+ * Build the gateway start command
  * 
- * This fixes the OpenClaw session key mismatch bug where:
- * - Sessions created via webchat are stored with key "main"
- * - chat.history looks up with canonical key "agent:main:main"
- * 
- * By pre-creating the session structure with the canonical key,
- * we ensure history loading works correctly from the first message.
+ * Note: The phioranex image doesn't support shell scripts in init.cmd
+ * (it wraps everything in node /app/dist/index.js). We handle the session
+ * key mismatch in our API layer instead.
  */
 function buildInitCommand(gatewayToken: string): string[] {
-  // Paths (these get interpolated into shell script)
-  const DIR = "/home/node/.openclaw/agents/main/sessions";
-  const KEY = "agent:main:main";
-  const FILE = `${DIR}/sessions.json`;
-  const HIST = `${DIR}/${KEY}`;
-  
-  // Shell script: create session structure with canonical key, then start gateway
-  // - Creates directory for canonical session key
-  // - If no sessions.json exists, creates one with correct key
-  // - If sessions.json has "main" key, renames it to canonical key
-  // - Starts gateway with required flags
-  const script = [
-    `mkdir -p "${HIST}"`,
-    `test -f "${FILE}" || echo '{"${KEY}":{}}' > "${FILE}"`,
-    `grep -q '"main"' "${FILE}" 2>/dev/null && ! grep -q '"${KEY}"' "${FILE}" && sed -i 's/"main"/"${KEY}"/g' "${FILE}" && echo "[init] fixed session key"`,
-    `test -d "${DIR}/main" && test ! -d "${HIST}" && mv "${DIR}/main" "${HIST}"`,
-    `exec gateway --allow-unconfigured --bind lan --auth token --token "${gatewayToken}"`
-  ].join('; ');
-  
-  return ["/bin/sh", "-c", script];
+  // Simple command - just start the gateway with required flags
+  // --allow-unconfigured: allows starting without config file
+  // --bind lan: allows external connections (beyond loopback)
+  // --auth token: use simple token auth
+  // --token: the authentication token
+  return ["gateway", "--allow-unconfigured", "--bind", "lan", "--auth", "token", "--token", gatewayToken];
 }
 
 /**
