@@ -190,9 +190,12 @@ async function createMachine(appName: string, volumeId: string): Promise<FlyMach
       cpus: 1,
       memory_mb: 2048,
     },
-    // Command to start the gateway (phioranex image just needs "gateway")
+    // Command to start the gateway with required config
+    // --mode local: required (no config file on first boot)
+    // --bind lan: allows external connections
+    // --token: authentication token for WebSocket connections
     init: {
-      cmd: ["gateway"],
+      cmd: ["gateway", "--mode", "local", "--bind", "lan", "--token", gatewayToken],
     },
     services: [
       {
@@ -205,9 +208,8 @@ async function createMachine(appName: string, volumeId: string): Promise<FlyMach
       },
     ],
     env: {
+      // Keep env vars as backup (some OpenClaw features may use them)
       OPENCLAW_GATEWAY_TOKEN: gatewayToken,
-      OPENCLAW_GATEWAY_MODE: "local",
-      OPENCLAW_GATEWAY_BIND: "lan",
     },
     mounts: [
       {
