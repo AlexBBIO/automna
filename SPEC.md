@@ -240,6 +240,19 @@ The upstream Clawdbot project rebranded to **OpenClaw**. We migrated all infrast
 
 ### 🏗️ History Loading Architecture
 
+> **⚠️ [DEPRECATED 2026-02-02]** The R2 caching architecture below is deprecated.
+> With Fly.io, history loads directly from persistent volumes via WebSocket.
+> See "Chat System Architecture" section for current flow.
+
+**Current Architecture (Fly.io):**
+- History stored in JSONL files at `/home/node/.openclaw/agents/main/sessions/`
+- Loaded via WebSocket `chat.history` method
+- No R2 sync needed - data persists on Fly volumes
+- Cold start: ~60s (machine boot), then instant
+
+<details>
+<summary>~~Old R2 Caching Architecture (DEPRECATED)~~</summary>
+
 **Problem:** Cold start takes 8-30s because loading history requires booting the container.
 
 **Solution:** Two-path architecture with R2 caching.
@@ -314,6 +327,8 @@ moltbot-data/
 - 30 second timeout on container startup to prevent indefinite hang
 - If timeout hits, returns error instead of hanging forever
 
+</details>
+
 ### 💬 Chat UI Architecture
 
 **Components:**
@@ -366,12 +381,12 @@ Dashboard (page.tsx)
 | **History Performance** | P0 | 11h | ✅ Mostly Done |
 | └─ Parallel HTTP fetch | P0 | 2h | ✅ Done |
 | └─ Lazy load old messages | P1 | 3h | Planned |
-| └─ R2 cache for history | P1 | 6h | Planned |
-| **File Management** | P0 | 16h | Planned |
-| └─ File tree API + UI | P0 | 6h | |
-| └─ Markdown viewer/editor | P0 | 4h | |
-| └─ Upload/download files | P0 | 4h | |
-| └─ Agent memory viewer | P1 | 2h | |
+| └─ ~~R2 cache for history~~ | ~~P1~~ | ~~6h~~ | N/A (using Fly volumes) |
+| **File Management** | P0 | 16h | ✅ Done |
+| └─ File tree API + UI | P0 | 6h | ✅ Done (Fly exec API) |
+| └─ Markdown viewer/editor | P0 | 4h | ✅ Done (FileBrowser) |
+| └─ Upload/download files | P0 | 4h | ✅ Done |
+| └─ Agent memory viewer | P1 | 2h | ✅ Done (via Files tab) |
 | **Chat UI Improvements** | P0 | 12h | ✅ Mostly Done |
 | └─ Visual polish | P0 | 3h | ✅ Done |
 | └─ Typing indicator | P0 | 1h | ✅ Done |
@@ -673,43 +688,95 @@ This is NOT a chatbot. Users will have their agents:
 
 ## Technical Architecture
 
-### Infrastructure Options
+### Infrastructure Decision: Fly.io ✅
 
-We have two viable infrastructure approaches:
+> **Decision made 2026-02-02:** We chose **Fly.io** for per-user infrastructure.
 
-#### Option A: Self-Managed Docker (Current Plan)
+**Why Fly.io:**
+- Per-user Fly apps provide true isolation
+- Persistent encrypted volumes (no R2 sync needed)
+- Simple Machines API for provisioning
+- Predictable pricing (~$9/user/month)
+- Good cold start times (~60s)
+- No Cloudflare Sandbox SDK beta issues
+
+**Current Architecture:**
+```
+automna.ai (Vercel)
+    └── Dashboard + API routes
+            └── Turso DB (user/machine tracking)
+                    └── Per-user Fly apps
+                            └── automna-u-{shortId}.fly.dev
+                                    └── OpenClaw on 2GB machine + 1GB volume
+```
+
+**Full details:** [`docs/PER-USER-SETUP.md`](docs/PER-USER-SETUP.md)
+
+---
+
+<details>
+<summary>~~Previous Options Evaluated (DEPRECATED)~~</summary>
+
+#### Option A: Self-Managed Docker
 - Docker containers on Hetzner servers
 - We manage orchestration, scaling, updates
-- Full control, predictable costs at scale
-- More ops overhead
+- **Not chosen:** Too much ops overhead
 
-#### Option B: Cloudflare Moltworker (Under Evaluation)
-- Cloudflare released [Moltworker](https://github.com/cloudflare/moltworker) on 2026-01-29
-- Runs Clawdbot on their Sandbox SDK (managed containers)
-- Zero orchestration — they handle everything
-- Per-user isolation via `getSandbox(env, userId)`
-- See: `docs/moltworker-test-plan.md` for evaluation details
+#### Option B: Cloudflare Moltworker
+- Cloudflare Sandbox SDK (managed containers)
+- **Not chosen:** Cold start issues, R2 sync complexity, beta instability
 
-**Moltworker Pros:**
-- No Docker/Kubernetes management
-- Auto-scaling built in
-- Global edge deployment
-- $5/mo base + pay-per-use
-- Cloudflare handles security, updates, networking
-
-**Moltworker Cons:**
-- 1-2 minute cold start if containers sleep
-- Cloudflare platform lock-in
-- Sandbox SDK still in beta
-- Cost at scale unclear (need to test)
-
-**Current Status:** ✅ APPROVED. Moltworker passed all Day 1 tests. Using Cloudflare Sandbox SDK.
+</details>
 
 ---
 
 ### Multi-User Isolation (Current Implementation)
 
-**✅ VERIFIED WORKING (2026-01-31)**
+> **⚠️ [DEPRECATED 2026-02-02]** The Cloudflare Sandbox SDK architecture below is deprecated.
+> We migrated to **Fly.io** on 2026-02-02. See current architecture below.
+
+---
+
+**✅ CURRENT ARCHITECTURE (Fly.io)**
+
+Each user gets a dedicated Fly.io app:
+
+```
+User A (Clerk) ──► Dashboard (automna.ai)
+                       │
+                       ▼
+                  Turso DB lookup (machines table)
+                       │
+                       ▼
+                  User's Fly App: automna-u-abc123.fly.dev
+                       │
+                       ▼
+                  OpenClaw Gateway (2GB RAM, 1GB volume)
+                       │
+                       ▼
+                  Persistent storage at /home/node/.openclaw/
+```
+
+**Key Points:**
+- Each user gets dedicated Fly app + machine + volume
+- Provisioned on first login via `/api/user/provision`
+- Tracked in Turso database (`machines` table)
+- Token-based auth per user
+- Data persists on encrypted Fly volumes
+- Cold start: ~60s (machine boot + gateway start)
+- Warm: instant
+
+**Current Resources (per user):**
+- 2GB RAM, 1 shared vCPU
+- 1GB encrypted volume
+- Custom Docker image with session key fix
+
+**📚 Full documentation:** [`docs/PER-USER-SETUP.md`](docs/PER-USER-SETUP.md), [`docs/AGENT-CONFIG-SYSTEM.md`](docs/AGENT-CONFIG-SYSTEM.md)
+
+---
+
+<details>
+<summary>~~Old Cloudflare Architecture (DEPRECATED)~~</summary>
 
 Each user gets fully isolated resources via Cloudflare's Sandbox SDK:
 
@@ -724,38 +791,11 @@ User A (Clerk) ──► Signed URL (userId + exp + sig)
                        │
                        ▼
                   Isolated DO → Container → R2 at /data/moltbot/users/user_abc/
-
-User B (Clerk) ──► Signed URL (userId + exp + sig)
-                       │
-                       ▼
-                  Worker validates signature
-                       │
-                       ▼
-                  getSandbox(env, "user-user_def")
-                       │
-                       ▼
-                  Isolated DO → Container → R2 at /data/moltbot/users/user_def/
 ```
 
-**Key Points:**
-- Single Moltworker deployment handles all users
-- Signed URLs (HMAC-SHA256) prevent userId tampering
-- Isolation via Durable Objects keyed by `user-{clerkUserId}` (lowercased)
-- Each DO gets its own container instance
-- R2 storage isolated at `/data/moltbot/users/{userId}/`
-- Cold start: 30-90s (container + R2 mount + gateway boot)
-- Warm: instant
+This architecture was used from 2026-01-29 to 2026-02-01 but had issues with cold starts and R2 sync reliability.
 
-**Current Limits:**
-- `max_instances: 10` (adjustable in wrangler.jsonc)
-- Container type: standard-4 (upgradeable)
-
-**⚠️ Known Issues:**
-- Deploy resets cause "code was updated" errors (~60s disruption)
-- Cold starts are slow (serverless tradeoff)
-- HTTP history fallback needs signed URL params (TODO)
-
-**📚 Full documentation:** [`docs/MULTI-USER-ISOLATION.md`](docs/MULTI-USER-ISOLATION.md)
+</details>
 
 ---
 
