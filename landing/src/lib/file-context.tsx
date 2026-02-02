@@ -12,7 +12,7 @@
  * All operations use signed URL auth (same as chat).
  */
 
-import { createContext, useContext, useCallback, useState, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useState, useRef, useEffect, type ReactNode } from 'react';
 
 // ============================================
 // TYPES
@@ -75,6 +75,38 @@ export function FileProvider({ gatewayUrl, children }: FileProviderProps) {
   
   // Cache the last known files to enable smart refresh
   const lastFilesRef = useRef<Map<string, FileItem[]>>(new Map());
+  
+  // Prewarm the container when FileProvider mounts (before user clicks anything)
+  // This triggers directory caching in the background so Files tab loads faster
+  useEffect(() => {
+    const prewarm = async () => {
+      try {
+        const wsUrl = new URL(gatewayUrl);
+        const httpUrl = wsUrl.protocol === 'wss:' ? 'https:' : 'http:';
+        const baseUrl = `${httpUrl}//${wsUrl.host}`;
+        
+        // Build keepalive URL with auth params
+        const keepaliveUrl = new URL(`${baseUrl}/api/keepalive`);
+        const userId = wsUrl.searchParams.get('userId');
+        const exp = wsUrl.searchParams.get('exp');
+        const sig = wsUrl.searchParams.get('sig');
+        
+        if (userId) keepaliveUrl.searchParams.set('userId', userId);
+        if (exp) keepaliveUrl.searchParams.set('exp', exp);
+        if (sig) keepaliveUrl.searchParams.set('sig', sig);
+        
+        // Fire and forget - don't wait for response
+        fetch(keepaliveUrl.toString()).catch(() => {
+          // Ignore errors - prewarm is best-effort
+        });
+        console.log('[files] Sent prewarm keepalive');
+      } catch (err) {
+        console.warn('[files] Prewarm failed:', err);
+      }
+    };
+    
+    prewarm();
+  }, [gatewayUrl]);
   
   // Build API URL from gateway WebSocket URL
   const buildUrl = useCallback((endpoint: string, params?: Record<string, string>) => {
