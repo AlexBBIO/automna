@@ -1484,6 +1484,120 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 
 ---
 
+## Future Feature: BYOT/BYOK Tier (Claude Max Integration)
+
+**Research Date:** 2026-02-02
+
+### Overview
+Allow users to bring their Claude Max subscription tokens instead of paying for API usage. This provides a cheaper option for users who already have Max subscriptions.
+
+### Two Options
+
+**BYOK (Bring Your Own Key)** — API Keys
+- User brings their Anthropic API key (`sk-ant-api...`)
+- Standard pay-per-token billing on their account
+- Fully legitimate, no ToS concerns
+- Primary recommended path
+
+**BYOT (Bring Your Own Token)** — Max Subscription Tokens
+- User brings OAuth tokens from their Claude Max subscription
+- Tokens: `sk-ant-oat01-...` (access) + `sk-ant-ort01-...` (refresh)
+- Uses their flat subscription instead of per-token API billing
+- ⚠️ Gray area — see ToS Analysis below
+
+### BYOT Technical Flow
+
+1. **User obtains tokens legitimately:**
+   - Install Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
+   - Run: `claude setup-token`
+   - Browser opens → user authenticates with Anthropic
+   - Tokens stored in `~/.claude/.credentials.json`
+
+2. **User provides tokens to Automna:**
+   - Copy from `~/.claude/.credentials.json`:
+     ```json
+     {
+       "claudeAiOauth": {
+         "accessToken": "sk-ant-oat01-...",
+         "refreshToken": "sk-ant-ort01-...",
+         "expiresAt": 1234567890
+       }
+     }
+     ```
+   - Paste into Automna dashboard (encrypted storage)
+
+3. **Automna uses tokens:**
+   - API calls with `Authorization: Bearer <accessToken>`
+   - Access tokens expire after 8 hours
+   - Refresh using:
+     ```bash
+     curl -X POST https://console.anthropic.com/api/oauth/token \
+       -H "Content-Type: application/json" \
+       -d '{
+         "grant_type": "refresh_token",
+         "refresh_token": "sk-ant-ort01-...",
+         "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+       }'
+     ```
+
+### ToS Analysis
+
+**Consumer Terms say:** Max is for "personal, non-commercial use through designated tools."
+
+**What Anthropic blocked (2026):**
+- Third-party tools initiating their own OAuth flow (Cline, RooCode, OpenCode)
+- Using `CLAUDE_CODE_OAUTH_TOKEN` env var in unauthorized apps
+- "Subscription arbitrage" (one Max → many users)
+
+**What still works:**
+- Reading tokens from `~/.claude/.credentials.json` (this is how Clawdbot/OpenClaw works)
+- Making API calls with legitimately-obtained tokens
+
+**Arguments for BYOT being acceptable:**
+- Tokens obtained through official Claude Code CLI ✅
+- One user = one subscription (no sharing) ✅
+- User is using their own subscription for their own agent ✅
+- Automna is just infrastructure/hosting ✅
+
+**Arguments against:**
+- Automna is a paid commercial product
+- User is accessing their subscription through non-"designated tool"
+
+**Risk level:** Medium. Could break if Anthropic tightens enforcement.
+
+### Implementation Plan
+
+1. **Phase 1:** Offer as "beta/experimental" feature
+2. **Add disclaimers:**
+   - "Uses your Claude Max subscription"
+   - "Anthropic's consumer terms apply"
+   - "May stop working if Anthropic changes policies"
+3. **Keep API key BYOK as primary** recommended option
+4. **Monitor:** If Anthropic blocks, gracefully degrade to API-only
+5. **Long-term:** Consider reaching out to Anthropic for official partnership/blessing
+
+### Dashboard UI (Draft)
+
+```
+Authentication Method:
+○ Anthropic API Key (Recommended)
+  - Pay-per-token on your Anthropic account
+  - Most reliable option
+  
+○ Claude Max Tokens (Beta)
+  - Use your existing Max subscription
+  - Requires Claude Code CLI setup
+  - ⚠️ Experimental — may stop working
+```
+
+### References
+- Claude Code OAuth client ID: `9d1c250a-e61b-44d9-88ed-5944d1962f5e`
+- Token refresh endpoint: `https://console.anthropic.com/api/oauth/token`
+- Credentials file: `~/.claude/.credentials.json`
+- LiteLLM integration: https://docs.litellm.ai/docs/tutorials/claude_code_max_subscription
+
+---
+
 ## Appendix
 
 ### A. Landing Page Copy (Draft)
