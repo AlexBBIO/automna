@@ -16,14 +16,15 @@
 | Landing page | ✅ Live | automna.ai on Vercel |
 | Clerk auth | ✅ Working | Sign up/sign in functional |
 | Stripe billing | ✅ Working | Checkout, webhooks, portal all functional |
-| **Fly.io Gateway** | ✅ Working | `automna-gateway.fly.dev` (shared MVP) |
-| **Per-user provisioning** | ✅ Working | `/api/user/provision` creates `automna-u-{shortId}` apps |
-| WebSocket chat | ✅ Working | Token auth, client ID 'webchat' |
-| Chat history | ✅ Working | Via WS `chat.history` method |
+| **Fly.io Gateway** | ✅ Working | Per-user apps: `automna-u-{shortId}.fly.dev` |
+| **Per-user provisioning** | ✅ Working | `/api/user/provision` creates isolated apps |
+| WebSocket chat | ✅ Working | Token auth, canonical session keys |
+| Chat history | ✅ Working | Via WS + HTTP proxy with session guards |
+| **Multi-conversation** | ✅ Working | localStorage-based, history per conversation |
 | **Turso database** | ✅ Set up | `automna` - users/machines/events tables |
 | **Drizzle ORM** | ✅ Set up | `src/lib/db/` in landing project |
 | Anthropic integration | ✅ Working | API key configured |
-| Optimistic UI | ✅ Working | Chat skeleton, no forced loading screen |
+| Optimistic UI | ✅ Working | Chat skeleton, animated loading |
 
 ### 🔧 In Progress
 | Component | Status | Notes |
@@ -42,6 +43,36 @@
 | `ghcr.io/phioranex/openclaw-docker` | ❌ Deprecated | Use custom Automna image |
 
 ### 📝 Recent Changes (2026-02-02)
+
+**💬 Chat System Overhaul (17:00-18:00 UTC):**
+Complete fix of multi-conversation chat system:
+
+1. **Session Key Canonicalization**
+   - UI uses simple keys: `main`, `test`, `work`
+   - Gateway stores canonical keys: `agent:main:main`, `agent:main:test`
+   - All WebSocket messages now canonicalize: `chat.send`, `chat.history`, `chat.abort`
+   - History proxy (`/api/ws/history`) canonicalizes session keys
+
+2. **Conversation Sidebar**
+   - Conversations stored in localStorage (OpenClaw has no session list API)
+   - Current conversation persisted to localStorage
+   - Survives page refresh and logout/login
+
+3. **Race Condition Fixes**
+   - Added `currentSessionRef` to track active session
+   - History handlers check session before setting messages
+   - Prevents "message contamination" when switching quickly
+   - 100ms debounce on WebSocket connections
+
+4. **Loading Screen Polish**
+   - Animated progress bar during provisioning (10% → 90% over 80s)
+   - Step-through messages: Creating → Storage → Workspace → Capabilities → Services
+   - Proper phase mapping to ChatSkeleton component
+
+5. **Performance Optimizations**
+   - Parallel sync + gateway fetch (don't wait for sync)
+   - Health poll interval: 1 second
+   - Messages clear immediately on conversation switch
 
 **🐳 Custom Docker Image (16:50 UTC):**
 Built and deployed custom Docker image with production-ready session key fix:
@@ -325,6 +356,86 @@ Dashboard (page.tsx)
 - Warm load: <2s
 - History load: <1s
 - File tree load: <500ms
+
+### 💬 Chat System Architecture (2026-02-02)
+
+**Data Flow:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Browser                                  │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │ ConversationSidebar│  │   AutomnaChat   │  │ clawdbot-runtime│  │
+│  │ (localStorage)  │  │   (UI component)│  │   (WebSocket)   │  │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  │
+└───────────┼─────────────────────┼─────────────────────┼─────────┘
+            │                     │                     │
+            │ conversations       │ sessionKey          │ messages
+            │ currentConversation │ (e.g., "test")      │ (canonical keys)
+            │                     │                     │
+            ▼                     ▼                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Vercel (automna.ai)                           │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │ /api/user/gateway│  │ /api/ws/history │  │ WebSocket proxy │  │
+│  │ (Turso lookup)  │  │ (canonicalize)  │  │ (pass-through)  │  │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  │
+└───────────┼─────────────────────┼─────────────────────┼─────────┘
+            │ gatewayUrl          │ agent:main:test     │
+            │ gatewayToken        │                     │
+            ▼                     ▼                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Fly.io (automna-u-{shortId}.fly.dev)                │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                    OpenClaw Gateway                          ││
+│  │  Sessions stored at: /home/node/.openclaw/agents/main/sessions/│
+│  │  Key format: agent:main:{conversationKey}                    ││
+│  │  Files: sessions.json + {key}/history.jsonl                  ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Session Key Handling:**
+
+| Component | Key Format | Example |
+|-----------|------------|---------|
+| UI (sidebar, props) | Simple | `test` |
+| Runtime (WebSocket) | Canonical | `agent:main:test` |
+| History proxy | Canonical | `agent:main:test` |
+| Gateway storage | Canonical | `agent:main:test` |
+
+**Canonicalization function:**
+```typescript
+function canonicalizeSessionKey(key: string): string {
+  if (key.startsWith('agent:main:')) return key;
+  return `agent:main:${key}`;
+}
+```
+
+**Race Condition Prevention:**
+```typescript
+// Track current session to prevent stale responses
+const currentSessionRef = useRef(sessionKey);
+currentSessionRef.current = sessionKey;
+
+// In history handlers:
+if (currentSessionRef.current !== sessionKey) {
+  console.log('History arrived for old session, ignoring');
+  return;
+}
+```
+
+**Key Files:**
+- `landing/src/lib/clawdbot-runtime.ts` - WebSocket client, history loading
+- `landing/src/app/dashboard/page.tsx` - Conversation state, sidebar
+- `landing/src/components/ConversationSidebar.tsx` - Sidebar UI
+- `landing/src/components/AutomnaChat.tsx` - Chat UI
+- `landing/src/app/api/ws/[...path]/route.ts` - History proxy
+- `docker/entrypoint.sh` - Session key fixer
+
+**Known Limitations:**
+- No server-side session list (OpenClaw doesn't have API)
+- Conversations are localStorage-only
+- Deleting conversations doesn't delete server-side data
 
 ### 💳 Stripe Integration (Configured)
 
