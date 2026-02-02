@@ -8,7 +8,7 @@
 
 ---
 
-## Current Status (2026-02-01)
+## Current Status (2026-02-02)
 
 ### ✅ Working
 | Component | Status | Notes |
@@ -16,25 +16,44 @@
 | Landing page | ✅ Live | automna.ai on Vercel |
 | Clerk auth | ✅ Working | Sign up/sign in functional |
 | Stripe billing | ✅ Working | Checkout, webhooks, portal all functional |
-| Cloudflare Moltworker | ✅ Working | moltbot-sandbox.alex-0bb.workers.dev |
-| Per-user sandboxes | ✅ Working | Isolated via Durable Objects + R2 paths |
-| WebSocket chat | ✅ Working | Fixed client ID issue (must use 'webchat') |
-| HTTP history fallback | ✅ Working | Parallel fetch, handles WS empty response |
-| R2 persistence | ✅ Working | Per-user paths, 30s background sync |
+| **Fly.io Gateway** | ✅ Working | `automna-gateway.fly.dev` (single machine MVP) |
+| WebSocket chat | ✅ Working | Token auth, client ID 'webchat' |
+| Chat history | ✅ Working | Via WS `chat.history` method |
+| **Turso database** | ✅ Set up | `automna` - users/machines/events tables |
+| **Drizzle ORM** | ✅ Set up | `src/lib/db/` in landing project |
 | Anthropic integration | ✅ Working | API key configured |
-| Test suite | ✅ Working | 30 unit tests + CI on GitHub Actions |
-| Optimistic UI | ✅ Working | Chat skeleton + progress during cold start |
-| Keep-alive pings | ✅ Working | Prevents sandbox hibernation |
+| Optimistic UI | ✅ Working | Chat skeleton, no forced loading screen |
 
-### 🔧 Needs Work
+### 🔧 In Progress (Fly.io Migration)
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Dashboard UI | 🔧 Basic | Needs file management, settings |
-| Per-user API keys | ❌ Not started | Currently all users share platform key |
-| Discord integration | ❌ Not started | Need setup flow in dashboard |
-| Telegram integration | ❌ Not started | Need setup flow in dashboard |
+| Multi-tenant machines | 🔧 Next | Need `/api/user/provision` endpoint |
+| Per-user volumes | 🔧 Planned | Persistent storage per user |
+| R2 backup sync | 🔧 Planned | Disaster recovery |
+| Files API | ❌ Blocked | Clawdbot has no HTTP file API |
 
-### 📝 Recent Changes (2026-02-01)
+### ❌ Deprecated
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Cloudflare Moltworker | ⚠️ Deprecated | Migrating to Fly.io |
+| R2 as primary storage | ⚠️ Deprecated | Moving to Fly Volumes |
+
+### 📝 Recent Changes (2026-02-02)
+
+**Fly.io Migration:**
+- Created single-machine MVP on Fly.io (`automna-gateway`)
+- Fixed WebSocket auth (token extraction from URL)
+- Fixed session key mismatch (`main` vs `agent:main:main`)
+- Added proxy routes to avoid CORS (`/api/gateway/*`, `/api/ws/*`, `/api/files/*`)
+- Removed forced loading screen (prewarm in background)
+
+**Turso Database:**
+- Created database: `libsql://automna-alexbbio.aws-us-west-2.turso.io`
+- Schema: `users`, `machines`, `machine_events` tables
+- Drizzle ORM set up in `src/lib/db/`
+- Vercel env vars configured
+
+### 📝 Previous Changes (2026-02-01)
 
 **Load Time & History:**
 - Fixed WebSocket client ID (must be 'webchat' not custom)

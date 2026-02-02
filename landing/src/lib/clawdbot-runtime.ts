@@ -59,20 +59,32 @@ function parseMessages(messages: Array<{ role: string; content: unknown; timesta
   });
 }
 
-// Build HTTP history URL from WebSocket URL
+// Build HTTP history URL - use local proxy to avoid CORS
 function buildHistoryUrl(gatewayUrl: string, sessionKey: string): string {
   const wsUrl = new URL(gatewayUrl);
-  const httpUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
-  const historyUrl = new URL(`${httpUrl}/ws/api/history`);
+  // Use local proxy instead of direct Fly.io call
+  const historyUrl = new URL('/api/ws/history', window.location.origin);
   historyUrl.searchParams.set('sessionKey', sessionKey);
-  // Pass through auth params
+  // Pass through all auth params from original URL
+  const token = wsUrl.searchParams.get('token');
   const userId = wsUrl.searchParams.get('userId');
   const exp = wsUrl.searchParams.get('exp');
   const sig = wsUrl.searchParams.get('sig');
+  if (token) historyUrl.searchParams.set('token', token);
   if (userId) historyUrl.searchParams.set('userId', userId);
   if (exp) historyUrl.searchParams.set('exp', exp);
   if (sig) historyUrl.searchParams.set('sig', sig);
   return historyUrl.toString();
+}
+
+// Extract token from URL query params
+function extractTokenFromUrl(url: string): string | undefined {
+  try {
+    const parsed = new URL(url);
+    return parsed.searchParams.get('token') || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function useClawdbotRuntime(config: ClawdbotConfig) {
@@ -196,10 +208,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     if (!wsUrl.includes('/ws')) {
       wsUrl = wsUrl.replace(/\/$/, '') + '/ws';
     }
-    if (config.authToken) {
-      const separator = wsUrl.includes('?') ? '&' : '?';
-      wsUrl = `${wsUrl}${separator}token=${encodeURIComponent(config.authToken)}`;
-    }
+    // Token is already in URL from gateway, no need to add again
     
     console.log('[clawdbot] Connecting...');
     const ws = new WebSocket(wsUrl);
@@ -212,11 +221,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       connectSentRef.current = true;
       
       const cfg = configRef.current;
+      // Get token from config or URL
+      const token = cfg.authToken || extractTokenFromUrl(cfg.gatewayUrl);
+      
       const connectParams: Record<string, unknown> = {
         minProtocol: 3,
         maxProtocol: 3,
         client: {
-          id: 'webchat',  // Must use valid Clawdbot client ID
+          id: 'webchat',
           version: '1.0.0',
           platform: typeof navigator !== 'undefined' ? navigator.platform : 'web',
           mode: 'webchat',
@@ -224,13 +236,11 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         role: 'operator',
         scopes: ['operator.read', 'operator.write'],
         caps: [],
-        commands: [],
-        permissions: {},
         locale: 'en-US',
       };
       
-      if (cfg.authToken) {
-        connectParams.auth = { token: cfg.authToken };
+      if (token) {
+        connectParams.auth = { token };
       }
       
       ws.send(JSON.stringify({
@@ -275,8 +285,16 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         // Handle history response from WebSocket
         // Debug: log all 'res' messages to understand the format
         if (msg.type === 'res') {
-          console.log('[clawdbot] Response:', msg.ok ? 'ok' : 'error', 'payload keys:', Object.keys(msg.payload || {}));
-          console.log('[clawdbot] messages is array?', Array.isArray(msg.payload?.messages), 'length:', msg.payload?.messages?.length);
+          const keys = Object.keys(msg.payload || {});
+          console.log('[clawdbot] Response:', msg.ok ? 'ok' : 'error', 'keys:', keys.join(','));
+          if (keys.includes('sessionKey') || keys.includes('messages')) {
+            console.log('[clawdbot] HISTORY response detected:', {
+              hasMessages: 'messages' in (msg.payload || {}),
+              isArray: Array.isArray(msg.payload?.messages),
+              length: msg.payload?.messages?.length,
+              sessionKey: msg.payload?.sessionKey,
+            });
+          }
         }
         if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
           console.log('[clawdbot] Entering history handler, historyLoadedRef:', historyLoadedRef.current);

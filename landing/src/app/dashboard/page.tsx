@@ -221,12 +221,14 @@ export default function DashboardPage() {
     
     try {
       const wsUrl = new URL(gatewayUrl);
-      const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
-      const keepAliveUrl = new URL(`${baseUrl}/api/keepalive`);
+      // Use local proxy to avoid CORS issues
+      const keepAliveUrl = new URL('/api/gateway/keepalive', window.location.origin);
       
       const userId = wsUrl.searchParams.get('userId');
       const exp = wsUrl.searchParams.get('exp');
       const sig = wsUrl.searchParams.get('sig');
+      const token = wsUrl.searchParams.get('token');
+      if (token) keepAliveUrl.searchParams.set('token', token);
       if (userId) keepAliveUrl.searchParams.set('userId', userId);
       if (exp) keepAliveUrl.searchParams.set('exp', exp);
       if (sig) keepAliveUrl.searchParams.set('sig', sig);
@@ -265,14 +267,12 @@ export default function DashboardPage() {
         return fetch('/api/user/gateway');
       })
       .then(res => res.json())
-      .then(async data => {
+      .then(data => {
         if (data.gatewayUrl) {
           setGatewayInfo(data);
-          setLoadPhase('warming');
-          // Wait for prewarm to complete before showing ready
-          // This ensures the container is warm before WebSocket connects
-          await prewarmSandbox(data.gatewayUrl);
           setLoadPhase('ready');
+          // Prewarm in background - don't block UI
+          prewarmSandbox(data.gatewayUrl);
         } else {
           setLoadPhase('error');
         }
@@ -289,12 +289,13 @@ export default function DashboardPage() {
     
     const pingInterval = setInterval(() => {
       const wsUrl = new URL(gatewayInfo.gatewayUrl);
-      const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
-      
-      const keepAliveUrl = new URL(`${baseUrl}/api/keepalive`);
+      // Use local proxy to avoid CORS
+      const keepAliveUrl = new URL('/api/gateway/keepalive', window.location.origin);
       const userId = wsUrl.searchParams.get('userId');
       const exp = wsUrl.searchParams.get('exp');
       const sig = wsUrl.searchParams.get('sig');
+      const token = wsUrl.searchParams.get('token');
+      if (token) keepAliveUrl.searchParams.set('token', token);
       if (userId) keepAliveUrl.searchParams.set('userId', userId);
       if (exp) keepAliveUrl.searchParams.set('exp', exp);
       if (sig) keepAliveUrl.searchParams.set('sig', sig);
@@ -307,13 +308,12 @@ export default function DashboardPage() {
     return () => clearInterval(pingInterval);
   }, [gatewayInfo]);
 
-  // Show skeleton during initial loading phases (including warming)
-  if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway' || loadPhase === 'warming') {
+  // Show skeleton only during essential loading phases (not warming - let that happen in background)
+  if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway') {
     const phaseMessages: Record<string, string> = {
       'init': 'Initializing...',
       'syncing': 'Syncing account...',
       'fetching-gateway': 'Connecting to your agent...',
-      'warming': 'Starting your agent (this may take a moment)...',
     };
     
     return (

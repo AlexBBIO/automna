@@ -21,10 +21,14 @@ if [ -d "$DATA_DIR/workspace" ]; then
     cp -a "$DATA_DIR/workspace/." "$WORKSPACE_DIR/"
 fi
 
-# Create config from template if needed
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "[startup] Creating config from template..."
-    mkdir -p "$CONFIG_DIR"
+# Always recreate config from template to ensure clean state
+echo "[startup] Creating config from template..."
+mkdir -p "$CONFIG_DIR"
+if [ -f "$CONFIG_FILE" ]; then
+    echo "[startup] Removing old config..."
+    rm -f "$CONFIG_FILE"
+fi
+if true; then
     
     if [ -f "$CONFIG_DIR/clawdbot.json.template" ]; then
         cp "$CONFIG_DIR/clawdbot.json.template" "$CONFIG_FILE"
@@ -75,17 +79,51 @@ config.gateway.port = 18789;
 config.gateway.mode = 'local';
 config.gateway.bind = 'lan';
 
-// Set gateway token if provided
+// Use token auth
 if (process.env.MOLTBOT_GATEWAY_TOKEN) {
-    config.gateway.auth = config.gateway.auth || {};
-    config.gateway.auth.mode = 'token';
-    config.gateway.auth.token = process.env.MOLTBOT_GATEWAY_TOKEN;
+    config.gateway.auth = {
+        mode: 'token',
+        token: process.env.MOLTBOT_GATEWAY_TOKEN
+    };
     console.log('Gateway token configured');
 }
 
-// Allow insecure auth for web chat
+// Auto-pair webchat client by creating a pre-approved device entry
+const devicesDir = '/root/.clawdbot/devices';
+const pairedPath = devicesDir + '/paired.json';
+const webchatDeviceId = 'webchat-automna';
+
+// Ensure devices directory exists
+const fss = require('fs');
+if (!fss.existsSync(devicesDir)) {
+    fss.mkdirSync(devicesDir, { recursive: true });
+}
+
+// Create or update paired devices with webchat pre-approved
+let paired = {};
+if (fss.existsSync(pairedPath)) {
+    try { paired = JSON.parse(fss.readFileSync(pairedPath, 'utf8')); } catch (e) {}
+}
+
+// Add webchat as a pre-paired device
+paired[webchatDeviceId] = {
+    deviceId: webchatDeviceId,
+    name: 'Automna WebChat',
+    platform: 'web',
+    role: 'operator',
+    pairedAt: Date.now(),
+    token: process.env.MOLTBOT_GATEWAY_TOKEN || 'webchat'
+};
+
+fss.writeFileSync(pairedPath, JSON.stringify(paired, null, 2));
+console.log('Webchat device pre-paired');
+
+// Allow insecure auth for web chat (no device pairing required)
 config.gateway.controlUi = config.gateway.controlUi || {};
 config.gateway.controlUi.allowInsecureAuth = true;
+
+// Trust Fly proxy for proper client detection
+config.gateway.trustedProxies = ['172.16.0.0/12', '10.0.0.0/8'];
 
 // Write updated config
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));

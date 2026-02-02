@@ -803,13 +803,19 @@ User C Machine ←→ Volume C (/data, 1GB)
 ## Revised Next Steps
 
 1. [x] Alex: Review and approve plan
-2. [ ] Create Fly.io account (`fly auth login`)
-3. [ ] Create Turso database + schema
-4. [ ] Set up Drizzle ORM in landing project
+2. [x] Create Fly.io account - Already done (`automna-gateway` app exists)
+3. [x] Create Turso database + schema (2026-02-02)
+   - Database: `automna` at `libsql://automna-alexbbio.aws-us-west-2.turso.io`
+   - Tables: `users`, `machines`, `machine_events`
+   - Config: `/root/clawd/projects/automna/config/turso.json`
+4. [x] Set up Drizzle ORM in landing project (2026-02-02)
+   - Schema: `src/lib/db/schema.ts`
+   - Client: `src/lib/db/index.ts`
+   - Vercel env vars added: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
 5. [ ] Build `/api/user/provision` endpoint
-6. [ ] Adapt Dockerfile for Fly
+6. [ ] Adapt Dockerfile for multi-user (currently single machine)
 7. [ ] Test basic machine lifecycle
-8. [ ] Update `/api/user/gateway` to use Fly
+8. [ ] Update `/api/user/gateway` to use Turso for machine lookup
 9. [ ] Add R2 backup sync to container
 10. [ ] Integration testing
 11. [ ] Cutover

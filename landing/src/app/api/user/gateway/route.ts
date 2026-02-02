@@ -32,8 +32,9 @@ export async function GET() {
       );
     }
     
-    // Build gateway URL with token
-    const gatewayUrl = `${FLY_GATEWAY_WS_URL}?token=${encodeURIComponent(gatewayToken)}`;
+    // Build gateway URL with token and client ID
+    // The clientId=webchat allows connections without device pairing when allowInsecureAuth is enabled
+    const gatewayUrl = `${FLY_GATEWAY_WS_URL}?token=${encodeURIComponent(gatewayToken)}&clientId=webchat`;
     
     return NextResponse.json({
       gatewayUrl,

@@ -82,15 +82,15 @@ export function FileProvider({ gatewayUrl, children }: FileProviderProps) {
     const prewarm = async () => {
       try {
         const wsUrl = new URL(gatewayUrl);
-        const httpUrl = wsUrl.protocol === 'wss:' ? 'https:' : 'http:';
-        const baseUrl = `${httpUrl}//${wsUrl.host}`;
         
-        // Build keepalive URL with auth params
-        const keepaliveUrl = new URL(`${baseUrl}/api/keepalive`);
+        // Use local proxy to avoid CORS issues
+        const keepaliveUrl = new URL('/api/gateway/keepalive', window.location.origin);
         const userId = wsUrl.searchParams.get('userId');
         const exp = wsUrl.searchParams.get('exp');
         const sig = wsUrl.searchParams.get('sig');
+        const token = wsUrl.searchParams.get('token');
         
+        if (token) keepaliveUrl.searchParams.set('token', token);
         if (userId) keepaliveUrl.searchParams.set('userId', userId);
         if (exp) keepaliveUrl.searchParams.set('exp', exp);
         if (sig) keepaliveUrl.searchParams.set('sig', sig);
@@ -108,19 +108,20 @@ export function FileProvider({ gatewayUrl, children }: FileProviderProps) {
     prewarm();
   }, [gatewayUrl]);
   
-  // Build API URL from gateway WebSocket URL
+  // Build API URL using local proxy to avoid CORS
   const buildUrl = useCallback((endpoint: string, params?: Record<string, string>) => {
     const wsUrl = new URL(gatewayUrl);
-    const httpUrl = wsUrl.protocol === 'wss:' ? 'https:' : 'http:';
-    const baseUrl = `${httpUrl}//${wsUrl.host}`;
     
-    const url = new URL(`${baseUrl}/api/files/${endpoint}`);
+    // Use local proxy
+    const url = new URL(`/api/files/${endpoint}`, window.location.origin);
     
     // Copy auth params from gateway URL
     const userId = wsUrl.searchParams.get('userId');
     const exp = wsUrl.searchParams.get('exp');
     const sig = wsUrl.searchParams.get('sig');
+    const token = wsUrl.searchParams.get('token');
     
+    if (token) url.searchParams.set('token', token);
     if (userId) url.searchParams.set('userId', userId);
     if (exp) url.searchParams.set('exp', exp);
     if (sig) url.searchParams.set('sig', sig);
