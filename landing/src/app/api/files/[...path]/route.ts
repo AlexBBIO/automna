@@ -377,11 +377,15 @@ export async function POST(
           const buffer = await file.arrayBuffer();
           const base64 = Buffer.from(buffer).toString('base64');
           
-          // Write via base64 decode
+          // Get parent directory
+          const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
+          
+          // Create parent directory and write file
+          // Use heredoc for large base64 to avoid argument length limits
           await execCommand(
             gateway.appName,
             gateway.machineId,
-            `echo "${base64}" | base64 -d > "${filePath}"`
+            `mkdir -p "${parentDir}" && cat > "${filePath}.b64" << 'EOF_B64'\n${base64}\nEOF_B64\nbase64 -d "${filePath}.b64" > "${filePath}" && rm "${filePath}.b64"`
           );
           
           return NextResponse.json({ success: true, path: filePath });
