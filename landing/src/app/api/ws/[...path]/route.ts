@@ -1,13 +1,16 @@
 /**
  * WebSocket API Proxy Route
  * 
- * Proxies HTTP requests to the Fly.io gateway's /ws/api/ endpoints.
+ * Proxies HTTP requests to the user's Fly.io gateway's /ws/api/ endpoints.
+ * Now looks up the per-user gateway URL from the database.
  * Paths: /api/ws/history, etc.
  */
 
+import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-
-const FLY_GATEWAY_URL = process.env.FLY_GATEWAY_URL || "https://automna-gateway.fly.dev";
+import { db } from "@/lib/db";
+import { machines } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET(
   request: NextRequest,
@@ -16,21 +19,51 @@ export async function GET(
   const { path } = await params;
   const pathStr = path.join("/");
   
-  // Build target URL - note: /ws/api/ path
-  const targetUrl = new URL(`${FLY_GATEWAY_URL}/ws/api/${pathStr}`);
-  
-  // Forward query params
-  request.nextUrl.searchParams.forEach((value, key) => {
-    targetUrl.searchParams.set(key, value);
-  });
-  
   try {
+    // Get the authenticated user
+    const { userId: clerkId } = await auth();
+    
+    if (!clerkId) {
+      return NextResponse.json(
+        { error: "Unauthorized", messages: [] },
+        { status: 401 }
+      );
+    }
+    
+    // Look up user's machine/app in database
+    const userMachine = await db.query.machines.findFirst({
+      where: eq(machines.userId, clerkId),
+    });
+    
+    if (!userMachine || !userMachine.appName) {
+      // No machine yet - return empty history
+      console.log(`[ws-proxy] No app found for user ${clerkId}`);
+      return NextResponse.json({ messages: [] });
+    }
+    
+    // Build target URL for user's gateway
+    const gatewayBase = `https://${userMachine.appName}.fly.dev`;
+    const targetUrl = new URL(`${gatewayBase}/ws/api/${pathStr}`);
+    
+    // Forward query params (including token for auth)
+    request.nextUrl.searchParams.forEach((value, key) => {
+      targetUrl.searchParams.set(key, value);
+    });
+    
+    console.log(`[ws-proxy] Proxying to ${targetUrl.toString()}`);
+    
     const response = await fetch(targetUrl.toString(), {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
     });
+    
+    // If gateway isn't ready yet (502, 503, etc), return empty history
+    if (!response.ok) {
+      console.log(`[ws-proxy] Gateway returned ${response.status}, returning empty history`);
+      return NextResponse.json({ messages: [] });
+    }
     
     const data = await response.text();
     
@@ -42,9 +75,7 @@ export async function GET(
     });
   } catch (error) {
     console.error("[ws-proxy] Error:", error);
-    return NextResponse.json(
-      { error: "Gateway request failed" },
-      { status: 502 }
-    );
+    // Return empty history on error - allows chat to work
+    return NextResponse.json({ messages: [] });
   }
 }

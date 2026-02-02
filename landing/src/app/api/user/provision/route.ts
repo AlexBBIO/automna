@@ -251,8 +251,9 @@ async function createMachine(appName: string, volumeId: string, gatewayToken: st
     // --allow-unconfigured: allows starting without config file
     // --bind lan: allows external connections (beyond loopback)
     // --token: authentication token for WebSocket connections
+    // --auth token: use simple token auth (no challenge-response)
     init: {
-      cmd: ["gateway", "--allow-unconfigured", "--bind", "lan", "--token", gatewayToken],
+      cmd: ["gateway", "--allow-unconfigured", "--bind", "lan", "--auth", "token", "--token", gatewayToken],
     },
     services: [
       {
