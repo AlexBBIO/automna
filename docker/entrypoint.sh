@@ -82,7 +82,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "defaults": {
       "workspace": "/home/node/.openclaw/workspace",
       "model": {
-        "primary": "anthropic/claude-sonnet-4-20250514"
+        "primary": "anthropic/claude-opus-4-5"
       },
       "userTimezone": "America/Los_Angeles"
     }

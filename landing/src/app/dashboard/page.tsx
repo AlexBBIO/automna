@@ -15,11 +15,10 @@ interface Conversation {
   key: string;
   name: string;
   icon: string;
+  lastActive?: number;
 }
 
-const DEFAULT_CONVERSATIONS: Conversation[] = [
-  { key: 'main', name: 'General', icon: '💬' },
-];
+// No more DEFAULT_CONVERSATIONS - we fetch from OpenClaw
 
 const CreditCardIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -53,26 +52,11 @@ export default function DashboardPage() {
   const [loadingPortal, setLoadingPortal] = useState(false);
   const prewarmStarted = useRef(false);
   
-  // Conversation state
-  const [conversations, setConversations] = useState<Conversation[]>(() => {
-    // Load from localStorage on initial render
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('automna-conversations');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
-          }
-        } catch {
-          // Ignore parse errors
-        }
-      }
-    }
-    return DEFAULT_CONVERSATIONS;
-  });
+  // Conversation state - fetched from OpenClaw
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
   const [currentConversation, setCurrentConversation] = useState(() => {
-    // Restore last active conversation from localStorage
+    // Restore last active conversation from localStorage (user preference only)
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('automna-current-conversation');
       return saved || 'main';
