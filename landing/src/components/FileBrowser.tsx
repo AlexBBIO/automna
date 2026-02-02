@@ -31,14 +31,22 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
     navigateUp,
     refresh,
     readFile,
+    writeFile,
     downloadFile,
     deleteFile,
     uploadFile,
+    createDirectory,
   } = useFiles();
   
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [showNewFileModal, setShowNewFileModal] = useState(false);
+  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Initial load
@@ -122,9 +130,70 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       await deleteFile(file.path);
       if (selectedFile?.path === file.path) {
         setSelectedFile(null);
+        setIsEditing(false);
       }
     } catch (err) {
       console.error('Delete failed:', err);
+    }
+  };
+  
+  const handleStartEdit = () => {
+    if (fileContent !== null) {
+      setEditContent(fileContent);
+      setIsEditing(true);
+    }
+  };
+  
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditContent('');
+  };
+  
+  const handleSave = async () => {
+    if (!selectedFile) return;
+    
+    setIsSaving(true);
+    try {
+      await writeFile(selectedFile.path, editContent);
+      setFileContent(editContent);
+      setIsEditing(false);
+      // Refresh to update modified time
+      refresh();
+    } catch (err) {
+      console.error('Save failed:', err);
+      alert('Failed to save file');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleCreateFile = async () => {
+    if (!newItemName.trim()) return;
+    
+    const filePath = `${currentPath}/${newItemName.trim()}`;
+    try {
+      await writeFile(filePath, '');
+      setShowNewFileModal(false);
+      setNewItemName('');
+      refresh();
+    } catch (err) {
+      console.error('Create file failed:', err);
+      alert('Failed to create file');
+    }
+  };
+  
+  const handleCreateFolder = async () => {
+    if (!newItemName.trim()) return;
+    
+    const folderPath = `${currentPath}/${newItemName.trim()}`;
+    try {
+      await createDirectory(folderPath);
+      setShowNewFolderModal(false);
+      setNewItemName('');
+      refresh();
+    } catch (err) {
+      console.error('Create folder failed:', err);
+      alert('Failed to create folder');
     }
   };
   
@@ -172,8 +241,26 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           </button>
           
           <button
+            onClick={() => setShowNewFolderModal(true)}
+            className="flex items-center gap-1 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
+            title="New Folder"
+          >
+            <span>📁</span>
+            <span>New Folder</span>
+          </button>
+          
+          <button
+            onClick={() => setShowNewFileModal(true)}
+            className="flex items-center gap-1 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
+            title="New File"
+          >
+            <span>📄</span>
+            <span>New File</span>
+          </button>
+          
+          <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition-colors"
+            className="flex items-center gap-1 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition-colors"
           >
             <span>⬆️</span>
             <span>Upload</span>
@@ -271,10 +358,85 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
               <div className="text-gray-400">Loading...</div>
             </div>
           ) : (
-            <FilePreview file={selectedFile} content={fileContent} onDownload={() => downloadFile(selectedFile.path)} />
+            <FilePreview 
+              file={selectedFile} 
+              content={fileContent}
+              isEditing={isEditing}
+              editContent={editContent}
+              isSaving={isSaving}
+              onDownload={() => downloadFile(selectedFile.path)}
+              onStartEdit={handleStartEdit}
+              onCancelEdit={handleCancelEdit}
+              onSave={handleSave}
+              onEditChange={setEditContent}
+            />
           )}
         </div>
       </div>
+      
+      {/* New File Modal */}
+      {showNewFileModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg p-6 w-96 border border-gray-700">
+            <h3 className="text-lg font-semibold mb-4">Create New File</h3>
+            <input
+              type="text"
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              placeholder="filename.md"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateFile()}
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => { setShowNewFileModal(false); setNewItemName(''); }}
+                className="px-4 py-2 text-gray-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateFile}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* New Folder Modal */}
+      {showNewFolderModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg p-6 w-96 border border-gray-700">
+            <h3 className="text-lg font-semibold mb-4">Create New Folder</h3>
+            <input
+              type="text"
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              placeholder="folder-name"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => { setShowNewFolderModal(false); setNewItemName(''); }}
+                className="px-4 py-2 text-gray-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateFolder}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -286,11 +448,33 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
 interface FilePreviewProps {
   file: FileItem;
   content: string | null;
+  isEditing: boolean;
+  editContent: string;
+  isSaving: boolean;
   onDownload: () => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSave: () => void;
+  onEditChange: (content: string) => void;
 }
 
-function FilePreview({ file, content, onDownload }: FilePreviewProps) {
+function FilePreview({ 
+  file, 
+  content, 
+  isEditing,
+  editContent,
+  isSaving,
+  onDownload,
+  onStartEdit,
+  onCancelEdit,
+  onSave,
+  onEditChange,
+}: FilePreviewProps) {
   const ext = file.extension?.toLowerCase() || '';
+  
+  // Check if file is editable
+  const editableExtensions = ['md', 'txt', 'json', 'yaml', 'yml', 'js', 'ts', 'jsx', 'tsx', 'py', 'css', 'html', 'xml', 'toml', 'ini', 'env', 'sh', 'bash'];
+  const isEditable = editableExtensions.includes(ext) || !ext;
   
   // Image preview
   const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
@@ -315,7 +499,7 @@ function FilePreview({ file, content, onDownload }: FilePreviewProps) {
     );
   }
   
-  // Text/code preview
+  // Text/code preview or edit
   if (content !== null) {
     const isMarkdown = ext === 'md';
     const isCode = ['js', 'ts', 'jsx', 'tsx', 'py', 'json', 'yaml', 'yml', 'css', 'html', 'xml', 'sh', 'bash'].includes(ext);
@@ -326,16 +510,52 @@ function FilePreview({ file, content, onDownload }: FilePreviewProps) {
           <h3 className="font-medium text-sm">{file.name}</h3>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">{formatFileSize(file.size)}</span>
-            <button
-              onClick={onDownload}
-              className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded"
-            >
-              ⬇️
-            </button>
+            {isEditing ? (
+              <>
+                <button
+                  onClick={onCancelEdit}
+                  disabled={isSaving}
+                  className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onSave}
+                  disabled={isSaving}
+                  className="px-2 py-1 text-xs bg-green-600 hover:bg-green-500 rounded disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : '💾 Save'}
+                </button>
+              </>
+            ) : (
+              <>
+                {isEditable && (
+                  <button
+                    onClick={onStartEdit}
+                    className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 rounded"
+                  >
+                    ✏️ Edit
+                  </button>
+                )}
+                <button
+                  onClick={onDownload}
+                  className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded"
+                >
+                  ⬇️
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className="flex-1 overflow-auto">
-          {isMarkdown ? (
+          {isEditing ? (
+            <textarea
+              value={editContent}
+              onChange={(e) => onEditChange(e.target.value)}
+              className="w-full h-full p-4 bg-gray-950 text-gray-300 font-mono text-sm resize-none focus:outline-none"
+              spellCheck={false}
+            />
+          ) : isMarkdown ? (
             <div className="p-4 prose prose-invert prose-sm max-w-none">
               <MarkdownPreview content={content} />
             </div>
