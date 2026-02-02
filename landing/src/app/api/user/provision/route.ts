@@ -190,6 +190,10 @@ async function createMachine(appName: string, volumeId: string): Promise<FlyMach
       cpus: 1,
       memory_mb: 2048,
     },
+    // Command to start the gateway (phioranex image needs explicit command)
+    init: {
+      cmd: ["gateway", "start", "--foreground"],
+    },
     services: [
       {
         ports: [
