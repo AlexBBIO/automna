@@ -71,6 +71,27 @@ run_fixer() {
 # Create directories
 mkdir -p "$SESSIONS_DIR"
 
+# Create config file if it doesn't exist
+# This configures workspace injection so the agent sees AGENTS.md, SOUL.md, etc.
+CONFIG_FILE="$OPENCLAW_DIR/clawdbot.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "[automna] Creating default config..."
+    cat > "$CONFIG_FILE" << 'EOF'
+{
+  "agents": {
+    "defaults": {
+      "workspace": "/home/node/.openclaw/workspace",
+      "model": {
+        "primary": "anthropic/claude-sonnet-4-20250514"
+      },
+      "userTimezone": "America/Los_Angeles"
+    }
+  }
+}
+EOF
+    echo "[automna] Config created at $CONFIG_FILE"
+fi
+
 # Initial fix
 echo "[automna] Initial session key check..."
 fix_session_keys
