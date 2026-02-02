@@ -36,10 +36,13 @@ export async function GET() {
     
     if (!userMachine || !userMachine.appName || !userMachine.gatewayToken) {
       // No machine yet - return default session only
+      console.log(`[sessions] No machine for user ${clerkId}, returning defaults`);
       return NextResponse.json({
         sessions: [{ key: 'main', name: 'General' }],
       });
     }
+    
+    console.log(`[sessions] Found machine for user: ${userMachine.appName}`);
     
     // Build gateway URL
     const gatewayBase = `https://${userMachine.appName}.fly.dev`;
@@ -65,10 +68,11 @@ export async function GET() {
       const data = await response.json();
       
       // Gateway returns sessions array
-      // Filter to only sessions that have messages (active conversations)
       // Normalize keys: "agent:main:work" -> "work" for UI consistency
+      console.log('[sessions] Raw gateway response:', JSON.stringify(data.sessions?.slice(0, 5)));
+      
       const sessions: Session[] = (data.sessions || [])
-        .filter((s: Session) => s.key && (s.messageCount ?? 0) > 0)
+        .filter((s: Session) => s.key) // Just need a key
         .map((s: Session) => {
           // Strip canonical prefix for UI display
           const normalizedKey = s.key.replace(/^agent:main:/, '');
