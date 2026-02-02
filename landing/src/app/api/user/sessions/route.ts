@@ -66,21 +66,34 @@ export async function GET() {
       
       // Gateway returns sessions array
       // Filter to only sessions that have messages (active conversations)
+      // Normalize keys: "agent:main:work" -> "work" for UI consistency
       const sessions: Session[] = (data.sessions || [])
         .filter((s: Session) => s.key && (s.messageCount ?? 0) > 0)
-        .map((s: Session) => ({
-          key: s.key,
-          name: s.name || formatSessionName(s.key),
-          lastActive: s.lastActive,
-          messageCount: s.messageCount,
-        }));
+        .map((s: Session) => {
+          // Strip canonical prefix for UI display
+          const normalizedKey = s.key.replace(/^agent:main:/, '');
+          return {
+            key: normalizedKey,
+            name: s.name || formatSessionName(normalizedKey),
+            lastActive: s.lastActive,
+            messageCount: s.messageCount,
+          };
+        });
+      
+      // Dedupe in case both "main" and "agent:main:main" exist
+      const seenKeys = new Set<string>();
+      const dedupedSessions = sessions.filter(s => {
+        if (seenKeys.has(s.key)) return false;
+        seenKeys.add(s.key);
+        return true;
+      });
       
       // Always include 'main' session even if empty
-      if (!sessions.some(s => s.key === 'main')) {
-        sessions.unshift({ key: 'main', name: 'General' });
+      if (!dedupedSessions.some(s => s.key === 'main')) {
+        dedupedSessions.unshift({ key: 'main', name: 'General' });
       }
       
-      return NextResponse.json({ sessions });
+      return NextResponse.json({ sessions: dedupedSessions });
     } catch (fetchError) {
       console.warn('[sessions] Failed to fetch from gateway:', fetchError);
       // Return defaults on error
