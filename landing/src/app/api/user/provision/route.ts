@@ -119,6 +119,64 @@ async function createApp(appName: string, orgId: string): Promise<FlyApp> {
 }
 
 /**
+ * Allocate public IP addresses for a Fly app
+ * Needed for the app to be accessible via appname.fly.dev
+ */
+async function allocateIps(appName: string): Promise<void> {
+  // Allocate shared IPv4 (free, returns null but still works)
+  const v4Response = await fetch("https://api.fly.io/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${FLY_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: `
+        mutation($input: AllocateIPAddressInput!) {
+          allocateIpAddress(input: $input) {
+            ipAddress { id address type }
+          }
+        }
+      `,
+      variables: {
+        input: { appId: appName, type: "shared_v4" },
+      },
+    }),
+  });
+  const v4Data = await v4Response.json();
+  if (v4Data.errors) {
+    console.warn(`[provision] IPv4 allocation warning:`, v4Data.errors);
+  }
+
+  // Allocate IPv6 (free, dedicated)
+  const v6Response = await fetch("https://api.fly.io/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${FLY_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: `
+        mutation($input: AllocateIPAddressInput!) {
+          allocateIpAddress(input: $input) {
+            ipAddress { id address type }
+          }
+        }
+      `,
+      variables: {
+        input: { appId: appName, type: "v6" },
+      },
+    }),
+  });
+  const v6Data = await v6Response.json();
+  if (v6Data.errors) {
+    console.warn(`[provision] IPv6 allocation warning:`, v6Data.errors);
+  }
+
+  console.log(`[provision] IPs allocated for ${appName}`);
+}
+
+/**
  * Set secrets for a Fly app
  */
 async function setAppSecrets(appName: string, secrets: Record<string, string>): Promise<void> {
@@ -394,6 +452,10 @@ export async function POST() {
     if (!(await appExists(appName))) {
       console.log(`[provision] Creating Fly app: ${appName}`);
       await createApp(appName, orgId);
+      
+      // Step 1b: Allocate public IPs for DNS resolution
+      console.log(`[provision] Allocating IPs for ${appName}`);
+      await allocateIps(appName);
     } else {
       console.log(`[provision] App ${appName} already exists`);
     }
