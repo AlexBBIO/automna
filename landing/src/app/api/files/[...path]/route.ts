@@ -63,8 +63,11 @@ async function execCommand(appName: string, machineId: string, command: string):
   const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
   
   if (!FLY_API_TOKEN) {
+    console.error('[files] FLY_API_TOKEN not found in env');
     throw new Error('FLY_API_TOKEN not configured');
   }
+  
+  console.log('[files] execCommand:', { appName, machineId, command: command.substring(0, 50) });
   
   const url = `https://api.machines.dev/v1/apps/${appName}/machines/${machineId}/exec`;
   
@@ -183,21 +186,24 @@ export async function GET(
     switch (operation) {
       case 'list': {
         try {
+          console.log('[files] Listing directory:', filePath, 'via', gateway.appName, gateway.machineId);
           const result = await execCommand(
             gateway.appName,
             gateway.machineId,
             `ls -la --time-style=long-iso "${filePath}"`
           );
           
+          console.log('[files] ls stdout:', result.stdout?.substring(0, 200));
           const files = parseLsOutput(result.stdout, filePath);
           return NextResponse.json({ files });
         } catch (err) {
-          // Exec not available - return mock data for now
-          console.warn('[files] Exec failed, returning empty:', err);
+          // Return error with details so we can debug
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          console.error('[files] Exec failed:', errorMsg);
           return NextResponse.json({ 
             files: [],
-            error: 'File listing not yet available - gateway exec endpoint needed'
-          });
+            error: `File listing failed: ${errorMsg}`
+          }, { status: 500 });
         }
       }
       
