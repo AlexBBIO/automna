@@ -265,7 +265,8 @@ async function createMachine(appName: string, volumeId: string, gatewayToken: st
       },
     ],
     env: {
-      // Keep env vars as backup (some OpenClaw features may use them)
+      // API keys and config passed as env vars (secrets deploy doesn't work for Machines API)
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
       OPENCLAW_GATEWAY_TOKEN: gatewayToken,
     },
     mounts: [
