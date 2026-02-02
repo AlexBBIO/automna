@@ -228,7 +228,7 @@ export default function DashboardPage() {
     prewarmStarted.current = true;
     
     const MAX_WAIT_MS = 60000; // 60 seconds max wait
-    const POLL_INTERVAL_MS = 2000; // Check every 2 seconds
+    const POLL_INTERVAL_MS = 1000; // Check every 1 second (was 2s)
     
     console.log('[warmup] Waiting for gateway to be ready...');
     const startTime = Date.now();
@@ -237,7 +237,7 @@ export default function DashboardPage() {
       try {
         const response = await fetch('/api/user/health', {
           method: 'GET',
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(3000),  // Reduced from 8s
         });
         
         const data = await response.json();
@@ -265,14 +265,13 @@ export default function DashboardPage() {
     
     const initializeGateway = async () => {
       try {
-        setLoadPhase('syncing');
-        
-        // Sync user to database
-        await fetch('/api/user/sync', { method: 'POST' });
-        
         setLoadPhase('fetching-gateway');
         
-        // Try to get gateway URL
+        // Sync user and fetch gateway info in parallel (faster startup)
+        // Fire off sync in background, don't await
+        fetch('/api/user/sync', { method: 'POST' }).catch(() => {});
+        
+        // Fetch gateway info
         let gatewayRes = await fetch('/api/user/gateway');
         let gatewayData = await gatewayRes.json();
         
