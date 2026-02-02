@@ -2,7 +2,9 @@
 
 **Date:** 2026-02-02  
 **Status:** ✅ MVP Complete (Per-User Provisioning Working)  
-**Last Updated:** 2026-02-02 05:40 UTC
+**Last Updated:** 2026-02-02 16:00 UTC
+
+> **📚 See also:** [`PER-USER-SETUP.md`](PER-USER-SETUP.md) for detailed per-user instance documentation.
 
 ---
 
