@@ -392,13 +392,16 @@ export default function DashboardPage() {
 
   // Show skeleton during all loading phases until ready
   if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway' || loadPhase === 'provisioning' || loadPhase === 'warming') {
-    const phaseMessages: Record<string, string> = {
-      'init': 'Initializing...',
-      'syncing': 'Syncing account...',
-      'fetching-gateway': 'Connecting to your agent...',
-      'provisioning': 'Creating your agent (this may take 1-2 minutes)...',
-      'warming': 'Starting your agent...',
+    // Map dashboard phases to ChatSkeleton phases
+    const skeletonPhaseMap: Record<string, 'connecting' | 'provisioning' | 'warming' | 'loading-history'> = {
+      'init': 'connecting',
+      'syncing': 'connecting',
+      'fetching-gateway': 'connecting',
+      'provisioning': 'provisioning',
+      'warming': 'warming',
     };
+    
+    const skeletonPhase = skeletonPhaseMap[loadPhase] || 'connecting';
     
     return (
       <div className="h-screen bg-gray-950 flex flex-col">
@@ -409,7 +412,7 @@ export default function DashboardPage() {
           <div className="w-8 h-8 rounded-full bg-gray-800 animate-pulse"></div>
         </nav>
         <div className="flex-1">
-          <ChatSkeleton phase="connecting" message={phaseMessages[loadPhase] || 'Loading...'} />
+          <ChatSkeleton phase={skeletonPhase} />
         </div>
       </div>
     );

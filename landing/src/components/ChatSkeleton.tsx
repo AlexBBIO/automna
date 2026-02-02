@@ -1,19 +1,92 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+
 interface ChatSkeletonProps {
-  phase?: 'connecting' | 'warming' | 'loading-history' | 'ready';
+  phase?: 'connecting' | 'provisioning' | 'warming' | 'loading-history' | 'ready';
   message?: string;
 }
 
+// Provisioning steps shown during the ~60s wait
+const provisioningSteps = [
+  { text: 'Creating your agent...', duration: 8000 },
+  { text: 'Setting up secure storage...', duration: 10000 },
+  { text: 'Configuring workspace...', duration: 12000 },
+  { text: 'Installing capabilities...', duration: 15000 },
+  { text: 'Starting services...', duration: 15000 },
+  { text: 'Almost ready...', duration: 20000 },
+];
+
 export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProps) {
+  const [provisionStep, setProvisionStep] = useState(0);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
+
+  // Cycle through provisioning steps
+  useEffect(() => {
+    if (phase !== 'provisioning') {
+      setProvisionStep(0);
+      return;
+    }
+
+    let stepIndex = 0;
+    const advanceStep = () => {
+      stepIndex = (stepIndex + 1) % provisioningSteps.length;
+      setProvisionStep(stepIndex);
+    };
+
+    // Advance through steps based on their durations
+    let timeout: NodeJS.Timeout;
+    const scheduleNext = () => {
+      const currentStep = provisioningSteps[stepIndex];
+      timeout = setTimeout(() => {
+        advanceStep();
+        scheduleNext();
+      }, currentStep.duration);
+    };
+    scheduleNext();
+
+    return () => clearTimeout(timeout);
+  }, [phase]);
+
+  // Smooth animated progress during provisioning
+  useEffect(() => {
+    if (phase !== 'provisioning') {
+      setAnimatedProgress(0);
+      return;
+    }
+
+    // Animate from 10% to 90% over ~80 seconds (never reaches 100 until done)
+    const startTime = Date.now();
+    const duration = 80000; // 80 seconds
+    const startProgress = 10;
+    const endProgress = 90;
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(
+        startProgress + (endProgress - startProgress) * (elapsed / duration),
+        endProgress
+      );
+      setAnimatedProgress(progress);
+
+      if (elapsed < duration) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    const animationId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationId);
+  }, [phase]);
+
   const phases = {
     connecting: { progress: 25, text: 'Connecting to your agent...' },
-    warming: { progress: 50, text: 'Starting workspace...' },
-    'loading-history': { progress: 75, text: 'Loading conversation...' },
+    provisioning: { progress: animatedProgress, text: provisioningSteps[provisionStep].text },
+    warming: { progress: 85, text: 'Starting your agent...' },
+    'loading-history': { progress: 95, text: 'Loading conversation...' },
     ready: { progress: 100, text: 'Ready!' },
   };
 
-  const current = phases[phase];
+  const current = phases[phase] || phases.connecting;
 
   return (
     <div className="h-full flex flex-col bg-gray-950">
