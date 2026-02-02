@@ -18,8 +18,6 @@ interface Conversation {
   lastActive?: number;
 }
 
-// No more DEFAULT_CONVERSATIONS - we fetch from OpenClaw
-
 const CreditCardIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect width="20" height="14" x="2" y="5" rx="2"/>
@@ -56,7 +54,6 @@ export default function DashboardPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(true);
   const [currentConversation, setCurrentConversation] = useState(() => {
-    // Restore last active conversation from localStorage (user preference only)
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('automna-current-conversation');
       return saved || 'main';
@@ -86,17 +83,14 @@ export default function DashboardPage() {
   }, []);
   
   // Handle resize: auto-hide sidebar when shrinking from large to small
-  // (but don't prevent user from opening it on mobile)
   useEffect(() => {
     let wasLarge = window.innerWidth >= 768;
     
     const handleResize = () => {
       const isLarge = window.innerWidth >= 768;
-      // Only auto-hide when transitioning FROM large TO small
       if (wasLarge && !isLarge) {
         setSidebarHidden(true);
       }
-      // Auto-show when transitioning FROM small TO large
       if (!wasLarge && isLarge) {
         setSidebarHidden(false);
         setSidebarCollapsed(false);
@@ -115,7 +109,6 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         const sessions = data.sessions || [];
-        // Transform to our Conversation format
         const convos: Conversation[] = sessions.map((s: { key: string; name: string; lastActive?: number }) => ({
           key: s.key,
           name: s.name,
@@ -138,14 +131,12 @@ export default function DashboardPage() {
     }
   }, [loadPhase, fetchConversations]);
 
-  // Save current conversation to localStorage when it changes (user preference)
+  // Save current conversation to localStorage when it changes
   useEffect(() => {
     localStorage.setItem('automna-current-conversation', currentConversation);
   }, [currentConversation]);
   
   // Create a new conversation
-  // The session will be created on OpenClaw when the first message is sent
-  // We optimistically add it to the UI and set the label via API
   const handleCreateConversation = useCallback(async (name: string) => {
     const key = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     if (!key || conversations.some(c => c.key === key)) return;
@@ -156,11 +147,9 @@ export default function DashboardPage() {
       icon: '📝',
     };
     
-    // Optimistically add to UI
     setConversations(prev => [...prev, newConversation]);
     setCurrentConversation(key);
     
-    // Set the label on OpenClaw (will create session entry if first message sent)
     try {
       await fetch('/api/user/sessions', {
         method: 'PATCH',
@@ -169,7 +158,6 @@ export default function DashboardPage() {
       });
     } catch (err) {
       console.error('[dashboard] Failed to set session label:', err);
-      // Non-fatal - label will just be auto-generated
     }
   }, [conversations]);
 
@@ -199,7 +187,6 @@ export default function DashboardPage() {
       const baseUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
       const resetUrl = new URL(`${baseUrl}/api/reset-workspace`);
       
-      // Copy auth params
       const userId = wsUrl.searchParams.get('userId');
       const exp = wsUrl.searchParams.get('exp');
       const sig = wsUrl.searchParams.get('sig');
@@ -214,18 +201,15 @@ export default function DashboardPage() {
       
       if (data.success) {
         setResetStatus('Cleaning up local data...');
-        // Clear local storage preferences
         localStorage.removeItem('automna-current-conversation');
         localStorage.removeItem('automna-channels');
         
         setResetStatus('Restarting your agent...');
-        // Give the gateway a moment to restart
         await new Promise(r => setTimeout(r, 2000));
         
         setResetStatus('Done! Refreshing...');
         await new Promise(r => setTimeout(r, 500));
         
-        // Reload to get fresh state
         window.location.reload();
       } else {
         console.error('Reset failed:', data);
@@ -238,17 +222,15 @@ export default function DashboardPage() {
       setIsResetting(false);
       alert('Failed to reset account. Please try again.');
     }
-    // Don't reset isResetting on success - page will reload
   };
 
-  // Wait for gateway to be ready - polls our health check endpoint
-  // Returns true when ready, false on timeout
+  // Wait for gateway to be ready
   const waitForGatewayReady = async (): Promise<boolean> => {
     if (prewarmStarted.current) return true;
     prewarmStarted.current = true;
     
-    const MAX_WAIT_MS = 60000; // 60 seconds max wait
-    const POLL_INTERVAL_MS = 1000; // Check every 1 second (was 2s)
+    const MAX_WAIT_MS = 60000;
+    const POLL_INTERVAL_MS = 1000;
     
     console.log('[warmup] Waiting for gateway to be ready...');
     const startTime = Date.now();
@@ -279,7 +261,6 @@ export default function DashboardPage() {
   };
 
   // Sync user and fetch gateway info on mount
-  // If user doesn't have a machine yet, provision one first
   useEffect(() => {
     if (!isLoaded || !user) return;
     
@@ -287,11 +268,8 @@ export default function DashboardPage() {
       try {
         setLoadPhase('fetching-gateway');
         
-        // Sync user and fetch gateway info in parallel (faster startup)
-        // Fire off sync in background, don't await
         fetch('/api/user/sync', { method: 'POST' }).catch(() => {});
         
-        // Fetch gateway info
         let gatewayRes = await fetch('/api/user/gateway');
         let gatewayData = await gatewayRes.json();
         
@@ -302,7 +280,6 @@ export default function DashboardPage() {
           error: gatewayData.error,
         });
         
-        // If user needs provisioning, do it now
         if (gatewayData.needsProvisioning) {
           console.log('[dashboard] Provisioning new machine...');
           setLoadPhase('provisioning');
@@ -319,7 +296,6 @@ export default function DashboardPage() {
             return;
           }
           
-          // Retry getting gateway URL after provisioning
           setLoadPhase('fetching-gateway');
           gatewayRes = await fetch('/api/user/gateway');
           gatewayData = await gatewayRes.json();
@@ -333,7 +309,6 @@ export default function DashboardPage() {
         if (gatewayData.gatewayUrl) {
           setGatewayInfo(gatewayData);
           
-          // Wait for gateway to be ready before showing chat
           setLoadPhase('warming');
           const isReady = await waitForGatewayReady();
           
@@ -355,13 +330,12 @@ export default function DashboardPage() {
     initializeGateway();
   }, [isLoaded, user]);
 
-  // Keep-alive pings to prevent sandbox hibernation
+  // Keep-alive pings
   useEffect(() => {
     if (!gatewayInfo?.gatewayUrl) return;
     
     const pingInterval = setInterval(() => {
       const wsUrl = new URL(gatewayInfo.gatewayUrl);
-      // Use local proxy to avoid CORS
       const keepAliveUrl = new URL('/api/gateway/keepalive', window.location.origin);
       const userId = wsUrl.searchParams.get('userId');
       const exp = wsUrl.searchParams.get('exp');
@@ -380,26 +354,26 @@ export default function DashboardPage() {
     return () => clearInterval(pingInterval);
   }, [gatewayInfo]);
 
-  // Show error state
+  // Error state
   if (loadPhase === 'error') {
     return (
-      <div className="h-screen bg-gray-950 flex flex-col">
-        <nav className="border-b border-gray-800 bg-black/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
+      <div className="h-screen bg-white flex flex-col">
+        <nav className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
           <Link href="/" className="text-xl font-bold tracking-tight">
-            <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
+            <span className="text-purple-600">Auto</span><span className="text-zinc-900">mna</span>
           </Link>
           <UserButton />
         </nav>
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center max-w-md">
             <div className="text-6xl mb-4">⚠️</div>
-            <h2 className="text-xl font-semibold text-white mb-2">Setup Failed</h2>
-            <p className="text-gray-400 mb-4">
+            <h2 className="text-xl font-semibold text-zinc-900 mb-2">Setup Failed</h2>
+            <p className="text-zinc-500 mb-4">
               {loadError || 'Something went wrong while setting up your agent.'}
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-white transition-colors"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors"
             >
               Try Again
             </button>
@@ -409,9 +383,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Show skeleton during all loading phases until ready
+  // Loading skeleton
   if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway' || loadPhase === 'provisioning' || loadPhase === 'warming') {
-    // Map dashboard phases to ChatSkeleton phases
     const skeletonPhaseMap: Record<string, 'connecting' | 'provisioning' | 'warming' | 'loading-history'> = {
       'init': 'connecting',
       'syncing': 'connecting',
@@ -423,12 +396,12 @@ export default function DashboardPage() {
     const skeletonPhase = skeletonPhaseMap[loadPhase] || 'connecting';
     
     return (
-      <div className="h-screen bg-gray-950 flex flex-col">
-        <nav className="border-b border-gray-800 bg-black/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
+      <div className="h-screen bg-zinc-50 flex flex-col">
+        <nav className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
           <Link href="/" className="text-xl font-bold tracking-tight">
-            <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
+            <span className="text-purple-600">Auto</span><span className="text-zinc-900">mna</span>
           </Link>
-          <div className="w-8 h-8 rounded-full bg-gray-800 animate-pulse"></div>
+          <div className="w-8 h-8 rounded-full bg-zinc-200 animate-pulse"></div>
         </nav>
         <div className="flex-1">
           <ChatSkeleton phase={skeletonPhase} />
@@ -440,9 +413,9 @@ export default function DashboardPage() {
   // Gateway configured - show chat as main interface
   if (gatewayInfo) {
     return (
-      <div className="h-screen bg-gray-950 flex flex-col">
+      <div className="h-screen bg-zinc-50 flex flex-col">
         {/* Persistent nav header */}
-        <nav className="border-b border-gray-800 bg-black/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center sticky top-0 z-20">
+        <nav className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center sticky top-0 z-20">
           <div className="flex items-center gap-3">
             {/* Mobile: Hamburger button */}
             {sidebarHidden && (
@@ -452,7 +425,7 @@ export default function DashboardPage() {
                   e.preventDefault();
                   setSidebarHidden(false);
                 }}
-                className="p-3 -ml-1 text-gray-400 hover:text-white active:text-white hover:bg-gray-800 active:bg-gray-800 rounded-lg transition-colors md:hidden touch-manipulation"
+                className="p-3 -ml-1 text-zinc-500 hover:text-zinc-900 active:text-zinc-900 hover:bg-zinc-100 active:bg-zinc-100 rounded-lg transition-colors md:hidden touch-manipulation"
                 title="Open sidebar"
               >
                 <svg className="w-5 h-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -461,7 +434,7 @@ export default function DashboardPage() {
               </button>
             )}
             <Link href="/" className="text-xl font-bold tracking-tight">
-              <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
+              <span className="text-purple-600">Auto</span><span className="text-zinc-900">mna</span>
             </Link>
           </div>
           <div className="flex items-center gap-3">
@@ -484,49 +457,47 @@ export default function DashboardPage() {
         
         {/* Reset confirmation modal */}
         {showResetConfirm && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 rounded-2xl p-6 max-w-md w-full border border-gray-700 shadow-2xl">
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-zinc-200 shadow-2xl">
               {isResetting ? (
-                // Progress view
                 <div className="text-center py-4">
-                  <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-purple-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-purple-600 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Resetting Account</h3>
-                  <p className="text-purple-300 text-sm animate-pulse">{resetStatus || 'Please wait...'}</p>
-                  <p className="text-gray-500 text-xs mt-4">Don&apos;t close this window</p>
+                  <h3 className="text-lg font-semibold text-zinc-900 mb-2">Resetting Account</h3>
+                  <p className="text-purple-600 text-sm animate-pulse">{resetStatus || 'Please wait...'}</p>
+                  <p className="text-zinc-400 text-xs mt-4">Don&apos;t close this window</p>
                 </div>
               ) : (
-                // Confirmation view
                 <>
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-white">Reset Account?</h3>
-                      <p className="text-sm text-gray-400">This cannot be undone</p>
+                      <h3 className="text-lg font-semibold text-zinc-900">Reset Account?</h3>
+                      <p className="text-sm text-zinc-500">This cannot be undone</p>
                     </div>
                   </div>
-                  <p className="text-gray-300 text-sm mb-6">
+                  <p className="text-zinc-600 text-sm mb-6">
                     This will permanently delete all your conversations, custom settings, and agent data. 
                     Your account will be reset to a fresh state.
                   </p>
                   <div className="flex gap-3 justify-end">
                     <button
                       onClick={() => setShowResetConfirm(false)}
-                      className="px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                      className="px-4 py-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleResetAccount}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
                     >
                       Reset Everything
                     </button>
@@ -541,14 +512,14 @@ export default function DashboardPage() {
           {/* Mobile backdrop - click to close */}
           <div 
             className={`
-              fixed inset-0 bg-black/60 z-30 md:hidden
+              fixed inset-0 bg-black/40 z-30 md:hidden
               transition-opacity duration-200
               ${sidebarHidden ? 'opacity-0 pointer-events-none' : 'opacity-100'}
             `}
             onClick={() => setSidebarHidden(true)}
           />
           
-          {/* Conversation sidebar - drawer on mobile, inline on desktop */}
+          {/* Conversation sidebar */}
           <div className={`
             fixed md:relative inset-y-0 left-0 z-40 md:z-0
             transition-transform duration-200 ease-out
@@ -582,15 +553,15 @@ export default function DashboardPage() {
           
           {/* Main content area with tabs */}
           <FileProvider gatewayUrl={gatewayInfo.gatewayUrl}>
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col bg-white">
               {/* Tab bar */}
-              <div className="flex border-b border-gray-800 bg-gray-900/30">
+              <div className="flex border-b border-zinc-200 bg-zinc-50/50">
                 <button
                   onClick={() => setActiveTab('chat')}
                   className={`px-4 py-3 text-sm font-medium transition-colors ${
                     activeTab === 'chat'
-                      ? 'text-white border-b-2 border-purple-500'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'text-zinc-900 border-b-2 border-purple-600'
+                      : 'text-zinc-500 hover:text-zinc-900'
                   }`}
                 >
                   💬 Chat
@@ -599,8 +570,8 @@ export default function DashboardPage() {
                   onClick={() => setActiveTab('files')}
                   className={`px-4 py-3 text-sm font-medium transition-colors ${
                     activeTab === 'files'
-                      ? 'text-white border-b-2 border-purple-500'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'text-zinc-900 border-b-2 border-purple-600'
+                      : 'text-zinc-500 hover:text-zinc-900'
                   }`}
                 >
                   📁 Files
@@ -630,14 +601,14 @@ export default function DashboardPage() {
 
   // No gateway - show setup prompt
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white">
-      <nav className="border-b border-gray-800 bg-black/50 backdrop-blur-sm">
+    <div className="min-h-screen bg-gradient-to-b from-white via-zinc-50 to-white text-zinc-900">
+      <nav className="border-b border-zinc-200 bg-white/50 backdrop-blur-sm">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/" className="text-2xl font-bold tracking-tight">
-            <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Auto</span>mna
+            <span className="text-purple-600">Auto</span>mna
           </Link>
           <div className="flex items-center gap-4">
-            <span className="text-gray-400 text-sm">
+            <span className="text-zinc-500 text-sm">
               {user?.emailAddresses[0]?.emailAddress}
             </span>
             <UserButton>
@@ -656,13 +627,13 @@ export default function DashboardPage() {
       <main className="container mx-auto px-6 py-12">
         <div className="max-w-2xl mx-auto text-center">
           <div className="text-6xl mb-6">🤖</div>
-          <h1 className="text-3xl font-bold mb-4">Set Up Your Agent</h1>
-          <p className="text-gray-400 mb-8">
+          <h1 className="text-3xl font-bold mb-4 text-zinc-900">Set Up Your Agent</h1>
+          <p className="text-zinc-500 mb-8">
             Your agent isn&apos;t configured yet. Complete the setup to start chatting.
           </p>
           <Link
             href="/dashboard/setup"
-            className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg font-semibold transition-colors"
+            className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg font-semibold transition-colors"
           >
             Start Setup →
           </Link>

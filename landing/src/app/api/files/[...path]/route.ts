@@ -43,7 +43,7 @@ async function getUserGateway(clerkId: string) {
 }
 
 function getFileServerUrl(appName: string, endpoint: string, token: string, params?: Record<string, string>) {
-  const url = new URL(`http://${appName}.fly.dev:${FILE_SERVER_PORT}${endpoint}`);
+  const url = new URL(`https://${appName}.fly.dev:${FILE_SERVER_PORT}${endpoint}`);
   url.searchParams.set('token', token);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
