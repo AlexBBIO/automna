@@ -86,6 +86,16 @@ Full end-to-end provisioning now working:
 - Gateway startup takes ~60 seconds (needs loading UI)
 - Claude Opus responses are slow (10-20s, consider Sonnet default)
 - File browser not integrated yet
+- Session key mismatch (workaround in place, need API-layer fix)
+
+**TODO - Loading Screen Improvements:**
+- Show step-by-step progress during provisioning:
+  - "Creating your agent..." (app creation)
+  - "Setting up storage..." (volume)
+  - "Starting services..." (machine)
+  - "Almost ready..." (health check)
+- Animate progress bar so it doesn't look frozen
+- Show estimated time remaining (~60s)
 
 **Gateway CLI flags:**
 ```bash
