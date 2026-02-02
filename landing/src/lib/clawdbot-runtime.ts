@@ -134,15 +134,16 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     setLoadingPhase('connecting');
     setError(null);
     
-    // Safety timeout - if nothing loads in 2 seconds, allow chat anyway
+    // Safety timeout - if nothing loads in 10 seconds, allow chat anyway
+    // (Gateway should already be ready at this point since dashboard waits for it)
     const safetyTimeout = setTimeout(() => {
       if (mountedRef.current && !historyLoadedRef.current) {
-        console.log('[clawdbot] Safety timeout - allowing chat');
+        console.log('[clawdbot] Safety timeout - allowing chat (history may load later)');
         historyLoadedRef.current = true;
         setIsConnected(true);
         setLoadingPhase('ready');
       }
-    }, 2000);
+    }, 10000);
     
     // === PARALLEL HTTP HISTORY FETCH ===
     // Start fetching history via HTTP immediately (don't wait for WebSocket)
@@ -162,7 +163,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         return res.json();
       })
       .then(data => {
-        console.log('[clawdbot] HTTP history data:', { keys: Object.keys(data || {}), hasMessages: 'messages' in (data || {}), historyLoadedRef: historyLoadedRef.current });
+        console.log('[clawdbot] HTTP history data:', { keys: Object.keys(data || {}), hasMessages: 'messages' in (data || {}), messageCount: data?.messages?.length, historyLoadedRef: historyLoadedRef.current });
         if (!mountedRef.current) {
           console.log('[clawdbot] Component unmounted, ignoring HTTP history');
           return;
@@ -172,20 +173,19 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           return;
         }
         
-        // Mark as loaded regardless of content - empty is valid for new sessions
-        historyLoadedRef.current = true;
-        
+        // Only mark as loaded if we actually got messages
+        // Empty response might mean the endpoint doesn't exist, let WS try
         if (data?.messages && Array.isArray(data.messages) && data.messages.length > 0) {
           console.log(`[clawdbot] HTTP history loaded: ${data.messages.length} messages`);
+          historyLoadedRef.current = true;
           setMessages(parseMessages(data.messages, 'http'));
+          setIsConnected(true);
+          setError(null);
+          setLoadingPhase('ready');
         } else {
-          console.log('[clawdbot] HTTP history empty or missing - new session');
+          console.log('[clawdbot] HTTP history empty - waiting for WebSocket');
+          // Don't set historyLoadedRef - let WebSocket try to load history
         }
-        
-        // HTTP success means we can use the chat (even if WS failed)
-        setIsConnected(true);
-        setError(null);
-        setLoadingPhase('ready');
       })
       .catch(err => {
         if (err.name === 'AbortError') {
