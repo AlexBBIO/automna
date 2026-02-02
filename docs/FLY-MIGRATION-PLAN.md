@@ -517,24 +517,299 @@ If migration fails:
 
 ---
 
-## Open Questions
+## Decisions & Robust Architecture
 
-1. **Database for machine tracking?** — Currently no DB. Need to add one (Turso, PlanetScale, or Fly Postgres)?
+### Decision 1: Fly API Capabilities ✅
 
-2. **Machine naming convention?** — `user-{clerkId}` or UUID?
+**Yes, Fly API can control everything we need:**
 
-3. **Volume per user or shared?** — Per-user volume is simpler, but more overhead.
+| Operation | API Endpoint | Notes |
+|-----------|--------------|-------|
+| Create Machine | `POST /v1/apps/{app}/machines` | Full config: image, env, services, mounts |
+| Delete Machine | `DELETE /v1/apps/{app}/machines/{id}` | Clean removal |
+| Start/Stop | `POST /v1/apps/{app}/machines/{id}/start` | Lifecycle control |
+| List Machines | `GET /v1/apps/{app}/machines` | Query all machines |
+| Get Machine | `GET /v1/apps/{app}/machines/{id}` | Status, config |
+| Create Volume | `POST /v1/apps/{app}/volumes` | Persistent storage |
+| Delete Volume | `DELETE /v1/apps/{app}/volumes/{id}` | Cleanup |
+| Attach Volume | Part of machine config | `mounts` in config |
 
-4. **Keep R2 or migrate to S3?** — R2 is fine, can access from Fly via S3 API.
-
-5. **Proxy layer or direct connection?** — Direct is simpler, proxy allows caching.
+**API is REST-based, well-documented, and stable.** No vendor lock-in concerns — it's straightforward HTTP/JSON.
 
 ---
 
-## Next Steps
+### Decision 2: Database — Turso ✅
 
-1. [ ] Alex: Review and approve plan
-2. [ ] Create Fly.io account
-3. [ ] Test basic Dockerfile on Fly
-4. [ ] Decide on database for machine tracking
-5. [ ] Start Phase 1 implementation
+**Choice: Turso (serverless SQLite at the edge)**
+
+**Why Turso:**
+- **Free tier:** 500M reads, 10M writes, 5GB storage, 100 databases
+- **Developer plan:** $5/month if we exceed free tier
+- **Edge replication:** Low latency from Vercel functions
+- **SQLite:** Simple, no ORM needed, familiar
+- **Drizzle ORM:** Works great with Turso, type-safe
+
+**Schema:**
+
+```sql
+-- Users table (synced from Clerk webhooks)
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,           -- Clerk user ID (user_xxx)
+  email TEXT,
+  created_at INTEGER DEFAULT (unixepoch()),
+  updated_at INTEGER DEFAULT (unixepoch())
+);
+
+-- Machines table (Fly machine tracking)
+CREATE TABLE machines (
+  id TEXT PRIMARY KEY,           -- Fly machine ID
+  user_id TEXT NOT NULL UNIQUE,  -- One machine per user
+  region TEXT NOT NULL,          -- e.g., 'sjc'
+  volume_id TEXT,                -- Attached volume ID
+  status TEXT DEFAULT 'created', -- created, started, stopped, destroyed
+  ip_address TEXT,               -- Private IP for direct connection
+  created_at INTEGER DEFAULT (unixepoch()),
+  updated_at INTEGER DEFAULT (unixepoch()),
+  last_active_at INTEGER,        -- For billing/cleanup
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- Machine events (audit log)
+CREATE TABLE machine_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  machine_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,      -- created, started, stopped, destroyed, error
+  details TEXT,                  -- JSON blob
+  created_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (machine_id) REFERENCES machines(id)
+);
+```
+
+**Why not alternatives:**
+- **PlanetScale:** More expensive, MySQL (overkill for our use)
+- **Fly Postgres:** Requires managing a Fly app, more ops
+- **Supabase:** Great but heavier than we need
+- **Clerk metadata:** Can't query, no relationships
+
+---
+
+### Decision 3: Volume Strategy ✅
+
+**Choice: One dedicated volume per user**
+
+**Architecture:**
+```
+User A Machine ←→ Volume A (/data, 1GB)
+User B Machine ←→ Volume B (/data, 1GB)
+User C Machine ←→ Volume C (/data, 1GB)
+```
+
+**Why per-user volumes:**
+1. **Isolation:** No risk of cross-user data access
+2. **Simplicity:** No replication logic needed
+3. **Scalability:** Each user's data grows independently
+4. **Cleanup:** Delete user → delete volume (clean)
+
+**Volume contents:**
+```
+/data/
+├── clawdbot/           # Clawdbot config
+│   ├── clawdbot.json
+│   └── agents/
+├── workspace/          # User's workspace files
+│   ├── AGENTS.md
+│   ├── SOUL.md
+│   ├── USER.md
+│   └── memory/
+└── .last-sync          # Timestamp for debugging
+```
+
+**Volume sizing:**
+- **Initial:** 1GB per user ($0.15/month)
+- **Growth:** Can extend via API if needed
+- **Snapshots:** Fly takes daily snapshots (retained 5 days free)
+
+**Cost:** ~$0.15-0.30/user/month for storage
+
+---
+
+### Decision 4: Storage Strategy — Keep R2 + Volumes ✅
+
+**Hybrid approach for robustness:**
+
+| Data Type | Primary Storage | Backup/Secondary |
+|-----------|-----------------|------------------|
+| Workspace files | Fly Volume | R2 (nightly backup) |
+| Chat history | Fly Volume | R2 (real-time sync) |
+| Config | Fly Volume | R2 (on change) |
+| File cache | Local (in-memory) | None needed |
+
+**Why hybrid:**
+1. **Fly Volume:** Fast, local to machine, always available
+2. **R2 Backup:** Disaster recovery, cross-region redundancy
+3. **No single point of failure:** Volume dies → restore from R2
+
+**Sync strategy:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    User's Fly Machine                        │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │                   /data (Volume)                     │    │
+│  │   Primary storage — all reads/writes go here        │    │
+│  └───────────────────────┬─────────────────────────────┘    │
+│                          │                                   │
+│              Background sync (every 5 min)                   │
+│                          │                                   │
+│                          ▼                                   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │              R2 Bucket (via S3 API)                  │    │
+│  │   /users/{userId}/backup/                            │    │
+│  │   Secondary — disaster recovery only                 │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**R2 access from Fly:**
+- Use S3 API (R2 is S3-compatible)
+- No special SDK needed, just `aws-sdk` or `@aws-sdk/client-s3`
+- Credentials: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`
+
+---
+
+### Production-Ready Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              INTERNET                                        │
+└─────────────────────────────────┬───────────────────────────────────────────┘
+                                  │
+                    ┌─────────────┴─────────────┐
+                    │                           │
+                    ▼                           ▼
+┌───────────────────────────────┐  ┌───────────────────────────────────────────┐
+│         Vercel                │  │                 Fly.io                     │
+│                               │  │                                           │
+│  ┌─────────────────────────┐  │  │  ┌─────────────────────────────────────┐  │
+│  │   Next.js Dashboard     │  │  │  │          Fly Proxy (Edge)           │  │
+│  │                         │  │  │  │   Routes *.automna-agents.fly.dev   │  │
+│  │  - Landing page         │  │  │  │   to correct machine by hostname    │  │
+│  │  - Auth (Clerk)         │  │  │  └─────────────────┬───────────────────┘  │
+│  │  - Dashboard UI         │  │  │                    │                      │
+│  │  - Billing (Stripe)     │  │  │    ┌───────────────┼───────────────┐      │
+│  └─────────────────────────┘  │  │    │               │               │      │
+│                               │  │    ▼               ▼               ▼      │
+│  ┌─────────────────────────┐  │  │  ┌─────┐       ┌─────┐       ┌─────┐     │
+│  │   API Routes            │  │  │  │ M-A │       │ M-B │       │ M-C │     │
+│  │                         │──┼──┼─▶│     │       │     │       │     │     │
+│  │  /api/user/gateway      │  │  │  │Clawd│       │Clawd│       │Clawd│     │
+│  │  /api/user/provision    │  │  │  │ bot │       │ bot │       │ bot │     │
+│  │  /api/webhooks/clerk    │  │  │  │     │       │     │       │     │     │
+│  │  /api/webhooks/stripe   │  │  │  │ V-A │       │ V-B │       │ V-C │     │
+│  └───────────┬─────────────┘  │  │  └──┬──┘       └──┬──┘       └──┬──┘     │
+│              │                │  │     │             │             │         │
+└──────────────┼────────────────┘  └─────┼─────────────┼─────────────┼─────────┘
+               │                         │             │             │
+               ▼                         └──────┬──────┴──────┬──────┘
+┌───────────────────────────────┐               │             │
+│         Turso                 │               │             │
+│                               │               ▼             ▼
+│  - users table                │       ┌───────────────────────────┐
+│  - machines table             │       │     Cloudflare R2         │
+│  - machine_events             │       │                           │
+│                               │       │  /users/{userId}/backup/  │
+│  Edge-replicated SQLite       │       │  Nightly backups from     │
+└───────────────────────────────┘       │  each machine's volume    │
+                                        └───────────────────────────┘
+```
+
+---
+
+### API Flow (Production)
+
+#### User Signs Up
+```
+1. User signs up via Clerk
+2. Clerk webhook → /api/webhooks/clerk
+3. Insert into Turso: users table
+4. (Machine NOT created yet — lazy provisioning)
+```
+
+#### User Opens Dashboard
+```
+1. Dashboard calls /api/user/gateway
+2. Check Turso: does user have a machine?
+   
+   IF NO MACHINE:
+   3a. Call Fly API: create volume
+   3b. Call Fly API: create machine (with volume attached)
+   3c. Wait for machine to start (~10-30s first time)
+   3d. Insert into Turso: machines table
+   3e. Return gateway URL
+   
+   IF MACHINE EXISTS:
+   3a. Check machine status
+   3b. If stopped → start it
+   3c. Return gateway URL
+   
+4. Frontend connects via WebSocket
+5. User chats with agent
+```
+
+#### User Closes Tab
+```
+1. WebSocket disconnects
+2. Machine keeps running (always-on!)
+3. Background sync continues to R2
+```
+
+#### User Churns / Deletes Account
+```
+1. Clerk webhook → /api/webhooks/clerk (user.deleted)
+2. Call Fly API: stop machine
+3. Call Fly API: delete machine
+4. Call Fly API: delete volume
+5. Optionally: keep R2 backup for 30 days
+6. Update Turso: mark as deleted
+```
+
+---
+
+### Failure Modes & Recovery
+
+| Failure | Detection | Recovery |
+|---------|-----------|----------|
+| **Machine crashes** | Fly auto-restarts | Volume persists, data safe |
+| **Volume corrupts** | Startup fails | Restore from R2 backup |
+| **R2 unavailable** | Sync fails | Volume is primary, R2 is backup |
+| **Turso unavailable** | API calls fail | Cache machine info, retry |
+| **Fly API down** | Provisioning fails | Queue request, retry with backoff |
+
+---
+
+### Cost Breakdown (Production)
+
+| Component | Per User/Month | Notes |
+|-----------|----------------|-------|
+| **Fly Machine** | ~$7-9 | shared-cpu-1x, 2GB RAM |
+| **Fly Volume** | ~$0.15 | 1GB storage |
+| **R2 Storage** | ~$0.02 | ~100MB/user backup |
+| **R2 Operations** | ~$0.01 | Sync operations |
+| **Turso** | ~$0.01 | Shared across all users |
+| **Vercel** | $0 | Pro plan shared |
+| **Total** | **~$7-10** | Per active user |
+
+---
+
+## Revised Next Steps
+
+1. [x] Alex: Review and approve plan
+2. [ ] Create Fly.io account (`fly auth login`)
+3. [ ] Create Turso database + schema
+4. [ ] Set up Drizzle ORM in landing project
+5. [ ] Build `/api/user/provision` endpoint
+6. [ ] Adapt Dockerfile for Fly
+7. [ ] Test basic machine lifecycle
+8. [ ] Update `/api/user/gateway` to use Fly
+9. [ ] Add R2 backup sync to container
+10. [ ] Integration testing
+11. [ ] Cutover
