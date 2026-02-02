@@ -213,8 +213,11 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
 
   const [input, setInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -226,13 +229,68 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = (e: FormEvent) => {
+  const uploadFileToWorkspace = async (file: File): Promise<string> => {
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const targetPath = `/home/node/.openclaw/workspace/uploads/${timestamp}_${safeName}`;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('path', targetPath);
+    
+    const response = await fetch('/api/files/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error('Upload failed');
+    }
+    
+    return targetPath;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isRunning) return;
+    if ((!input.trim() && pendingFiles.length === 0) || isRunning || isUploading) return;
+    
+    let messageText = input.trim();
+    
+    // Upload any pending files
+    if (pendingFiles.length > 0) {
+      setIsUploading(true);
+      try {
+        const uploadedPaths: string[] = [];
+        for (const file of pendingFiles) {
+          const path = await uploadFileToWorkspace(file);
+          uploadedPaths.push(path);
+        }
+        
+        // Add file references to the message
+        const fileRefs = uploadedPaths.map(p => {
+          const filename = p.split('/').pop();
+          return `[Attached: ${filename} at ${p}]`;
+        }).join('\n');
+        
+        messageText = messageText 
+          ? `${messageText}\n\n${fileRefs}`
+          : fileRefs;
+        
+        setPendingFiles([]);
+      } catch (err) {
+        console.error('Upload failed:', err);
+        alert('Failed to upload file(s)');
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
+    
+    if (!messageText) return;
     
     append({
       role: 'user',
-      content: [{ type: 'text', text: input }],
+      content: [{ type: 'text', text: messageText }],
     });
     setInput('');
     
@@ -240,6 +298,21 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setPendingFiles(prev => [...prev, ...files]);
+    }
+    // Reset input so same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -349,15 +422,60 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
       {/* Input area */}
       <div className="p-4 border-t border-gray-800/50 bg-gray-900/50">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+          {/* Pending files preview */}
+          {pendingFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3 px-1">
+              {pendingFiles.map((file, i) => (
+                <div 
+                  key={i}
+                  className="flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-1.5 text-sm"
+                >
+                  <span className="text-gray-400">
+                    {file.type.startsWith('image/') ? '🖼️' : '📄'}
+                  </span>
+                  <span className="text-gray-300 max-w-[150px] truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removePendingFile(i)}
+                    className="text-gray-500 hover:text-red-400 ml-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
           <div className={`flex items-end gap-3 bg-gray-800/80 rounded-2xl p-3 border-2 transition-colors ${
-            input.trim() ? 'border-purple-500/50' : 'border-transparent'
+            input.trim() || pendingFiles.length > 0 ? 'border-purple-500/50' : 'border-transparent'
           }`}>
+            {/* File upload button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isRunning || isUploading}
+              className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-colors flex-shrink-0 disabled:opacity-50"
+              title="Attach file"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileSelect}
+              className="hidden"
+              multiple
+              accept="image/*,.pdf,.txt,.md,.json,.csv,.doc,.docx,.xls,.xlsx"
+            />
+            
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything..."
+              placeholder={pendingFiles.length > 0 ? "Add a message (optional)..." : "Ask anything..."}
               rows={1}
               className="flex-1 bg-transparent text-white placeholder-gray-500 focus:outline-none resize-none px-1 py-2 text-base min-h-[44px] max-h-[200px] leading-relaxed"
               onInput={(e) => {
@@ -380,22 +498,29 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
             ) : (
               <button
                 type="submit"
-                disabled={!input.trim()}
+                disabled={(!input.trim() && pendingFiles.length === 0) || isUploading}
                 className={`p-3 rounded-xl transition-all flex-shrink-0 ${
-                  input.trim()
+                  (input.trim() || pendingFiles.length > 0) && !isUploading
                     ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/25'
                     : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                 }`}
                 title="Send (Enter)"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
+                {isUploading ? (
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                )}
               </button>
             )}
           </div>
           <p className="text-xs text-gray-600 mt-2 text-center">
-            {isRunning ? 'Press Esc to stop' : 'Enter to send, Shift+Enter for new line'}
+            {isUploading ? 'Uploading files...' : isRunning ? 'Press Esc to stop' : 'Enter to send, Shift+Enter for new line'}
           </p>
         </form>
       </div>
