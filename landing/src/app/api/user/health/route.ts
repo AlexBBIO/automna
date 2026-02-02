@@ -44,8 +44,8 @@ export async function GET() {
         headers: {
           "Content-Type": "application/json",
         },
-        // Very short timeout - we just want to know if it's responding
-        signal: AbortSignal.timeout(2000),
+        // Short timeout - we just want to know if it's responding
+        signal: AbortSignal.timeout(5000),
       });
       
       // Any response (including 401, 404) means the gateway is up

@@ -237,7 +237,7 @@ export default function DashboardPage() {
       try {
         const response = await fetch('/api/user/health', {
           method: 'GET',
-          signal: AbortSignal.timeout(3000),  // Reduced from 8s
+          signal: AbortSignal.timeout(6000),
         });
         
         const data = await response.json();
