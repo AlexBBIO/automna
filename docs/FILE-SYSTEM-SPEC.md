@@ -4,6 +4,8 @@
 **Status:** Draft  
 **Priority:** High (core MVP feature)
 
+
+> **Implementation:** See [`FILE-BROWSER-SPEC.md`](FILE-BROWSER-SPEC.md) for API details and [`AGENT-CONFIG-SYSTEM.md`](AGENT-CONFIG-SYSTEM.md) for workspace configuration.
 ---
 
 ## Overview

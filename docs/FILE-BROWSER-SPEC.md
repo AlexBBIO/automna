@@ -1,7 +1,7 @@
 # File Browser Specification
 
 **Date:** 2026-02-02  
-**Status:** Planning  
+**Status:** ✅ Implemented  
 **Priority:** P0
 
 ---
@@ -10,17 +10,20 @@
 
 Allow users to browse, view, edit, and manage files in their agent's workspace through the web dashboard.
 
-## Current State
+## Current State (2026-02-02 22:00 UTC)
 
-**What we have:**
+**✅ Implemented:**
 - `FileBrowser.tsx` - Full UI component with tree view, preview panel
 - `file-context.tsx` - React context with file operations API
-- `/api/files/[...path]/route.ts` - Proxy stub (uses old shared gateway)
+- `/api/files/[...path]/route.ts` - Full implementation using Fly Machines exec API
+- All CRUD operations working (list, read, write, delete, mkdir, move, upload, download)
+- Per-user gateway lookup from Turso database
+- Path security validation
 
-**What's missing:**
-- OpenClaw doesn't have files REST API endpoints
-- Need to implement file operations via exec commands or custom server
-- Files proxy needs per-user gateway lookup from Turso
+**⏳ Testing needed:**
+- UI integration testing (Files tab in dashboard)
+- Error handling edge cases
+- Large file handling
 
 ---
 
@@ -91,9 +94,11 @@ Modify OpenClaw to expose files API.
 
 ---
 
-## Decision: Option A (Exec-Based) for MVP
+## Decision: Option A (Exec-Based) ✅ IMPLEMENTED
 
-Fast to implement, works with existing infrastructure. Can migrate to Option B later if needed.
+Fast to implement, works with existing infrastructure.
+
+**Implementation:** Uses Fly Machines exec API (`POST /v1/apps/{app}/machines/{id}/exec`) to run shell commands on user's machine. No changes to OpenClaw/Docker image needed.
 
 ---
 
@@ -275,28 +280,28 @@ Implementation:
 
 ## Implementation Plan
 
-### Phase 1: Basic Browsing (2-3 hours)
-1. Update `/api/files/[...path]/route.ts` to use Turso for per-user gateway
-2. Implement `/api/files/list` using exec
-3. Implement `/api/files/read` using exec
-4. Test with dashboard FileBrowser
+### Phase 1: Basic Browsing ✅ DONE (2026-02-02)
+1. ✅ Update `/api/files/[...path]/route.ts` to use Turso for per-user gateway
+2. ✅ Implement `/api/files/list` using Fly Machines exec API
+3. ✅ Implement `/api/files/read` using exec
+4. ⏳ Test with dashboard FileBrowser
 
-### Phase 2: File Operations (2-3 hours)
-1. Implement `/api/files/write`
-2. Implement `/api/files/mkdir`
-3. Implement DELETE handler
-4. Test create/edit/delete flow
+### Phase 2: File Operations ✅ DONE (2026-02-02)
+1. ✅ Implement `/api/files/write`
+2. ✅ Implement `/api/files/mkdir`
+3. ✅ Implement DELETE handler
+4. ⏳ Test create/edit/delete flow
 
-### Phase 3: Upload/Download (2-3 hours)
-1. Implement `/api/files/download` with binary support
-2. Implement `/api/files/upload` with multipart handling
-3. Add progress indicators
+### Phase 3: Upload/Download ✅ DONE (2026-02-02)
+1. ✅ Implement `/api/files/download` with binary support
+2. ✅ Implement `/api/files/upload` with multipart handling
+3. ⏳ Add progress indicators
 
-### Phase 4: Polish (2 hours)
-1. Add create file/folder buttons to UI
-2. Add inline rename
-3. Add error toasts
-4. Add loading states
+### Phase 4: Polish ⏳ PENDING
+1. ⏳ Add create file/folder buttons to UI
+2. ⏳ Add inline rename
+3. ⏳ Add error toasts
+4. ⏳ Add loading states
 
 ---
 
