@@ -46,6 +46,32 @@
 
 ### 📝 Recent Changes (2026-02-02)
 
+**🔌 Sessions API & WebSocket Protocol Fix (22:30 UTC):**
+
+Fixed sessions not loading in sidebar. Multiple protocol issues discovered:
+
+1. **Docker Entrypoint Fix**
+   - Was calling `node /app/dist/index.js` (wrong path)
+   - Fixed to `node /app/dist/entry.js`
+   - Gateway now starts properly
+
+2. **OpenClaw WebSocket Protocol** (NOT JSON-RPC!)
+   - Uses `type: 'req'` not `jsonrpc: '2.0'`
+   - Uses `params` not `payload` for request parameters
+   - Uses `msg.payload` not `msg.result` for response data
+   - Client ID must be from allowlist (`gateway-client`, `webchat`, etc.)
+   - Full handshake required: challenge → connect → hello-ok → RPC
+
+3. **Sessions API Created**
+   - `GET /api/user/sessions` - Fetches from OpenClaw via WebSocket RPC
+   - `PATCH /api/user/sessions` - Updates session label
+   - `DELETE /api/user/sessions?key=xxx` - Deletes session
+   - Dashboard now shows real conversations from gateway (not localStorage)
+
+4. **Documentation**
+   - Created `docs/OPENCLAW-WEBSOCKET-PROTOCOL.md` - Full protocol reference
+   - Updated SPEC.md with Sessions API section
+
 **⚙️ Agent Configuration & Memory (22:00 UTC):**
 
 1. **Default Config Creation**
@@ -482,9 +508,42 @@ if (currentSessionRef.current !== sessionKey) {
 - `docker/entrypoint.sh` - Session key fixer
 
 **Known Limitations:**
-- No server-side session list (OpenClaw doesn't have API)
-- Conversations are localStorage-only
-- Deleting conversations doesn't delete server-side data
+- ~~No server-side session list (OpenClaw doesn't have API)~~ **FIXED 2026-02-02**
+- ~~Conversations are localStorage-only~~ **FIXED 2026-02-02**
+- Deleting conversations deletes server-side data via `sessions.delete`
+
+### 🔌 Sessions API (2026-02-02)
+
+> **⚠️ IMPORTANT:** The sessions API uses the OpenClaw WebSocket protocol, NOT JSON-RPC 2.0.
+> See [`docs/OPENCLAW-WEBSOCKET-PROTOCOL.md`](docs/OPENCLAW-WEBSOCKET-PROTOCOL.md) for full protocol reference.
+
+**API Routes:**
+- `GET /api/user/sessions` - Fetch all conversations from OpenClaw
+- `PATCH /api/user/sessions` - Update conversation label
+- `DELETE /api/user/sessions?key=xxx` - Delete a conversation
+
+**How It Works:**
+1. Dashboard calls `/api/user/sessions` on load
+2. API looks up user's Fly app from Turso database
+3. Opens WebSocket to user's gateway (`wss://automna-u-xxx.fly.dev/ws`)
+4. Performs connect handshake (challenge → connect → hello-ok)
+5. Sends `sessions.list` RPC request
+6. Returns sessions to dashboard
+
+**Critical Protocol Details:**
+
+| Wrong | Correct |
+|-------|---------|
+| `jsonrpc: '2.0'` | `type: 'req'` |
+| `payload: {...}` in request | `params: {...}` |
+| `msg.result` in response | `msg.payload` |
+| `client.id: 'custom'` | `client.id: 'gateway-client'` (from allowlist) |
+
+**Valid Client IDs:** `webchat`, `webchat-ui`, `gateway-client`, `cli`, `node-host`, `test`
+
+**Key Files:**
+- `landing/src/app/api/user/sessions/route.ts` - Sessions API
+- `docs/OPENCLAW-WEBSOCKET-PROTOCOL.md` - Full protocol reference
 
 ### 💳 Stripe Integration (Configured)
 
