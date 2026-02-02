@@ -133,8 +133,19 @@ fix_session_keys
 # Start background fixer
 run_fixer &
 FIXER_PID=$!
+echo "[automna] Session fixer running (PID: $FIXER_PID)"
 
-echo "[automna] Session fixer running (PID: $FIXER_PID), starting gateway..."
+# Start file server
+if [ -f "/app/file-server.js" ]; then
+    echo "[automna] Starting file server on port ${FILE_SERVER_PORT:-8080}..."
+    node /app/file-server.js &
+    FILE_SERVER_PID=$!
+    echo "[automna] File server running (PID: $FILE_SERVER_PID)"
+else
+    echo "[automna] Warning: file-server.js not found, skipping"
+fi
+
+echo "[automna] Starting gateway..."
 
 # Execute the gateway (pass through all args)
 # The phioranex image has the entry at /app/dist/entry.js (loaded via /app/openclaw.mjs)
