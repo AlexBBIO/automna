@@ -2,9 +2,9 @@
 
 > **Note:** Original name was "Automna" but changed to "Automna" (K spelling) to avoid trademark conflict with Agent IQ (USPTO #99399937). Domain automna.ai confirmed available 2026-01-28.
 
-**Version:** 0.2  
-**Date:** 2026-01-29  
-**Status:** MVP In Progress
+**Version:** 0.3  
+**Date:** 2026-02-02  
+**Status:** MVP In Progress (Per-User Infrastructure Complete)
 
 ---
 
@@ -31,7 +31,9 @@
 |-----------|--------|-------|
 | Per-user volumes | ✅ Working | 1GB encrypted volume per user |
 | OpenClaw migration | ✅ Done | Migrated from Clawdbot to OpenClaw |
-| Files API | 🔧 Planned | Need to implement file management |
+| **Files API** | ✅ Implemented | Uses Fly machines exec API |
+| **Agent Config** | ✅ Working | Workspace injection, memory enabled |
+| File Browser UI | 🔧 Testing | UI exists, needs testing |
 
 ### ❌ Deprecated
 | Component | Status | Notes |
@@ -43,6 +45,38 @@
 | `ghcr.io/phioranex/openclaw-docker` | ❌ Deprecated | Use custom Automna image |
 
 ### 📝 Recent Changes (2026-02-02)
+
+**⚙️ Agent Configuration & Memory (22:00 UTC):**
+
+1. **Default Config Creation**
+   - Docker entrypoint creates `clawdbot.json` if missing
+   - Sets workspace to `/home/node/.openclaw/workspace`
+   - Enables full memory stack by default
+   - Model: `anthropic/claude-opus-4-5`
+
+2. **Memory System Enabled**
+   - `memorySearch` with Gemini embeddings
+   - `sessionMemory` indexes conversation history
+   - Hybrid search (vector 0.7 + text 0.3)
+   - Context pruning and compaction enabled
+   - GEMINI_API_KEY added to all user machines
+
+3. **Files API Implemented**
+   - `/api/files/list` - List directory via Fly exec
+   - `/api/files/read` - Read file content
+   - `/api/files/write` - Write/create files
+   - `/api/files/mkdir` - Create directories
+   - `/api/files/move` - Move/rename files
+   - `/api/files/download` - Download binary files
+   - `/api/files/upload` - Upload files (multipart)
+   - `DELETE /api/files` - Delete files
+   - Uses Fly Machines exec API for shell commands
+   - Per-user gateway lookup from Turso
+
+4. **Documentation**
+   - Created `docs/AGENT-CONFIG-SYSTEM.md` - Full config reference
+   - Created `docs/FILE-BROWSER-SPEC.md` - Files feature spec
+   - Updated `docs/PER-USER-SETUP.md`
 
 **💬 Chat System Overhaul (17:00-18:00 UTC):**
 Complete fix of multi-conversation chat system:
@@ -610,37 +644,24 @@ This is NOT a chatbot. Users will have their agents:
 
 ## Architecture Principles
 
-These principles guide all Automna feature development:
+> **⚠️ [DEPRECATED 2026-02-02]** These principles were for the Cloudflare Moltworker architecture.
+> We migrated to **Fly.io** with persistent volumes. See `docs/AGENT-CONFIG-SYSTEM.md` for current architecture.
 
-### R2-First Design
-All persistent data goes to R2 from the start. Don't design for local filesystem then retrofit R2 later.
+~~### R2-First Design~~
+~~All persistent data goes to R2 from the start. Don't design for local filesystem then retrofit R2 later.~~
 
-**Why:** Cloudflare Workers are stateless. Container storage is ephemeral. R2 is the only durable layer.
+**[SUPERSEDED]** We now use **Fly.io volumes** mounted at `/home/node/.openclaw`. Data persists on encrypted volumes, no R2 sync needed.
 
-**Rules:**
-- Design APIs around object storage patterns (key-based, eventual consistency)
-- No local filesystem assumptions in worker code
-- Treat container `/data` as a cache, not source of truth
-- Sync to R2 on every meaningful state change
-- Load from R2 first, fall back to container only if needed
+~~### User Isolation by Default~~
 
-**Pattern:**
-```
-Write: API → R2 → (optional) container cache
-Read:  API → R2 (fast path) → container (fallback if R2 miss)
-```
-
-### User Isolation by Default
-Every feature must consider multi-tenancy from day one.
-
-**Rules:**
-- All R2 paths include userId: `/users/{userId}/...`
-- All Durable Objects keyed by userId
-- Never share state between users
-- Validate userId from signed token, never from request body
+**[STILL VALID]** Each user gets:
+- Dedicated Fly app: `automna-u-{shortId}.fly.dev`
+- Isolated 1GB encrypted volume
+- Own gateway token
+- Tracked in Turso database
 
 ### Fail Gracefully
-Containers sleep. R2 might be slow. Design for degradation.
+**[STILL VALID]** Containers can sleep. Design for degradation.
 
 **Rules:**
 - Always have timeout on container operations

@@ -112,7 +112,8 @@ async function gatewayRpc(
           if (msg.error) {
             reject(new Error(msg.error.message || 'RPC error'));
           } else {
-            resolve(msg.result);
+            // OpenClaw uses 'payload' not 'result' for response data
+            resolve(msg.payload);
           }
         }
       } catch {
