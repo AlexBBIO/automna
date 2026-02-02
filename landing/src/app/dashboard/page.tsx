@@ -109,7 +109,7 @@ export default function DashboardPage() {
   }, []);
 
   // Fetch conversations from gateway when ready
-  // Gateway is the source of truth for what sessions exist
+  // Merge with local conversations to preserve user-created ones that haven't had messages yet
   useEffect(() => {
     if (loadPhase !== 'ready' || !gatewayInfo) return;
     
@@ -119,32 +119,57 @@ export default function DashboardPage() {
         const data = await response.json();
         
         if (data.sessions && Array.isArray(data.sessions)) {
-          const newConversations: Conversation[] = data.sessions.map((s: { key: string; name?: string }) => ({
-            key: s.key,
-            name: s.name || (s.key === 'main' ? 'General' : s.key),
-            icon: s.key === 'main' ? '💬' : '📝',
-          }));
-          
-          // Always have at least the General conversation
-          if (newConversations.length === 0) {
-            newConversations.push({ key: 'main', name: 'General', icon: '💬' });
+          const gatewaySessions = new Map<string, { key: string; name?: string }>();
+          for (const s of data.sessions) {
+            gatewaySessions.set(s.key, s);
           }
           
-          setConversations(newConversations);
-          
-          // If current conversation doesn't exist anymore, switch to main
-          if (!newConversations.some(c => c.key === currentConversation)) {
-            setCurrentConversation('main');
-          }
+          // Merge: keep local conversations that aren't on gateway yet
+          // Update local ones with gateway data if they exist there
+          setConversations(prev => {
+            const merged = new Map<string, Conversation>();
+            
+            // First, add all local conversations
+            for (const conv of prev) {
+              merged.set(conv.key, conv);
+            }
+            
+            // Then, add/update with gateway sessions
+            for (const [key, session] of gatewaySessions) {
+              if (merged.has(key)) {
+                // Update existing with gateway name if different
+                const existing = merged.get(key)!;
+                merged.set(key, {
+                  ...existing,
+                  name: session.name || existing.name,
+                });
+              } else {
+                // Add new session from gateway
+                merged.set(key, {
+                  key,
+                  name: session.name || (key === 'main' ? 'General' : key),
+                  icon: key === 'main' ? '💬' : '📝',
+                });
+              }
+            }
+            
+            // Ensure main exists
+            if (!merged.has('main')) {
+              merged.set('main', { key: 'main', name: 'General', icon: '💬' });
+            }
+            
+            return Array.from(merged.values());
+          });
         }
       } catch (err) {
         console.warn('[dashboard] Failed to fetch sessions:', err);
-        // Keep default conversations on error
+        // Keep existing conversations on error
       }
     };
     
     fetchSessions();
-  }, [loadPhase, gatewayInfo, currentConversation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadPhase, gatewayInfo]); // Don't include currentConversation to avoid refetch loop
   
   // Save conversations to localStorage when they change (for local convos before first message)
   useEffect(() => {
@@ -605,11 +630,12 @@ export default function DashboardPage() {
               {/* Tab content */}
               <div className="flex-1 overflow-hidden">
                 {activeTab === 'chat' && (
-                  <AutomnaChat
-                    key={currentConversation}
-                    gatewayUrl={gatewayInfo.gatewayUrl}
-                    sessionKey={currentConversation}
-                  />
+                  <div className="h-full animate-fadeIn" key={currentConversation}>
+                    <AutomnaChat
+                      gatewayUrl={gatewayInfo.gatewayUrl}
+                      sessionKey={currentConversation}
+                    />
+                  </div>
                 )}
                 {activeTab === 'files' && (
                   <FileBrowser isVisible={activeTab === 'files'} />
