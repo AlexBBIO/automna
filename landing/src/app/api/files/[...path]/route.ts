@@ -397,17 +397,43 @@ export async function POST(
             return NextResponse.json({ error: 'Failed to create directory' }, { status: 500 });
           }
           
-          // Write base64 to temp file, decode, and cleanup
-          // Use printf to avoid issues with echo and special chars
-          const writeResult = await execCommand(
+          // For large files, split into chunks and write via multiple commands
+          // Fly exec has limits on command size
+          const CHUNK_SIZE = 50000; // 50KB chunks
+          const tempFile = `${filePath}.b64.tmp`;
+          
+          // Clear any existing temp file
+          await execCommand(gateway.appName, gateway.machineId, `rm -f "${tempFile}"`);
+          
+          // Write base64 in chunks
+          for (let i = 0; i < base64.length; i += CHUNK_SIZE) {
+            const chunk = base64.slice(i, i + CHUNK_SIZE);
+            // Use double quotes and escape any problematic characters
+            const safeChunk = chunk.replace(/'/g, "'\\''");
+            const appendResult = await execCommand(
+              gateway.appName,
+              gateway.machineId,
+              `printf '%s' '${safeChunk}' >> "${tempFile}"`
+            );
+            
+            if (appendResult.code !== 0) {
+              console.error('[files] Chunk write failed at offset', i, ':', appendResult.stderr);
+              await execCommand(gateway.appName, gateway.machineId, `rm -f "${tempFile}"`);
+              return NextResponse.json({ error: 'Failed to write file chunk' }, { status: 500 });
+            }
+          }
+          
+          // Decode the complete base64 file
+          const decodeResult = await execCommand(
             gateway.appName,
             gateway.machineId,
-            `printf '%s' '${base64}' | base64 -d > "${filePath}"`
+            `base64 -d "${tempFile}" > "${filePath}" && rm -f "${tempFile}"`
           );
           
-          if (writeResult.code !== 0) {
-            console.error('[files] Write failed:', writeResult.stderr);
-            return NextResponse.json({ error: 'Failed to write file' }, { status: 500 });
+          if (decodeResult.code !== 0) {
+            console.error('[files] Decode failed:', decodeResult.stderr);
+            await execCommand(gateway.appName, gateway.machineId, `rm -f "${tempFile}"`);
+            return NextResponse.json({ error: 'Failed to decode file' }, { status: 500 });
           }
           
           // Verify file exists
