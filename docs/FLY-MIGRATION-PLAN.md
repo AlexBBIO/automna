@@ -1,8 +1,51 @@
 # Fly.io Migration Plan
 
 **Date:** 2026-02-02  
-**Status:** Planning  
-**Estimated Effort:** 3-5 days
+**Status:** ✅ MVP Complete (Per-User Provisioning Working)  
+**Last Updated:** 2026-02-02 05:40 UTC
+
+---
+
+## Current State (2026-02-02)
+
+### ✅ Completed
+- [x] Single-machine MVP (`automna-gateway.fly.dev`)
+- [x] Per-user provisioning API (`/api/user/provision`)
+- [x] Per-user Fly apps (`automna-u-{shortId}.fly.dev`)
+- [x] 1GB encrypted volumes per user
+- [x] Turso database for machine tracking
+- [x] **OpenClaw migration** (from Clawdbot)
+
+### 🔧 OpenClaw Stack (Current)
+| Component | Value |
+|-----------|-------|
+| npm package | `openclaw@2026.1.30` (pinned) |
+| Docker image | `ghcr.io/phioranex/openclaw-docker:latest` |
+| Config path | `/home/node/.openclaw` |
+| Machine command | `gateway start --foreground` |
+| Gateway port | 18789 |
+| Env vars | `OPENCLAW_GATEWAY_TOKEN`, `OPENCLAW_GATEWAY_MODE`, `OPENCLAW_GATEWAY_BIND` |
+
+### Machine Config (Provision API)
+```typescript
+const config = {
+  image: "ghcr.io/phioranex/openclaw-docker:latest",
+  guest: { cpu_kind: "shared", cpus: 1, memory_mb: 2048 },
+  init: { cmd: ["gateway", "start", "--foreground"] },
+  services: [{ ports: [{ port: 443, handlers: ["tls", "http"] }], internal_port: 18789 }],
+  env: {
+    OPENCLAW_GATEWAY_TOKEN: gatewayToken,
+    OPENCLAW_GATEWAY_MODE: "local",
+    OPENCLAW_GATEWAY_BIND: "lan",
+  },
+  mounts: [{ volume: volumeId, path: "/home/node/.openclaw" }],
+};
+```
+
+### 📝 Key Learnings
+1. **phioranex image needs explicit command** — doesn't auto-start gateway
+2. **Runs as `node` user** — config at `/home/node/.openclaw`, not `/root/.openclaw`
+3. **Volume mount path matters** — must match image's expected config location
 
 ---
 

@@ -16,7 +16,8 @@
 | Landing page | ✅ Live | automna.ai on Vercel |
 | Clerk auth | ✅ Working | Sign up/sign in functional |
 | Stripe billing | ✅ Working | Checkout, webhooks, portal all functional |
-| **Fly.io Gateway** | ✅ Working | `automna-gateway.fly.dev` (single machine MVP) |
+| **Fly.io Gateway** | ✅ Working | `automna-gateway.fly.dev` (shared MVP) |
+| **Per-user provisioning** | ✅ Working | `/api/user/provision` creates `automna-u-{shortId}` apps |
 | WebSocket chat | ✅ Working | Token auth, client ID 'webchat' |
 | Chat history | ✅ Working | Via WS `chat.history` method |
 | **Turso database** | ✅ Set up | `automna` - users/machines/events tables |
@@ -24,23 +25,41 @@
 | Anthropic integration | ✅ Working | API key configured |
 | Optimistic UI | ✅ Working | Chat skeleton, no forced loading screen |
 
-### 🔧 In Progress (Fly.io Migration)
+### 🔧 In Progress
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Multi-tenant machines | 🔧 Next | Need `/api/user/provision` endpoint |
-| Per-user volumes | 🔧 Planned | Persistent storage per user |
-| R2 backup sync | 🔧 Planned | Disaster recovery |
-| Files API | ❌ Blocked | Clawdbot has no HTTP file API |
+| Per-user volumes | ✅ Working | 1GB encrypted volume per user |
+| OpenClaw migration | ✅ Done | Migrated from Clawdbot to OpenClaw |
+| Files API | 🔧 Planned | Need to implement file management |
 
 ### ❌ Deprecated
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Cloudflare Moltworker | ⚠️ Deprecated | Migrating to Fly.io |
-| R2 as primary storage | ⚠️ Deprecated | Moving to Fly Volumes |
+| Cloudflare Moltworker | ❌ Removed | Fully migrated to Fly.io |
+| R2 as primary storage | ❌ Removed | Using Fly Volumes |
+| `clawdbot` npm package | ❌ Deprecated | Use `openclaw` instead |
+| `mkbehr/clawdbot` image | ❌ Deprecated | Use `ghcr.io/phioranex/openclaw-docker` |
 
 ### 📝 Recent Changes (2026-02-02)
 
-**Fly.io Migration:**
+**OpenClaw Migration (05:30 UTC):**
+The upstream Clawdbot project rebranded to **OpenClaw**. We migrated all infrastructure:
+
+| Component | Old | New |
+|-----------|-----|-----|
+| npm package | `clawdbot@2026.1.24-3` | `openclaw@2026.1.30` (pinned) |
+| Docker image | `mkbehr/clawdbot:latest` | `ghcr.io/phioranex/openclaw-docker:latest` |
+| Config directory | `/root/.clawdbot` | `/home/node/.openclaw` |
+| CLI command | `clawdbot` | `openclaw` |
+| Env vars | `CLAWDBOT_*`, `MOLTBOT_*` | `OPENCLAW_*` |
+
+**Per-User Provisioning:**
+- Each user gets isolated Fly app: `automna-u-{shortId}.fly.dev`
+- 1GB encrypted volume mounted at `/home/node/.openclaw`
+- Machine config includes `init.cmd: ["gateway", "start", "--foreground"]`
+- Tracked in Turso database (`machines` table)
+
+**Fly.io Migration (earlier):**
 - Created single-machine MVP on Fly.io (`automna-gateway`)
 - Fixed WebSocket auth (token extraction from URL)
 - Fixed session key mismatch (`main` vs `agent:main:main`)
