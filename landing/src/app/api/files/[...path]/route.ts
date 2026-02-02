@@ -236,28 +236,33 @@ export async function POST(
           { path: filePath }
         );
         
-        // Stream the file directly to the file server
-        const response = await fetch(fileServerUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            'Content-Length': file.size.toString(),
-          },
-          body: file.stream(),
-          signal: AbortSignal.timeout(120000), // 2 min for large files
-          // @ts-ignore - duplex is needed for streaming
-          duplex: 'half',
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          console.log(`[files] UPLOAD success: ${filePath}`);
-        } else {
-          console.error(`[files] UPLOAD failed:`, data);
+        try {
+          // Convert file to buffer (more reliable than streaming in Vercel)
+          const buffer = Buffer.from(await file.arrayBuffer());
+          
+          const response = await fetch(fileServerUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/octet-stream',
+              'Content-Length': buffer.length.toString(),
+            },
+            body: buffer,
+            signal: AbortSignal.timeout(120000), // 2 min for large files
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok) {
+            console.log(`[files] UPLOAD success: ${filePath}`);
+          } else {
+            console.error(`[files] UPLOAD failed:`, data);
+          }
+          
+          return NextResponse.json(data, { status: response.status });
+        } catch (err) {
+          console.error(`[files] UPLOAD error:`, err);
+          return NextResponse.json({ error: 'Upload failed: ' + (err instanceof Error ? err.message : 'unknown') }, { status: 500 });
         }
-        
-        return NextResponse.json(data, { status: response.status });
       }
       
       default:

@@ -1,8 +1,101 @@
 @import "tailwindcss";
 
+/* 
+ * Automna Theme System
+ * Default: Light mode
+ * Toggle: .dark class on html or body
+ */
+
 :root {
+  /* Base colors - Light mode (default) */
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #09090B;
+  
+  /* Surface colors */
+  --surface-1: #f4f4f5;      /* Cards, sidebars */
+  --surface-2: #e4e4e7;      /* Inputs, hover states */
+  --surface-3: #d4d4d8;      /* Borders, dividers */
+  
+  /* Text colors */
+  --text-primary: #09090B;
+  --text-secondary: #52525b;
+  --text-muted: #a1a1aa;
+  --text-inverse: #ffffff;
+  
+  /* Brand colors */
+  --brand-primary: #7c3aed;    /* Purple */
+  --brand-secondary: #8b5cf6;
+  --brand-accent: #a78bfa;
+  --brand-muted: #ede9fe;
+  
+  /* UI colors */
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --ring: #7c3aed;
+  
+  /* Status colors */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+  
+  /* Chat colors */
+  --chat-user-bg: #f4f4f5;
+  --chat-agent-bg: #ede9fe;
+  --chat-input-bg: #ffffff;
+  --chat-input-border: #e4e4e7;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  
+  /* Gradients */
+  --gradient-brand: linear-gradient(to right, #7c3aed, #8b5cf6);
+  --gradient-surface: linear-gradient(to bottom, #ffffff, #f4f4f5);
+}
+
+/* Dark mode */
+.dark {
+  --background: #09090B;
+  --foreground: #fafafa;
+  
+  /* Surface colors */
+  --surface-1: #18181b;
+  --surface-2: #27272a;
+  --surface-3: #3f3f46;
+  
+  /* Text colors */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-inverse: #09090B;
+  
+  /* Brand colors (adjusted for dark) */
+  --brand-primary: #a78bfa;
+  --brand-secondary: #8b5cf6;
+  --brand-accent: #7c3aed;
+  --brand-muted: rgba(124, 58, 237, 0.15);
+  
+  /* UI colors */
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --ring: #a78bfa;
+  
+  /* Chat colors */
+  --chat-user-bg: #18181b;
+  --chat-agent-bg: rgba(124, 58, 237, 0.15);
+  --chat-input-bg: #18181b;
+  --chat-input-border: #27272a;
+  
+  /* Shadows (darker for dark mode) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  
+  /* Gradients */
+  --gradient-brand: linear-gradient(to right, #a78bfa, #8b5cf6);
+  --gradient-surface: linear-gradient(to bottom, #09090B, #18181b);
 }
 
 @theme inline {
@@ -12,18 +105,27 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* Utility classes for theme colors */
+.bg-surface-1 { background-color: var(--surface-1); }
+.bg-surface-2 { background-color: var(--surface-2); }
+.bg-surface-3 { background-color: var(--surface-3); }
+.bg-brand { background-color: var(--brand-primary); }
+.bg-brand-muted { background-color: var(--brand-muted); }
+
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+.text-brand { color: var(--brand-primary); }
+
+.border-theme { border-color: var(--border); }
+.border-strong { border-color: var(--border-strong); }
 
 /* Animation utilities */
 @keyframes fadeIn {
@@ -41,7 +143,7 @@ body {
   animation: fadeIn 0.3s ease-out forwards;
 }
 
-/* Custom scrollbar for chat */
+/* Custom scrollbar - adapts to theme */
 .overflow-y-auto::-webkit-scrollbar {
   width: 6px;
 }
@@ -51,10 +153,59 @@ body {
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: #374151;
+  background: var(--surface-3);
   border-radius: 3px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+  background: var(--text-muted);
+}
+
+/* Focus ring */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+}
+
+/* Button variants */
+.btn-primary {
+  background: var(--brand-primary);
+  color: var(--text-inverse);
+}
+
+.btn-primary:hover {
+  background: var(--brand-secondary);
+}
+
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--surface-3);
+}
+
+/* Card styles */
+.card {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Input styles */
+.input-theme {
+  background: var(--chat-input-bg);
+  border: 1px solid var(--chat-input-border);
+  color: var(--text-primary);
+}
+
+.input-theme:focus {
+  border-color: var(--brand-primary);
+  outline: none;
+}
+
+.input-theme::placeholder {
+  color: var(--text-muted);
 }
