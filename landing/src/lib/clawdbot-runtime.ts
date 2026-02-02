@@ -131,19 +131,27 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     connectSentRef.current = false;
     streamingTextRef.current = '';
     historyLoadedRef.current = false;
+    setMessages([]); // Clear messages when switching conversations
     setLoadingPhase('connecting');
     setError(null);
+    
+    // Small delay to allow previous WebSocket cleanup to complete
+    // This prevents "WebSocket closed before connection established" errors
+    let connectionDelayTimer: NodeJS.Timeout | null = null;
     
     // Safety timeout - if nothing loads in 10 seconds, allow chat anyway
     // (Gateway should already be ready at this point since dashboard waits for it)
     const safetyTimeout = setTimeout(() => {
       if (mountedRef.current && !historyLoadedRef.current) {
-        console.log('[clawdbot] Safety timeout - allowing chat (history may load later)');
+        console.log('[clawdbot] Safety timeout - allowing chat');
         historyLoadedRef.current = true;
         setIsConnected(true);
         setLoadingPhase('ready');
       }
     }, 10000);
+    
+    // Debounce connection to prevent rapid reconnect issues when switching conversations
+    connectionDelayTimer = setTimeout(() => {
     
     // === PARALLEL HTTP HISTORY FETCH ===
     // Start fetching history via HTTP immediately (don't wait for WebSocket)
@@ -406,14 +414,19 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       }
     };
 
+    }, 50); // 50ms delay to allow cleanup
+
     return () => {
       mountedRef.current = false;
+      if (connectionDelayTimer) clearTimeout(connectionDelayTimer);
       httpHistoryAbortRef.current?.abort();
       clearTimeout(safetyTimeout);
-      if (connectTimer) clearTimeout(connectTimer);
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close(1000, 'Component unmounted');
+      // Close WebSocket using ref (ws variable is inside the delayed callback)
+      const currentWs = wsRef.current;
+      if (currentWs && (currentWs.readyState === WebSocket.OPEN || currentWs.readyState === WebSocket.CONNECTING)) {
+        currentWs.close(1000, 'Component unmounted');
       }
+      wsRef.current = null;
     };
   }, [config.gatewayUrl, config.authToken, sessionKey, wsSend]);
 
