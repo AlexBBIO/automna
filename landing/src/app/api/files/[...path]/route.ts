@@ -369,8 +369,11 @@ export async function POST(
         const filePath = formData.get('path') as string | null;
         
         if (!file || !filePath || !validatePath(filePath)) {
+          console.log('[files] Upload validation failed:', { hasFile: !!file, filePath });
           return NextResponse.json({ error: 'Invalid upload' }, { status: 400 });
         }
+        
+        console.log('[files] Starting upload:', { filename: file.name, size: file.size, path: filePath });
         
         try {
           // Convert file to base64
@@ -380,17 +383,49 @@ export async function POST(
           // Get parent directory
           const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
           
-          // Create parent directory and write file
-          // Use heredoc for large base64 to avoid argument length limits
-          await execCommand(
+          console.log('[files] Upload base64 length:', base64.length, 'parentDir:', parentDir);
+          
+          // Create parent directory first
+          const mkdirResult = await execCommand(
             gateway.appName,
             gateway.machineId,
-            `mkdir -p "${parentDir}" && cat > "${filePath}.b64" << 'EOF_B64'\n${base64}\nEOF_B64\nbase64 -d "${filePath}.b64" > "${filePath}" && rm "${filePath}.b64"`
+            `mkdir -p "${parentDir}"`
           );
           
+          if (mkdirResult.code !== 0) {
+            console.error('[files] mkdir failed:', mkdirResult.stderr);
+            return NextResponse.json({ error: 'Failed to create directory' }, { status: 500 });
+          }
+          
+          // Write base64 to temp file, decode, and cleanup
+          // Use printf to avoid issues with echo and special chars
+          const writeResult = await execCommand(
+            gateway.appName,
+            gateway.machineId,
+            `printf '%s' '${base64}' | base64 -d > "${filePath}"`
+          );
+          
+          if (writeResult.code !== 0) {
+            console.error('[files] Write failed:', writeResult.stderr);
+            return NextResponse.json({ error: 'Failed to write file' }, { status: 500 });
+          }
+          
+          // Verify file exists
+          const verifyResult = await execCommand(
+            gateway.appName,
+            gateway.machineId,
+            `test -f "${filePath}" && stat -c %s "${filePath}"`
+          );
+          
+          if (verifyResult.code !== 0) {
+            console.error('[files] Verify failed:', verifyResult.stderr);
+            return NextResponse.json({ error: 'File not created' }, { status: 500 });
+          }
+          
+          console.log('[files] Upload success:', filePath, 'size:', verifyResult.stdout.trim());
           return NextResponse.json({ success: true, path: filePath });
         } catch (err) {
-          console.warn('[files] Upload failed:', err);
+          console.error('[files] Upload failed:', err);
           return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
         }
       }
