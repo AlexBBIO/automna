@@ -129,7 +129,10 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
   };
   
   // Breadcrumb path segments
+  // OpenClaw workspace is at /home/node/.openclaw
+  const WORKSPACE_ROOT = '/home/node/.openclaw';
   const pathSegments = currentPath.split('/').filter(Boolean);
+  const workspaceSegmentCount = WORKSPACE_ROOT.split('/').filter(Boolean).length;
   
   return (
     <div className="h-full flex flex-col bg-gray-950 text-white">
@@ -138,16 +141,16 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
         <div className="flex items-center gap-2 text-sm">
           {/* Breadcrumbs */}
           <button 
-            onClick={() => navigateTo('/root/clawd')}
+            onClick={() => navigateTo(WORKSPACE_ROOT)}
             className="text-gray-400 hover:text-white"
           >
             📁 workspace
           </button>
-          {pathSegments.slice(2).map((segment, i) => (
+          {pathSegments.slice(workspaceSegmentCount).map((segment, i) => (
             <span key={i} className="flex items-center gap-2">
               <span className="text-gray-600">/</span>
               <button
-                onClick={() => navigateTo('/' + pathSegments.slice(0, i + 3).join('/'))}
+                onClick={() => navigateTo('/' + pathSegments.slice(0, workspaceSegmentCount + i + 1).join('/'))}
                 className="text-gray-400 hover:text-white"
               >
                 {segment}
@@ -196,7 +199,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
         {/* File list */}
         <div className="w-1/2 border-r border-gray-800 overflow-y-auto">
           {/* Up button */}
-          {currentPath !== '/root/clawd' && (
+          {currentPath !== '/home/node/.openclaw' && (
             <button
               onClick={navigateUp}
               className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-800/50 text-gray-400 border-b border-gray-800/50"

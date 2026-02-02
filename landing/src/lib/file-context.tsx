@@ -56,7 +56,8 @@ export interface FileContextType {
 
 const FileContext = createContext<FileContextType | null>(null);
 
-const WORKSPACE_ROOT = '/root/clawd';
+// OpenClaw workspace is in /home/node/.openclaw on Fly machines
+const WORKSPACE_ROOT = '/home/node/.openclaw';
 
 // ============================================
 // PROVIDER
