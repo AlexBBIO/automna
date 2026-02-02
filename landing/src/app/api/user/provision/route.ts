@@ -238,8 +238,7 @@ async function createVolume(appName: string): Promise<FlyVolume> {
 /**
  * Create and start a machine in the app
  */
-async function createMachine(appName: string, volumeId: string): Promise<FlyMachine> {
-  const gatewayToken = process.env.FLY_GATEWAY_TOKEN || crypto.randomUUID();
+async function createMachine(appName: string, volumeId: string, gatewayToken: string): Promise<FlyMachine> {
   
   const config = {
     image: OPENCLAW_IMAGE,
@@ -472,9 +471,9 @@ export async function POST() {
     console.log(`[provision] Creating volume for ${appName}`);
     const volume = await createVolume(appName);
 
-    // Step 4: Create machine
+    // Step 4: Create machine (pass token so it matches what we store in DB)
     console.log(`[provision] Creating machine for ${appName}`);
-    const machine = await createMachine(appName, volume.id);
+    const machine = await createMachine(appName, volume.id, gatewayToken);
 
     // Step 5: Wait for machine to be ready
     console.log(`[provision] Waiting for machine ${machine.id} to start`);
