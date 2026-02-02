@@ -114,6 +114,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   
   const rawSessionKey = config.sessionKey || 'main';
   const sessionKey = canonicalizeSessionKey(rawSessionKey);
+  
+  // Track current session to prevent stale responses from other sessions
+  const currentSessionRef = useRef(sessionKey);
+  currentSessionRef.current = sessionKey;
 
   // Send WebSocket message
   const wsSend = useCallback((method: string, params: Record<string, unknown>) => {
@@ -192,6 +196,11 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         // Only mark as loaded if we actually got messages
         // Empty response might mean the endpoint doesn't exist, let WS try
         if (data?.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+          // Guard: only set messages if we're still on the same session
+          if (currentSessionRef.current !== sessionKey) {
+            console.log('[clawdbot] HTTP history arrived for old session, ignoring');
+            return;
+          }
           console.log(`[clawdbot] HTTP history loaded: ${data.messages.length} messages`);
           historyLoadedRef.current = true;
           setMessages(parseMessages(data.messages, 'http'));
@@ -314,6 +323,13 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         }
         if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
           console.log('[clawdbot] Entering history handler, historyLoadedRef:', historyLoadedRef.current);
+          
+          // Guard: only process if we're still on the same session
+          if (currentSessionRef.current !== sessionKey) {
+            console.log('[clawdbot] WS history arrived for old session, ignoring');
+            return;
+          }
+          
           const wsMessages = msg.payload.messages;
           
           // Mark as loaded - empty is valid for new channels
@@ -422,7 +438,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       }
     };
 
-    }, 50); // 50ms delay to allow cleanup
+    }, 100); // 100ms delay to allow cleanup and prevent race conditions
 
     return () => {
       mountedRef.current = false;
