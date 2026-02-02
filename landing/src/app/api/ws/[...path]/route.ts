@@ -49,10 +49,16 @@ export async function GET(
     targetUrl.searchParams.set('token', userMachine.gatewayToken);
     
     // Forward other query params (sessionKey, etc.)
+    // Canonicalize session key to match how OpenClaw stores sessions
     request.nextUrl.searchParams.forEach((value, key) => {
       // Don't override the token we just set
       if (key !== 'token') {
-        targetUrl.searchParams.set(key, value);
+        if (key === 'sessionKey' && !value.startsWith('agent:main:')) {
+          // Convert to canonical form: "test" -> "agent:main:test"
+          targetUrl.searchParams.set(key, `agent:main:${value}`);
+        } else {
+          targetUrl.searchParams.set(key, value);
+        }
       }
     });
     
