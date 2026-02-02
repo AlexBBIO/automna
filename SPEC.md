@@ -42,6 +42,27 @@
 
 ### 📝 Recent Changes (2026-02-02)
 
+**Chat History & Session Fixes (06:57 UTC):**
+Fixed multiple issues with chat functionality:
+
+1. **Gateway readiness** - Dashboard now waits for gateway to respond before showing chat
+   - New `/api/user/health` endpoint polls gateway until ready
+   - Loading screen shows "Starting your agent..." during warmup
+
+2. **History loading** - Fixed WebSocket history not loading
+   - HTTP history endpoint doesn't exist on OpenClaw (returns control UI)
+   - Fixed runtime to not block WS history when HTTP returns empty
+
+3. **Session key mismatch** - Found/fixed OpenClaw bug
+   - Sessions created via webchat stored with key `main`
+   - `chat.history` looks up with canonical key `agent:main:main`
+   - **Workaround:** Rename session key in `sessions.json` from `main` to `agent:main:main`
+   - **TODO:** Report upstream to OpenClaw
+
+4. **Conversations sidebar** - Now fetches from gateway instead of localStorage
+   - Old localStorage data was showing stale conversations
+   - New `/api/user/sessions` endpoint fetches real sessions
+
 **Per-User Provisioning WORKING (06:30 UTC):**
 Full end-to-end provisioning now working:
 - User visits dashboard → auto-provisions Fly app if needed
