@@ -282,6 +282,7 @@ async function createMachine(appName: string, volumeId: string, gatewayToken: st
     env: {
       // API keys and config passed as env vars (secrets deploy doesn't work for Machines API)
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
       OPENCLAW_GATEWAY_TOKEN: gatewayToken,
     },
     mounts: [

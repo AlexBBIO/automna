@@ -84,7 +84,41 @@ if [ ! -f "$CONFIG_FILE" ]; then
       "model": {
         "primary": "anthropic/claude-opus-4-5"
       },
-      "userTimezone": "America/Los_Angeles"
+      "userTimezone": "America/Los_Angeles",
+      "memorySearch": {
+        "enabled": true,
+        "sources": ["memory", "sessions"],
+        "provider": "gemini",
+        "model": "gemini-embedding-001",
+        "experimental": {
+          "sessionMemory": true
+        },
+        "store": {
+          "vector": {
+            "enabled": true
+          }
+        },
+        "sync": {
+          "watch": true
+        },
+        "query": {
+          "hybrid": {
+            "enabled": true,
+            "vectorWeight": 0.7,
+            "textWeight": 0.3
+          }
+        },
+        "cache": {
+          "enabled": true
+        }
+      },
+      "contextPruning": {
+        "mode": "cache-ttl",
+        "ttl": "1h"
+      },
+      "compaction": {
+        "mode": "safeguard"
+      }
     }
   }
 }
@@ -103,4 +137,5 @@ FIXER_PID=$!
 echo "[automna] Session fixer running (PID: $FIXER_PID), starting gateway..."
 
 # Execute the gateway (pass through all args)
-exec node /app/dist/index.js "$@"
+# The phioranex image has the entry at /app/dist/entry.js (loaded via /app/openclaw.mjs)
+exec node /app/dist/entry.js "$@"
