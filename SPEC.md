@@ -38,9 +38,18 @@
 | Cloudflare Moltworker | ❌ Removed | Fully migrated to Fly.io |
 | R2 as primary storage | ❌ Removed | Using Fly Volumes |
 | `clawdbot` npm package | ❌ Deprecated | Use `openclaw` instead |
-| `mkbehr/clawdbot` image | ❌ Deprecated | Use `ghcr.io/phioranex/openclaw-docker` |
+| `mkbehr/clawdbot` image | ❌ Deprecated | Use custom Automna image |
+| `ghcr.io/phioranex/openclaw-docker` | ❌ Deprecated | Use custom Automna image |
 
 ### 📝 Recent Changes (2026-02-02)
+
+**🐳 Custom Docker Image (16:50 UTC):**
+Built and deployed custom Docker image with production-ready session key fix:
+- **Image:** `registry.fly.io/automna-openclaw-image:latest`
+- **Source:** `docker/Dockerfile` + `docker/entrypoint.sh`
+- **Fix:** Background process monitors and fixes session keys every 3 seconds
+- **Works for:** All conversations (main, work, research, etc.)
+- See [`docs/PER-USER-SETUP.md`](docs/PER-USER-SETUP.md) for rebuild instructions
 
 **📚 Per-User Setup Documentation (16:00 UTC):**
 - Created comprehensive setup guide: [`docs/PER-USER-SETUP.md`](docs/PER-USER-SETUP.md)
@@ -58,12 +67,11 @@ Fixed multiple issues with chat functionality:
    - HTTP history endpoint doesn't exist on OpenClaw (returns control UI)
    - Fixed runtime to not block WS history when HTTP returns empty
 
-3. **Session key mismatch** - OpenClaw bug (fixed!)
-   - Sessions created via webchat stored with key `main`
-   - `chat.history` looks up with canonical key `agent:main:main`
-   - **✅ Fixed:** Init script in provisioning creates session with canonical key
-   - Existing instances auto-fixed on restart
-   - See PER-USER-SETUP.md for details
+3. **Session key mismatch** - OpenClaw bug (✅ FIXED with custom Docker image)
+   - **Root cause:** OpenClaw stores sessions with key `main` but looks up with `agent:main:main`
+   - **Solution:** Custom Docker image with background fixer
+   - **How it works:** Entrypoint runs background process that monitors and fixes keys every 3s
+   - Sessions are automatically converted to canonical form
 
 4. **Conversations sidebar** - Now fetches from gateway instead of localStorage
    - Old localStorage data was showing stale conversations
@@ -83,10 +91,9 @@ Full end-to-end provisioning now working:
 4. **Fly secrets vs env vars** - Machines API doesn't use `fly secrets`, pass in config.env
 
 **Known Issues:**
-- Gateway startup takes ~60 seconds (needs loading UI)
+- Gateway startup takes ~60 seconds (needs better loading UI)
 - Claude Opus responses are slow (10-20s, consider Sonnet default)
 - File browser not integrated yet
-- Session key mismatch (workaround in place, need API-layer fix)
 
 **TODO - Loading Screen Improvements:**
 - Show step-by-step progress during provisioning:

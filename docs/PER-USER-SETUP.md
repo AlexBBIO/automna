@@ -1,6 +1,6 @@
 # Per-User Instance Setup
 
-**Last Updated:** 2026-02-02 16:00 UTC  
+**Last Updated:** 2026-02-02 17:00 UTC  
 **Status:** Production (MVP)
 
 This document covers everything needed to provision, configure, and troubleshoot per-user OpenClaw instances on Fly.io.
@@ -25,15 +25,56 @@ User signs up → Dashboard visit → Provision API → Fly app created → User
 
 ---
 
-## OpenClaw Stack
+## Docker Image (Custom Automna Build)
+
+We use a **custom Docker image** that extends the community OpenClaw image with a session key fixer.
 
 | Component | Value |
 |-----------|-------|
-| Docker Image | `ghcr.io/phioranex/openclaw-docker:latest` |
-| npm package | `openclaw@2026.1.30` |
+| **Image** | `registry.fly.io/automna-openclaw-image:latest` |
+| Base image | `ghcr.io/phioranex/openclaw-docker:latest` |
+| Source | `docker/Dockerfile` + `docker/entrypoint.sh` |
+| npm package | `openclaw@2026.1.30` (from base) |
 | Config directory | `/home/node/.openclaw` (runs as `node` user) |
 | Gateway port | 18789 |
 | Default model | Claude (via ANTHROPIC_API_KEY) |
+
+### Why Custom Image?
+
+OpenClaw has a bug where sessions are stored with key `main` but looked up with canonical key `agent:main:main`. Our custom image includes a background fixer that:
+
+1. Runs every 3 seconds
+2. Detects non-canonical session keys
+3. Converts them to canonical form
+4. Works for all conversations (main, work, etc.)
+
+### Rebuilding the Image
+
+When the upstream OpenClaw image updates or we need changes:
+
+```bash
+cd /root/clawd/projects/automna/docker
+
+# Build locally
+docker build -t automna-openclaw:latest .
+
+# Tag for Fly registry
+docker tag automna-openclaw:latest registry.fly.io/automna-openclaw-image:latest
+
+# Authenticate with Fly (if needed)
+export FLY_API_TOKEN=$(jq -r .token ../config/fly.json)
+fly auth docker
+
+# Push to Fly registry
+docker push registry.fly.io/automna-openclaw-image:latest
+```
+
+**New users** will automatically get the updated image on provisioning.
+
+**Existing users** need their machine updated:
+```bash
+fly machines update <machine-id> -a automna-u-xxx --image registry.fly.io/automna-openclaw-image:latest --yes
+```
 
 ---
 
@@ -127,7 +168,7 @@ User signs up → Dashboard visit → Provision API → Fly app created → User
 
 ---
 
-## Session Key Issue
+## Session Key Issue (✅ FIXED)
 
 ### The Bug
 
@@ -135,60 +176,78 @@ OpenClaw has a session key mismatch bug that affects chat history:
 
 | Where | Key Used |
 |-------|----------|
-| **WebSocket creates session** | `main` |
-| **`chat.history` lookup** | `agent:main:main` (canonical form) |
+| **WebSocket creates session** | `main`, `work`, etc. |
+| **`chat.history` lookup** | `agent:main:main`, `agent:main:work` (canonical form) |
 
 **Result:** History lookup fails because the store has `{"main": {...}}` but code looks for `store["agent:main:main"]`.
 
-### ✅ Implemented Fix
+### ✅ Production Fix: Background Session Key Fixer
 
-**Fixed in:** `landing/src/app/api/user/provision/route.ts` (2026-02-02)
+**Fixed via:** Custom Docker image with background fixer (`docker/entrypoint.sh`)
 
-The provisioning API now includes an initialization script in the machine's `init.cmd` that:
+The fix runs as a background process in the container:
 
-1. **Creates the canonical session directory** before gateway starts
-2. **Pre-creates sessions.json** with the canonical key `agent:main:main`
-3. **Auto-fixes existing sessions** if they have the wrong `main` key
+1. **Monitors sessions.json** every 3 seconds
+2. **Detects non-canonical keys** (keys without `agent:main:` prefix that have session data)
+3. **Converts to canonical form** using Node.js for reliable JSON manipulation
+4. **Works for all conversations** — main, work, research, etc.
 
-**The init script:**
+**The entrypoint script:**
 ```bash
-# Runs before gateway start
-mkdir -p "/home/node/.openclaw/agents/main/sessions/agent:main:main"
-test -f sessions.json || echo '{"agent:main:main":{}}' > sessions.json
-# If "main" key exists, rename to canonical key
-grep -q '"main"' sessions.json && sed -i 's/"main"/"agent:main:main"/g' sessions.json
-# Start gateway
-exec gateway --allow-unconfigured --bind lan --auth token --token "<token>"
+# Background fixer loop (runs every 3 seconds)
+run_fixer() {
+    while true; do
+        sleep 3
+        # Node.js script that:
+        # - Reads sessions.json
+        # - Finds keys like "main", "work" with sessionId data
+        # - Renames to "agent:main:main", "agent:main:work"
+        # - Writes back if changed
+        fix_session_keys
+    done
+}
+
+# Start fixer in background, then start gateway
+run_fixer &
+exec node /app/dist/index.js "$@"
 ```
 
-**Result:** New instances start with the correct session key structure. Existing instances are auto-fixed on next restart.
+**Result:** Sessions are automatically fixed within 3 seconds of creation. History loading works correctly.
 
-### Manual Fix (For Existing Instances)
+### Manual Fix (If Needed)
 
-If an instance was provisioned before this fix:
+If you need to manually fix sessions:
 
 ```bash
 # SSH into the machine
+export FLY_API_TOKEN=$(jq -r .token config/fly.json)
 fly ssh console -a automna-u-xxx
 
-# Edit sessions file
-vi /home/node/.openclaw/agents/main/sessions/sessions.json
+# Check current sessions
+cat /home/node/.openclaw/agents/main/sessions/sessions.json
 
-# Change:  { "main": { ... } }
-# To:      { "agent:main:main": { ... } }
-
-# Also rename directory if needed
-mv /home/node/.openclaw/agents/main/sessions/main \
-   /home/node/.openclaw/agents/main/sessions/agent:main:main
+# The background fixer should auto-fix, but if not:
+# Use Node.js to fix (from outside container):
+fly ssh console -a automna-u-xxx -C 'node -e "
+const fs = require(\"fs\");
+const file = \"/home/node/.openclaw/agents/main/sessions/sessions.json\";
+const data = JSON.parse(fs.readFileSync(file));
+const fixed = {};
+for (const [k, v] of Object.entries(data)) {
+  const key = k.startsWith(\"agent:main:\") ? k : \"agent:main:\" + k;
+  if (v.sessionId) fixed[key] = v;
+}
+fs.writeFileSync(file, JSON.stringify(fixed, null, 2));
+console.log(\"Fixed\");
+"'
 ```
-
-Or simply restart the machine — the init script will auto-fix it.
 
 ### Upstream Bug Report (TODO)
 
 Should still report to OpenClaw:
-- Issue: Session creation should use canonical key from the start
-- Repo: https://github.com/phioranex/openclaw
+- **Issue:** Session creation should use canonical key from the start
+- **Repo:** https://github.com/phioranex/openclaw
+- **Workaround:** Our custom Docker image with background fixer
 
 ### Session File Structure
 
