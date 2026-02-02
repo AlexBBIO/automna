@@ -21,8 +21,9 @@ const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
 const FLY_ORG_ID = process.env.FLY_ORG_ID; // Must be the actual org ID, not slug
 const FLY_REGION = process.env.FLY_REGION || "sjc";
 const FLY_API_BASE = "https://api.machines.dev/v1";
-// Use community OpenClaw image from GHCR
-const OPENCLAW_IMAGE = process.env.OPENCLAW_IMAGE || "ghcr.io/phioranex/openclaw-docker:latest";
+// Use our custom Automna OpenClaw image with session key fix
+// Falls back to community image if not set
+const OPENCLAW_IMAGE = process.env.OPENCLAW_IMAGE || "registry.fly.io/automna-openclaw-image:latest";
 
 /**
  * Get the personal organization ID from Fly API
