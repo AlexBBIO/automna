@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
-import prisma from '@/lib/db';
+import prisma from '@/lib/prisma';
 import crypto from 'crypto';
 
 // Simple encryption for API keys (in production, use proper key management)

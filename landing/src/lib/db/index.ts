@@ -8,22 +8,15 @@ import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
-// Environment variables
-const TURSO_DATABASE_URL = process.env.TURSO_DATABASE_URL;
-const TURSO_AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN;
+// Re-export schema tables and types
+export { users, machines, machineEvents } from "./schema";
+export type { User, NewUser, Machine, NewMachine, MachineEvent, NewMachineEvent } from "./schema";
 
-if (!TURSO_DATABASE_URL) {
-  throw new Error("TURSO_DATABASE_URL is not set");
-}
-
-// Create libsql client
+// Create client - will fail at runtime if env vars not set (expected during build)
 const client = createClient({
-  url: TURSO_DATABASE_URL,
-  authToken: TURSO_AUTH_TOKEN,
+  url: process.env.TURSO_DATABASE_URL || "libsql://placeholder.turso.io",
+  authToken: process.env.TURSO_AUTH_TOKEN || "placeholder",
 });
 
-// Create Drizzle instance with schema
+// Create Drizzle instance with schema for relational queries
 export const db = drizzle(client, { schema });
-
-// Re-export schema for convenience
-export * from "./schema";
