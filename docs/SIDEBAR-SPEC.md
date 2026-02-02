@@ -1,5 +1,15 @@
 # Sidebar Navigation Spec
 
+**Status:** Future Design (Partial Implementation)  
+**Last Updated:** 2026-02-02
+
+> **Current Implementation:**
+> - ✅ Conversation sidebar with channels
+> - ✅ Files tab (top navigation, not sidebar)
+> - ⏳ Memory tab - not implemented
+> - ⏳ Settings page - not implemented
+> - ⏳ Starred/Recent sections - not implemented
+
 **Inspired by:** Claude's sidebar (Chats, Projects, Artifacts, Code, Starred, Recents)
 
 ---

@@ -1,6 +1,6 @@
 # Per-User Instance Setup
 
-**Last Updated:** 2026-02-02 17:00 UTC  
+**Last Updated:** 2026-02-02 22:30 UTC  
 **Status:** Production (MVP)
 
 This document covers everything needed to provision, configure, and troubleshoot per-user OpenClaw instances on Fly.io.
@@ -123,7 +123,7 @@ fly machines update <machine-id> -a automna-u-xxx --image registry.fly.io/automn
 6. **Create machine** with full config
    ```json
    {
-     "image": "ghcr.io/phioranex/openclaw-docker:latest",
+     "image": "registry.fly.io/automna-openclaw-image:latest",
      "guest": { "cpu_kind": "shared", "cpus": 1, "memory_mb": 2048 },
      "init": {
        "cmd": ["gateway", "--allow-unconfigured", "--bind", "lan", "--auth", "token", "--token", "<gatewayToken>"]
@@ -134,6 +134,7 @@ fly machines update <machine-id> -a automna-u-xxx --image registry.fly.io/automn
      }],
      "env": {
        "ANTHROPIC_API_KEY": "...",
+       "GEMINI_API_KEY": "...",
        "OPENCLAW_GATEWAY_TOKEN": "<gatewayToken>"
      },
      "mounts": [{
@@ -142,6 +143,8 @@ fly machines update <machine-id> -a automna-u-xxx --image registry.fly.io/automn
      }]
    }
    ```
+   
+   **Note:** The custom image's entrypoint also creates a default `clawdbot.json` config with workspace injection and memory settings. See [`AGENT-CONFIG-SYSTEM.md`](AGENT-CONFIG-SYSTEM.md).
 
 7. **Wait for machine** (polls until `state === "started"`)
 
@@ -452,11 +455,13 @@ When provisioning is triggered:
 - [ ] IPs allocated (both v4 and v6)
 - [ ] Volume created (1GB, encrypted, in same region)
 - [ ] Machine created with correct config:
-  - [ ] Image: `ghcr.io/phioranex/openclaw-docker:latest`
+  - [ ] Image: `registry.fly.io/automna-openclaw-image:latest`
   - [ ] init.cmd: `["gateway", "--allow-unconfigured", "--bind", "lan", "--auth", "token", "--token", "..."]`
   - [ ] Mount path: `/home/node/.openclaw`
-  - [ ] Env vars: ANTHROPIC_API_KEY, OPENCLAW_GATEWAY_TOKEN
+  - [ ] Env vars: ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENCLAW_GATEWAY_TOKEN
 - [ ] Machine reaches "started" state
+- [ ] Entrypoint creates `clawdbot.json` config (workspace + memory settings)
+- [ ] Session key fixer running in background
 - [ ] Record stored in Turso (machines table)
 - [ ] Event logged (machine_events table)
 - [ ] Gateway responds to health check

@@ -1,10 +1,13 @@
 # Fly.io Migration Plan
 
 **Date:** 2026-02-02  
-**Status:** ✅ MVP Complete (Per-User Provisioning Working)  
-**Last Updated:** 2026-02-02 16:00 UTC
+**Status:** ✅ COMPLETE (Historical Reference)  
+**Last Updated:** 2026-02-02 22:30 UTC
 
-> **📚 See also:** [`PER-USER-SETUP.md`](PER-USER-SETUP.md) for detailed per-user instance documentation.
+> **📌 Note:** Migration is complete. This document is kept as historical reference.
+> For current setup, see:
+> - [`PER-USER-SETUP.md`](PER-USER-SETUP.md) - Per-user instance documentation
+> - [`AGENT-CONFIG-SYSTEM.md`](AGENT-CONFIG-SYSTEM.md) - Agent configuration
 
 ---
 
@@ -21,24 +24,29 @@
 ### 🔧 OpenClaw Stack (Current)
 | Component | Value |
 |-----------|-------|
-| npm package | `openclaw@2026.1.30` (pinned) |
-| Docker image | `ghcr.io/phioranex/openclaw-docker:latest` |
+| npm package | `openclaw@2026.1.30` (pinned, in base image) |
+| **Docker image** | `registry.fly.io/automna-openclaw-image:latest` |
+| Base image | `ghcr.io/phioranex/openclaw-docker:latest` |
 | Config path | `/home/node/.openclaw` |
-| Machine command | `gateway start --foreground` |
+| Machine command | `gateway --allow-unconfigured --bind lan --auth token --token <token>` |
 | Gateway port | 18789 |
-| Env vars | `OPENCLAW_GATEWAY_TOKEN`, `OPENCLAW_GATEWAY_MODE`, `OPENCLAW_GATEWAY_BIND` |
+| Env vars | `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN` |
+
+**Custom image includes:**
+- Session key fixer (background process)
+- Default config creation (workspace + memory settings)
 
 ### Machine Config (Provision API)
 ```typescript
 const config = {
-  image: "ghcr.io/phioranex/openclaw-docker:latest",
+  image: "registry.fly.io/automna-openclaw-image:latest",
   guest: { cpu_kind: "shared", cpus: 1, memory_mb: 2048 },
-  init: { cmd: ["gateway", "start", "--foreground"] },
+  init: { cmd: ["gateway", "--allow-unconfigured", "--bind", "lan", "--auth", "token", "--token", gatewayToken] },
   services: [{ ports: [{ port: 443, handlers: ["tls", "http"] }], internal_port: 18789 }],
   env: {
+    ANTHROPIC_API_KEY: "...",
+    GEMINI_API_KEY: "...",
     OPENCLAW_GATEWAY_TOKEN: gatewayToken,
-    OPENCLAW_GATEWAY_MODE: "local",
-    OPENCLAW_GATEWAY_BIND: "lan",
   },
   mounts: [{ volume: volumeId, path: "/home/node/.openclaw" }],
 };
