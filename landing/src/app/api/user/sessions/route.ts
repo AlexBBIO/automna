@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import WebSocket from "ws";
 
 interface OpenClawSession {
   key: string;
@@ -30,10 +31,10 @@ interface SessionResponse {
 }
 
 // WebSocket RPC helper - makes a single request and returns the response
-async function rpcRequest(
-  gatewayUrl: string, 
-  token: string, 
-  method: string, 
+async function gatewayRpc(
+  gatewayUrl: string,
+  token: string,
+  method: string,
   params: Record<string, unknown>
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -42,11 +43,12 @@ async function rpcRequest(
     }, 10000);
     
     // Build WebSocket URL
-    const wsUrl = new URL(gatewayUrl.replace(/^http/, 'ws'));
+    const wsUrl = new URL(gatewayUrl.replace(/^https?/, 'wss'));
+    wsUrl.pathname = '/ws';
     wsUrl.searchParams.set('token', token);
     wsUrl.searchParams.set('clientId', 'sessions-api');
     
-    const ws = new (require('ws'))(wsUrl.toString());
+    const ws = new WebSocket(wsUrl.toString());
     const requestId = `req-${Date.now()}`;
     
     ws.on('open', () => {
@@ -70,14 +72,19 @@ async function rpcRequest(
             resolve(msg.result);
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore parse errors for non-JSON messages
       }
     });
     
     ws.on('error', (err: Error) => {
       clearTimeout(timeout);
+      ws.close();
       reject(err);
+    });
+    
+    ws.on('close', () => {
+      clearTimeout(timeout);
     });
   });
 }
@@ -105,7 +112,7 @@ export async function GET() {
     
     try {
       // Fetch sessions via WebSocket RPC
-      const result = await rpcRequest(gatewayUrl, userMachine.gatewayToken, 'sessions.list', {
+      const result = await gatewayRpc(gatewayUrl, userMachine.gatewayToken, 'sessions.list', {
         limit: 100,
         includeGlobal: false,
         includeUnknown: false,
@@ -181,7 +188,7 @@ export async function PATCH(request: Request) {
     const canonicalKey = key.startsWith('agent:main:') ? key : `agent:main:${key}`;
     
     try {
-      await rpcRequest(gatewayUrl, userMachine.gatewayToken, 'sessions.patch', {
+      await gatewayRpc(gatewayUrl, userMachine.gatewayToken, 'sessions.patch', {
         key: canonicalKey,
         label: label || null,
       });
@@ -232,7 +239,7 @@ export async function DELETE(request: Request) {
     const canonicalKey = key.startsWith('agent:main:') ? key : `agent:main:${key}`;
     
     try {
-      await rpcRequest(gatewayUrl, userMachine.gatewayToken, 'sessions.delete', {
+      await gatewayRpc(gatewayUrl, userMachine.gatewayToken, 'sessions.delete', {
         key: canonicalKey,
         deleteTranscript: true,
       });

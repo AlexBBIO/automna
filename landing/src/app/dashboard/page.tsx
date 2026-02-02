@@ -108,23 +108,45 @@ export default function DashboardPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // NOTE: Gateway sessions fetch disabled - OpenClaw doesn't have a session list API
-  // Conversations are localStorage-only for now. When you create a conversation and
-  // send messages, it's stored on the gateway, but we can't list them yet.
-  // TODO: Add session listing to OpenClaw or read from filesystem
-  
-  // Save conversations to localStorage when they change (for local convos before first message)
-  useEffect(() => {
-    localStorage.setItem('automna-conversations', JSON.stringify(conversations));
-  }, [conversations]);
+  // Fetch conversations from OpenClaw when gateway is ready
+  const fetchConversations = useCallback(async () => {
+    try {
+      const response = await fetch('/api/user/sessions');
+      if (response.ok) {
+        const data = await response.json();
+        const sessions = data.sessions || [];
+        // Transform to our Conversation format
+        const convos: Conversation[] = sessions.map((s: { key: string; name: string; lastActive?: number }) => ({
+          key: s.key,
+          name: s.name,
+          icon: s.key === 'main' ? '💬' : '📝',
+          lastActive: s.lastActive,
+        }));
+        setConversations(convos);
+      }
+    } catch (err) {
+      console.error('[dashboard] Failed to fetch conversations:', err);
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, []);
 
-  // Save current conversation to localStorage when it changes
+  // Fetch conversations when gateway becomes ready
+  useEffect(() => {
+    if (loadPhase === 'ready') {
+      fetchConversations();
+    }
+  }, [loadPhase, fetchConversations]);
+
+  // Save current conversation to localStorage when it changes (user preference)
   useEffect(() => {
     localStorage.setItem('automna-current-conversation', currentConversation);
   }, [currentConversation]);
   
   // Create a new conversation
-  const handleCreateConversation = useCallback((name: string) => {
+  // The session will be created on OpenClaw when the first message is sent
+  // We optimistically add it to the UI and set the label via API
+  const handleCreateConversation = useCallback(async (name: string) => {
     const key = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     if (!key || conversations.some(c => c.key === key)) return;
     
@@ -133,8 +155,22 @@ export default function DashboardPage() {
       name,
       icon: '📝',
     };
+    
+    // Optimistically add to UI
     setConversations(prev => [...prev, newConversation]);
     setCurrentConversation(key);
+    
+    // Set the label on OpenClaw (will create session entry if first message sent)
+    try {
+      await fetch('/api/user/sessions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, label: name }),
+      });
+    } catch (err) {
+      console.error('[dashboard] Failed to set session label:', err);
+      // Non-fatal - label will just be auto-generated
+    }
   }, [conversations]);
 
   const handleManageBilling = async () => {
@@ -178,8 +214,8 @@ export default function DashboardPage() {
       
       if (data.success) {
         setResetStatus('Cleaning up local data...');
-        // Clear any remaining local storage
-        localStorage.removeItem('automna-conversations');
+        // Clear local storage preferences
+        localStorage.removeItem('automna-current-conversation');
         localStorage.removeItem('automna-channels');
         
         setResetStatus('Restarting your agent...');
@@ -529,7 +565,7 @@ export default function DashboardPage() {
                   setSidebarHidden(true);
                 }
               }}
-              conversations={conversations}
+              conversations={conversations.length > 0 ? conversations : [{ key: 'main', name: 'General', icon: '💬' }]}
               onCreateConversation={handleCreateConversation}
               isCollapsed={sidebarCollapsed}
               onToggleCollapse={() => {
@@ -539,6 +575,8 @@ export default function DashboardPage() {
                   setSidebarCollapsed(!sidebarCollapsed);
                 }
               }}
+              isLoading={conversationsLoading}
+              onRefresh={fetchConversations}
             />
           </div>
           
