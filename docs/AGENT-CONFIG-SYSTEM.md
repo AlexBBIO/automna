@@ -42,11 +42,50 @@ Location: `/home/node/.openclaw/clawdbot.json`
       "model": {
         "primary": "anthropic/claude-opus-4-5"
       },
-      "userTimezone": "America/Los_Angeles"
+      "userTimezone": "America/Los_Angeles",
+      "memorySearch": {
+        "enabled": true,
+        "sources": ["memory", "sessions"],
+        "provider": "gemini",
+        "model": "gemini-embedding-001",
+        "experimental": {
+          "sessionMemory": true
+        },
+        "store": {
+          "vector": {
+            "enabled": true
+          }
+        },
+        "sync": {
+          "watch": true
+        },
+        "query": {
+          "hybrid": {
+            "enabled": true,
+            "vectorWeight": 0.7,
+            "textWeight": 0.3
+          }
+        },
+        "cache": {
+          "enabled": true
+        }
+      },
+      "contextPruning": {
+        "mode": "cache-ttl",
+        "ttl": "1h"
+      },
+      "compaction": {
+        "mode": "safeguard"
+      }
     }
   }
 }
 ```
+
+### Environment Variables (set during provisioning)
+- `ANTHROPIC_API_KEY` - Claude API access
+- `GEMINI_API_KEY` - Memory embeddings (shared key)
+- `OPENCLAW_GATEWAY_TOKEN` - Per-user auth token
 
 ### How It's Created
 
