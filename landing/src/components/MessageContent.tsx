@@ -142,11 +142,71 @@ interface MessageContentProps {
   isUser?: boolean;
 }
 
-// Parse text into segments (text, code blocks, inline code)
+// File attachment component for agent-shared files
+function FileAttachment({ path }: { path: string }) {
+  const filename = path.split('/').pop() || 'file';
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext);
+  
+  const downloadUrl = `/api/files/download?path=${encodeURIComponent(path)}`;
+  
+  if (isImage) {
+    return (
+      <div className="my-2">
+        <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="block">
+          <img 
+            src={downloadUrl} 
+            alt={filename}
+            className="max-w-full max-h-[400px] rounded-lg border border-gray-700 hover:border-purple-500 transition-colors"
+            onError={(e) => {
+              // If image fails to load, show fallback
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              target.nextElementSibling?.classList.remove('hidden');
+            }}
+          />
+          <div className="hidden flex items-center gap-2 p-3 bg-gray-800 rounded-lg mt-1">
+            <span>🖼️</span>
+            <span className="text-sm text-gray-300">{filename}</span>
+            <span className="text-xs text-gray-500">(failed to load)</span>
+          </div>
+        </a>
+      </div>
+    );
+  }
+  
+  // Non-image file - show download link
+  const fileIcons: Record<string, string> = {
+    pdf: '📕',
+    doc: '📄', docx: '📄',
+    xls: '📊', xlsx: '📊',
+    csv: '📊',
+    txt: '📝',
+    md: '📝',
+    json: '📋',
+    zip: '📦', tar: '📦', gz: '📦',
+  };
+  const icon = fileIcons[ext] || '📎';
+  
+  return (
+    <a 
+      href={downloadUrl}
+      download={filename}
+      className="inline-flex items-center gap-2 px-3 py-2 my-1 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+    >
+      <span>{icon}</span>
+      <span className="text-sm text-gray-300">{filename}</span>
+      <span className="text-xs text-purple-400">⬇️</span>
+    </a>
+  );
+}
+
+// Parse text into segments (text, code blocks, inline code, file refs)
 type Segment = 
   | { type: 'text'; content: string }
   | { type: 'code'; language: string; content: string }
-  | { type: 'inline-code'; content: string };
+  | { type: 'inline-code'; content: string }
+  | { type: 'file'; path: string };
 
 function parseContent(text: string): Segment[] {
   const segments: Segment[] = [];
@@ -155,6 +215,8 @@ function parseContent(text: string): Segment[] {
   const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
   // Regex for inline code: `code`
   const inlineCodeRegex = /`([^`\n]+)`/g;
+  // Regex for file references: [[file:/path/to/file.ext]] or [[image:/path/to/file.ext]]
+  const fileRefRegex = /\[\[(file|image):([^\]]+)\]\]/g;
   
   let lastIndex = 0;
   let match;
@@ -175,8 +237,34 @@ function parseContent(text: string): Segment[] {
     withCodeBlocks.push({ type: 'text', content: text.slice(lastIndex) });
   }
   
-  // Second pass: extract inline code from text segments
+  // Second pass: extract file references from text segments
+  const withFiles: Segment[] = [];
   for (const segment of withCodeBlocks) {
+    if (segment.type !== 'text') {
+      withFiles.push(segment);
+      continue;
+    }
+    
+    let textLastIndex = 0;
+    const textContent = segment.content;
+    fileRefRegex.lastIndex = 0;
+    while ((match = fileRefRegex.exec(textContent)) !== null) {
+      // Add text before file ref
+      if (match.index > textLastIndex) {
+        withFiles.push({ type: 'text', content: textContent.slice(textLastIndex, match.index) });
+      }
+      // Add file reference
+      withFiles.push({ type: 'file', path: match[2].trim() });
+      textLastIndex = match.index + match[0].length;
+    }
+    // Add remaining text
+    if (textLastIndex < textContent.length) {
+      withFiles.push({ type: 'text', content: textContent.slice(textLastIndex) });
+    }
+  }
+  
+  // Third pass: extract inline code from remaining text segments
+  for (const segment of withFiles) {
     if (segment.type !== 'text') {
       segments.push(segment);
       continue;
@@ -184,6 +272,7 @@ function parseContent(text: string): Segment[] {
     
     let textLastIndex = 0;
     const textContent = segment.content;
+    inlineCodeRegex.lastIndex = 0;
     while ((match = inlineCodeRegex.exec(textContent)) !== null) {
       // Add text before inline code
       if (match.index > textLastIndex) {
@@ -197,8 +286,6 @@ function parseContent(text: string): Segment[] {
     if (textLastIndex < textContent.length) {
       segments.push({ type: 'text', content: textContent.slice(textLastIndex) });
     }
-    // Reset regex lastIndex
-    inlineCodeRegex.lastIndex = 0;
   }
   
   return segments;
@@ -224,6 +311,9 @@ export function MessageContent({ text, isUser }: MessageContentProps) {
         }
         if (segment.type === 'inline-code') {
           return <InlineCode key={i} code={segment.content} />;
+        }
+        if (segment.type === 'file') {
+          return <FileAttachment key={i} path={segment.path} />;
         }
         // Text segment - preserve whitespace and line breaks
         return (
