@@ -42,6 +42,29 @@
 
 ### 📝 Recent Changes (2026-02-02)
 
+**Per-User Provisioning WORKING (06:30 UTC):**
+Full end-to-end provisioning now working:
+- User visits dashboard → auto-provisions Fly app if needed
+- Each user gets `automna-u-{shortId}.fly.dev` with 1GB encrypted volume
+- WebSocket chat working, Claude Opus responses working
+- Tracked in Turso database
+
+**Issues Fixed Tonight:**
+1. **Token mismatch** - DB token wasn't matching gateway token (fixed sync)
+2. **WS proxy wrong gateway** - `/api/ws/*` was using old shared gateway (fixed to lookup per-user)
+3. **ANTHROPIC_API_KEY missing** - Added to Vercel env vars
+4. **Fly secrets vs env vars** - Machines API doesn't use `fly secrets`, pass in config.env
+
+**Known Issues:**
+- Gateway startup takes ~60 seconds (needs loading UI)
+- Claude Opus responses are slow (10-20s, consider Sonnet default)
+- File browser not integrated yet
+
+**Gateway CLI flags:**
+```bash
+gateway --allow-unconfigured --bind lan --auth token --token <gateway_token>
+```
+
 **OpenClaw Migration (05:30 UTC):**
 The upstream Clawdbot project rebranded to **OpenClaw**. We migrated all infrastructure:
 
