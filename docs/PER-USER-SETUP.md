@@ -140,36 +140,55 @@ OpenClaw has a session key mismatch bug that affects chat history:
 
 **Result:** History lookup fails because the store has `{"main": {...}}` but code looks for `store["agent:main:main"]`.
 
-### Current Workaround
+### ✅ Implemented Fix
 
-After a user's first chat, manually rename the session key in `sessions.json`:
+**Fixed in:** `landing/src/app/api/user/provision/route.ts` (2026-02-02)
+
+The provisioning API now includes an initialization script in the machine's `init.cmd` that:
+
+1. **Creates the canonical session directory** before gateway starts
+2. **Pre-creates sessions.json** with the canonical key `agent:main:main`
+3. **Auto-fixes existing sessions** if they have the wrong `main` key
+
+**The init script:**
+```bash
+# Runs before gateway start
+mkdir -p "/home/node/.openclaw/agents/main/sessions/agent:main:main"
+test -f sessions.json || echo '{"agent:main:main":{}}' > sessions.json
+# If "main" key exists, rename to canonical key
+grep -q '"main"' sessions.json && sed -i 's/"main"/"agent:main:main"/g' sessions.json
+# Start gateway
+exec gateway --allow-unconfigured --bind lan --auth token --token "<token>"
+```
+
+**Result:** New instances start with the correct session key structure. Existing instances are auto-fixed on next restart.
+
+### Manual Fix (For Existing Instances)
+
+If an instance was provisioned before this fix:
 
 ```bash
 # SSH into the machine
 fly ssh console -a automna-u-xxx
 
-# Edit sessions file (as node user since that's who owns it)
+# Edit sessions file
 vi /home/node/.openclaw/agents/main/sessions/sessions.json
 
-# Change:
-#   { "main": { ... } }
-# To:
-#   { "agent:main:main": { ... } }
+# Change:  { "main": { ... } }
+# To:      { "agent:main:main": { ... } }
+
+# Also rename directory if needed
+mv /home/node/.openclaw/agents/main/sessions/main \
+   /home/node/.openclaw/agents/main/sessions/agent:main:main
 ```
 
-### Proper Fix (TODO)
+Or simply restart the machine — the init script will auto-fix it.
 
-1. **Option A: Report upstream to OpenClaw**
-   - File issue at https://github.com/phioranex/openclaw
-   - Session creation should use canonical key
+### Upstream Bug Report (TODO)
 
-2. **Option B: Initialization script**
-   - On first boot, create session with correct key structure
-   - Add to Dockerfile or entrypoint
-
-3. **Option C: Handle in /api/user/sessions endpoint**
-   - When fetching sessions, normalize keys
-   - Return history regardless of key format
+Should still report to OpenClaw:
+- Issue: Session creation should use canonical key from the start
+- Repo: https://github.com/phioranex/openclaw
 
 ### Session File Structure
 

@@ -58,11 +58,12 @@ Fixed multiple issues with chat functionality:
    - HTTP history endpoint doesn't exist on OpenClaw (returns control UI)
    - Fixed runtime to not block WS history when HTTP returns empty
 
-3. **Session key mismatch** - OpenClaw bug (documented in PER-USER-SETUP.md)
+3. **Session key mismatch** - OpenClaw bug (fixed!)
    - Sessions created via webchat stored with key `main`
    - `chat.history` looks up with canonical key `agent:main:main`
-   - **Current fix:** Manual rename in `sessions.json` after first chat
-   - **Proper fix:** TODO - see PER-USER-SETUP.md for options
+   - **✅ Fixed:** Init script in provisioning creates session with canonical key
+   - Existing instances auto-fixed on restart
+   - See PER-USER-SETUP.md for details
 
 4. **Conversations sidebar** - Now fetches from gateway instead of localStorage
    - Old localStorage data was showing stale conversations

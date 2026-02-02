@@ -236,6 +236,39 @@ async function createVolume(appName: string): Promise<FlyVolume> {
 }
 
 /**
+ * Build the initialization + gateway start command
+ * 
+ * This fixes the OpenClaw session key mismatch bug where:
+ * - Sessions created via webchat are stored with key "main"
+ * - chat.history looks up with canonical key "agent:main:main"
+ * 
+ * By pre-creating the session structure with the canonical key,
+ * we ensure history loading works correctly from the first message.
+ */
+function buildInitCommand(gatewayToken: string): string[] {
+  // Paths (these get interpolated into shell script)
+  const DIR = "/home/node/.openclaw/agents/main/sessions";
+  const KEY = "agent:main:main";
+  const FILE = `${DIR}/sessions.json`;
+  const HIST = `${DIR}/${KEY}`;
+  
+  // Shell script: create session structure with canonical key, then start gateway
+  // - Creates directory for canonical session key
+  // - If no sessions.json exists, creates one with correct key
+  // - If sessions.json has "main" key, renames it to canonical key
+  // - Starts gateway with required flags
+  const script = [
+    `mkdir -p "${HIST}"`,
+    `test -f "${FILE}" || echo '{"${KEY}":{}}' > "${FILE}"`,
+    `grep -q '"main"' "${FILE}" 2>/dev/null && ! grep -q '"${KEY}"' "${FILE}" && sed -i 's/"main"/"${KEY}"/g' "${FILE}" && echo "[init] fixed session key"`,
+    `test -d "${DIR}/main" && test ! -d "${HIST}" && mv "${DIR}/main" "${HIST}"`,
+    `exec gateway --allow-unconfigured --bind lan --auth token --token "${gatewayToken}"`
+  ].join('; ');
+  
+  return ["/bin/sh", "-c", script];
+}
+
+/**
  * Create and start a machine in the app
  */
 async function createMachine(appName: string, volumeId: string, gatewayToken: string): Promise<FlyMachine> {
@@ -247,13 +280,10 @@ async function createMachine(appName: string, volumeId: string, gatewayToken: st
       cpus: 1,
       memory_mb: 2048,
     },
-    // Command to start the gateway with required config
-    // --allow-unconfigured: allows starting without config file
-    // --bind lan: allows external connections (beyond loopback)
-    // --token: authentication token for WebSocket connections
-    // --auth token: use simple token auth (no challenge-response)
+    // Initialize session structure with canonical key, then start gateway
+    // This fixes the session key mismatch bug where "main" != "agent:main:main"
     init: {
-      cmd: ["gateway", "--allow-unconfigured", "--bind", "lan", "--auth", "token", "--token", gatewayToken],
+      cmd: buildInitCommand(gatewayToken),
     },
     services: [
       {
