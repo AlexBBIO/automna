@@ -14,8 +14,8 @@ USER root
 COPY entrypoint.sh /usr/local/bin/automna-entrypoint.sh
 RUN chmod +x /usr/local/bin/automna-entrypoint.sh
 
-# Copy file server
-COPY file-server.js /app/file-server.js
+# Copy file server (use .cjs for CommonJS in ESM environment)
+COPY file-server.cjs /app/file-server.cjs
 
 # Expose file server port (internal, not public)
 EXPOSE 8080

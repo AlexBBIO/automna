@@ -136,13 +136,13 @@ FIXER_PID=$!
 echo "[automna] Session fixer running (PID: $FIXER_PID)"
 
 # Start file server
-if [ -f "/app/file-server.js" ]; then
+if [ -f "/app/file-server.cjs" ]; then
     echo "[automna] Starting file server on port ${FILE_SERVER_PORT:-8080}..."
-    node /app/file-server.js &
+    node /app/file-server.cjs &
     FILE_SERVER_PID=$!
     echo "[automna] File server running (PID: $FILE_SERVER_PID)"
 else
-    echo "[automna] Warning: file-server.js not found, skipping"
+    echo "[automna] Warning: file-server.cjs not found, skipping"
 fi
 
 echo "[automna] Starting gateway..."
