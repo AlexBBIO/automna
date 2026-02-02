@@ -101,38 +101,43 @@ export default function DashboardPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Load conversations from localStorage on mount
-  // Also migrate old 'automna-channels' key if present
+  // Fetch conversations from gateway when ready
+  // Gateway is the source of truth for what sessions exist
   useEffect(() => {
-    // Try new key first
-    let saved = localStorage.getItem('automna-conversations');
+    if (loadPhase !== 'ready' || !gatewayInfo) return;
     
-    // Migrate from old key if new key doesn't exist
-    if (!saved) {
-      const oldSaved = localStorage.getItem('automna-channels');
-      if (oldSaved) {
-        saved = oldSaved;
-        localStorage.setItem('automna-conversations', oldSaved);
-        localStorage.removeItem('automna-channels');
-      }
-    }
-    
-    if (saved) {
+    const fetchSessions = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setConversations(parsed);
+        const response = await fetch('/api/user/sessions');
+        const data = await response.json();
+        
+        if (data.sessions && Array.isArray(data.sessions)) {
+          const newConversations: Conversation[] = data.sessions.map((s: { key: string; name?: string }) => ({
+            key: s.key,
+            name: s.name || (s.key === 'main' ? 'General' : s.key),
+            icon: s.key === 'main' ? '💬' : '📝',
+          }));
+          
+          // Always have at least the General conversation
+          if (newConversations.length === 0) {
+            newConversations.push({ key: 'main', name: 'General', icon: '💬' });
+          }
+          
+          setConversations(newConversations);
+          
+          // If current conversation doesn't exist anymore, switch to main
+          if (!newConversations.some(c => c.key === currentConversation)) {
+            setCurrentConversation('main');
+          }
         }
-      } catch {
-        // Ignore parse errors
+      } catch (err) {
+        console.warn('[dashboard] Failed to fetch sessions:', err);
+        // Keep default conversations on error
       }
-    }
-  }, []);
-  
-  // Save conversations to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem('automna-conversations', JSON.stringify(conversations));
-  }, [conversations]);
+    };
+    
+    fetchSessions();
+  }, [loadPhase, gatewayInfo, currentConversation]);
   
   // Create a new conversation
   const handleCreateConversation = useCallback((name: string) => {
@@ -189,8 +194,9 @@ export default function DashboardPage() {
       
       if (data.success) {
         setResetStatus('Cleaning up local data...');
-        // Clear local storage
+        // Clear any remaining local storage
         localStorage.removeItem('automna-conversations');
+        localStorage.removeItem('automna-channels');
         
         setResetStatus('Restarting your agent...');
         // Give the gateway a moment to restart
@@ -215,47 +221,41 @@ export default function DashboardPage() {
     // Don't reset isResetting on success - page will reload
   };
 
-  // Prewarm the sandbox - waits for container to be ready
-  // Returns when container is warm or after timeout (60s)
-  const prewarmSandbox = async (gatewayUrl: string): Promise<void> => {
-    if (prewarmStarted.current) return;
+  // Wait for gateway to be ready - polls our health check endpoint
+  // Returns true when ready, false on timeout
+  const waitForGatewayReady = async (): Promise<boolean> => {
+    if (prewarmStarted.current) return true;
     prewarmStarted.current = true;
     
-    const PREWARM_TIMEOUT_MS = 60000; // 60 seconds max wait
+    const MAX_WAIT_MS = 60000; // 60 seconds max wait
+    const POLL_INTERVAL_MS = 2000; // Check every 2 seconds
     
-    try {
-      const wsUrl = new URL(gatewayUrl);
-      // Use local proxy to avoid CORS issues
-      const keepAliveUrl = new URL('/api/gateway/keepalive', window.location.origin);
-      
-      const userId = wsUrl.searchParams.get('userId');
-      const exp = wsUrl.searchParams.get('exp');
-      const sig = wsUrl.searchParams.get('sig');
-      const token = wsUrl.searchParams.get('token');
-      if (token) keepAliveUrl.searchParams.set('token', token);
-      if (userId) keepAliveUrl.searchParams.set('userId', userId);
-      if (exp) keepAliveUrl.searchParams.set('exp', exp);
-      if (sig) keepAliveUrl.searchParams.set('sig', sig);
-      
-      console.log('[prewarm] Starting sandbox warmup...');
-      
-      // Fetch with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), PREWARM_TIMEOUT_MS);
-      
+    console.log('[warmup] Waiting for gateway to be ready...');
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < MAX_WAIT_MS) {
       try {
-        await fetch(keepAliveUrl.toString(), { signal: controller.signal });
-        console.log('[prewarm] Sandbox warmed');
-      } finally {
-        clearTimeout(timeoutId);
+        const response = await fetch('/api/user/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(8000),
+        });
+        
+        const data = await response.json();
+        
+        if (data.ready) {
+          console.log('[warmup] Gateway is ready!');
+          return true;
+        }
+        console.log(`[warmup] Gateway not ready yet: ${data.error || 'unknown'}`);
+      } catch (err) {
+        console.log(`[warmup] Health check failed: ${err instanceof Error ? err.message : 'error'}`);
       }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        console.warn('[prewarm] Timeout after 60s - proceeding anyway');
-      } else {
-        console.warn('[prewarm] Failed (non-fatal):', err);
-      }
+      
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
     }
+    
+    console.warn('[warmup] Timeout after 60s - proceeding anyway');
+    return false;
   };
 
   // Sync user and fetch gateway info on mount
@@ -313,9 +313,16 @@ export default function DashboardPage() {
         
         if (gatewayData.gatewayUrl) {
           setGatewayInfo(gatewayData);
+          
+          // Wait for gateway to be ready before showing chat
+          setLoadPhase('warming');
+          const isReady = await waitForGatewayReady();
+          
+          if (!isReady) {
+            console.warn('[dashboard] Gateway warmup timed out but proceeding anyway');
+          }
+          
           setLoadPhase('ready');
-          // Prewarm in background - don't block UI
-          prewarmSandbox(gatewayData.gatewayUrl);
         } else {
           console.error('[dashboard] No gatewayUrl in response:', gatewayData);
           setLoadPhase('error');
@@ -383,13 +390,14 @@ export default function DashboardPage() {
     );
   }
 
-  // Show skeleton only during essential loading phases (not warming - let that happen in background)
-  if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway' || loadPhase === 'provisioning') {
+  // Show skeleton during all loading phases until ready
+  if (!isLoaded || loadPhase === 'init' || loadPhase === 'syncing' || loadPhase === 'fetching-gateway' || loadPhase === 'provisioning' || loadPhase === 'warming') {
     const phaseMessages: Record<string, string> = {
       'init': 'Initializing...',
       'syncing': 'Syncing account...',
       'fetching-gateway': 'Connecting to your agent...',
       'provisioning': 'Creating your agent (this may take 1-2 minutes)...',
+      'warming': 'Starting your agent...',
     };
     
     return (

@@ -35,7 +35,7 @@ export async function GET(
       where: eq(machines.userId, clerkId),
     });
     
-    if (!userMachine || !userMachine.appName) {
+    if (!userMachine || !userMachine.appName || !userMachine.gatewayToken) {
       // No machine yet - return empty history
       console.log(`[ws-proxy] No app found for user ${clerkId}`);
       return NextResponse.json({ messages: [] });
@@ -45,9 +45,15 @@ export async function GET(
     const gatewayBase = `https://${userMachine.appName}.fly.dev`;
     const targetUrl = new URL(`${gatewayBase}/ws/api/${pathStr}`);
     
-    // Forward query params (including token for auth)
+    // Add token from database for authentication
+    targetUrl.searchParams.set('token', userMachine.gatewayToken);
+    
+    // Forward other query params (sessionKey, etc.)
     request.nextUrl.searchParams.forEach((value, key) => {
-      targetUrl.searchParams.set(key, value);
+      // Don't override the token we just set
+      if (key !== 'token') {
+        targetUrl.searchParams.set(key, value);
+      }
     });
     
     console.log(`[ws-proxy] Proxying to ${targetUrl.toString()}`);
