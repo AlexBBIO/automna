@@ -31,6 +31,7 @@ interface SessionResponse {
 }
 
 // WebSocket RPC helper - makes a single request and returns the response
+// Handles the OpenClaw connect.challenge handshake
 async function gatewayRpc(
   gatewayUrl: string,
   token: string,
@@ -50,19 +51,56 @@ async function gatewayRpc(
     
     const ws = new WebSocket(wsUrl.toString());
     const requestId = `req-${Date.now()}`;
+    let connected = false;
     
-    ws.on('open', () => {
+    const sendConnect = () => {
+      ws.send(JSON.stringify({
+        type: 'req',
+        method: 'connect',
+        payload: {
+          minProtocol: 3,
+          maxProtocol: 3,
+          client: {
+            id: 'sessions-api',
+            version: '1.0.0',
+            platform: 'server',
+            mode: 'api',
+          },
+        },
+      }));
+    };
+    
+    const sendRpc = () => {
       ws.send(JSON.stringify({
         jsonrpc: '2.0',
         id: requestId,
         method,
         params,
       }));
+    };
+    
+    ws.on('open', () => {
+      // Wait for challenge before sending anything
     });
     
     ws.on('message', (data: Buffer) => {
       try {
         const msg = JSON.parse(data.toString());
+        
+        // Handle connect.challenge - respond with connect request
+        if (msg.type === 'event' && msg.event === 'connect.challenge') {
+          sendConnect();
+          return;
+        }
+        
+        // Handle connect success - now send our RPC request
+        if (msg.type === 'res' && msg.ok && msg.payload?.type === 'hello-ok') {
+          connected = true;
+          sendRpc();
+          return;
+        }
+        
+        // Handle RPC response
         if (msg.id === requestId) {
           clearTimeout(timeout);
           ws.close();
