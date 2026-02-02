@@ -191,11 +191,11 @@ async function createMachine(appName: string, volumeId: string): Promise<FlyMach
       memory_mb: 2048,
     },
     // Command to start the gateway with required config
-    // --mode local: required (no config file on first boot)
-    // --bind lan: allows external connections
+    // --allow-unconfigured: allows starting without config file
+    // --bind lan: allows external connections (beyond loopback)
     // --token: authentication token for WebSocket connections
     init: {
-      cmd: ["gateway", "--mode", "local", "--bind", "lan", "--token", gatewayToken],
+      cmd: ["gateway", "--allow-unconfigured", "--bind", "lan", "--token", gatewayToken],
     },
     services: [
       {
