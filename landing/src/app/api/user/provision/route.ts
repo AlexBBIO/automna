@@ -392,12 +392,21 @@ async function createMachine(
     },
     services: [
       {
+        // Gateway (OpenClaw)
         ports: [
           { port: 443, handlers: ["tls", "http"] },
           { port: 80, handlers: ["http"] },
         ],
         protocol: "tcp",
         internal_port: 18789,
+      },
+      {
+        // File server
+        ports: [
+          { port: 8080, handlers: ["tls", "http"] },
+        ],
+        protocol: "tcp",
+        internal_port: 8080,
       },
     ],
     env,
