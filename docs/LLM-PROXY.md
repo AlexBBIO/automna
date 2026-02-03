@@ -306,22 +306,37 @@ TURSO_AUTH_TOKEN=...             # Database auth
 ```
 
 ### Fly Machine Configuration:
-The Docker entrypoint sets:
 
-```bash
-export ANTHROPIC_BASE_URL="https://automna.ai/api/llm"
+**Important:** OpenClaw/pi-ai does NOT read `ANTHROPIC_BASE_URL` environment variable!
+The baseUrl must be configured in `clawdbot.json` under `models.providers.anthropic`.
+
+The Docker entrypoint creates this config:
+
+```json
+{
+  "models": {
+    "providers": {
+      "anthropic": {
+        "baseUrl": "https://automna.ai/api/llm",
+        "models": []
+      }
+    }
+  }
+}
 ```
 
-This works because the Anthropic SDK respects `ANTHROPIC_BASE_URL` environment variable.
-The agent uses its gateway token as the API key, and our proxy handles authentication.
+Machine env vars set during provisioning:
+- `ANTHROPIC_API_KEY` = gateway token (NOT the real key!)
+- `ANTHROPIC_BASE_URL` = proxy URL (for reference, not actually used)
 
 ### How It Works:
-1. Agent calls Anthropic SDK with `ANTHROPIC_BASE_URL=https://automna.ai/api/llm`
-2. SDK sends request to `https://automna.ai/api/llm/v1/messages`
-3. Our proxy authenticates via the gateway token in the `Authorization: Bearer <token>` header
-4. Proxy forwards to real Anthropic API
-5. Proxy logs usage to Turso database
-6. Response returned to agent
+1. OpenClaw reads `models.providers.anthropic.baseUrl` from config
+2. Agent makes LLM request using gateway token as API key
+3. Request goes to `https://automna.ai/api/llm/v1/messages`
+4. Our proxy authenticates via the gateway token in `x-api-key` header
+5. Proxy forwards to real Anthropic API (with our real key)
+6. Proxy logs usage to Turso database
+7. Response returned to agent
 
 ## Security
 
