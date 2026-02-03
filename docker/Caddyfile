@@ -7,20 +7,14 @@
         max_size 100MB
     }
 
-    # File server routes
-    handle /files/* {
+    # File server routes - strip /files prefix before forwarding
+    handle_path /files/* {
         reverse_proxy localhost:8080
     }
 
     # Everything else goes to OpenClaw gateway
     handle {
-        reverse_proxy localhost:18788 {
-            # WebSocket support
-            header_up Host {host}
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-        }
+        reverse_proxy localhost:18788
     }
 
     # Logging
