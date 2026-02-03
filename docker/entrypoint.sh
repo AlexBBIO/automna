@@ -104,7 +104,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "defaults": {
       "workspace": "/home/node/.openclaw/workspace",
       "model": {
-        "primary": "anthropic/claude-3-5-sonnet-20241022"
+        "primary": "anthropic/claude-opus-4-5"
       },
       "userTimezone": "America/Los_Angeles",
       "contextPruning": {
@@ -136,11 +136,11 @@ if [ -f "$CONFIG_FILE" ] && ! grep -q '"trustedProxies"' "$CONFIG_FILE" 2>/dev/n
     " 2>/dev/null || echo "[automna] Warning: trustedProxies migration failed"
 fi
 
-# Migration: Fix model name (claude-sonnet-4 -> claude-3-5-sonnet-20241022)
-if [ -f "$CONFIG_FILE" ] && grep -q 'claude-sonnet-4' "$CONFIG_FILE" 2>/dev/null; then
-    echo "[automna] Migrating config: fixing model name..."
-    sed -i 's/claude-sonnet-4/claude-3-5-sonnet-20241022/g' "$CONFIG_FILE"
-    echo "[automna] Model name fixed"
+# Migration: Fix model name to Opus 4.5
+if [ -f "$CONFIG_FILE" ] && grep -qE 'claude-sonnet-4|claude-3-5-sonnet' "$CONFIG_FILE" 2>/dev/null; then
+    echo "[automna] Migrating config: setting model to Opus 4.5..."
+    sed -i 's/claude-sonnet-4/claude-opus-4-5/g; s/claude-3-5-sonnet-[0-9]*/claude-opus-4-5/g' "$CONFIG_FILE"
+    echo "[automna] Model set to Opus 4.5"
 fi
 
 # Initial session key fix

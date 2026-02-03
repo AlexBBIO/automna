@@ -374,11 +374,10 @@ async function createMachine(
   // Build env vars - only include integrations if configured
   // Note: cleanEnvValue strips trailing newlines that may be in Vercel env vars
   // 
-  // SECURITY: We intentionally DO NOT pass ANTHROPIC_API_KEY to machines.
-  // The LLM proxy (ANTHROPIC_BASE_URL) handles authentication with our key,
-  // so agents never see the real API key. This prevents users from bypassing
-  // our rate limits and usage tracking.
+  // TODO: Set up LLM proxy for rate limiting and usage tracking
+  // For now, pass ANTHROPIC_API_KEY directly until proxy is ready
   const env: Record<string, string> = {
+    ANTHROPIC_API_KEY: cleanEnvValue(process.env.ANTHROPIC_API_KEY),
     GEMINI_API_KEY: cleanEnvValue(process.env.GEMINI_API_KEY),
     OPENCLAW_GATEWAY_TOKEN: gatewayToken,
   };
