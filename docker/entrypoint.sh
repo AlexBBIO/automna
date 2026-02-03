@@ -70,6 +70,17 @@ run_fixer() {
 
 # Create directories
 mkdir -p "$SESSIONS_DIR"
+mkdir -p "$OPENCLAW_DIR/workspace"
+mkdir -p "$OPENCLAW_DIR/workspace/memory"
+mkdir -p "$OPENCLAW_DIR/workspace/uploads"
+
+# Copy default workspace files on first run
+if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initialized" ]; then
+    echo "[automna] Initializing workspace with defaults..."
+    cp -rn /app/default-workspace/* "$OPENCLAW_DIR/workspace/" 2>/dev/null || true
+    touch "$OPENCLAW_DIR/workspace/.initialized"
+    echo "[automna] Workspace initialized"
+fi
 
 # Create config file if it doesn't exist
 # This configures workspace injection so the agent sees AGENTS.md, SOUL.md, etc.

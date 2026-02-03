@@ -2,6 +2,7 @@
 # Extends the community phioranex image with:
 # - Session key fixer (background process)
 # - File server for robust uploads/downloads (port 8080)
+# - Default workspace files (AGENTS.md with MEDIA: instructions)
 #
 # The phioranex image runs as 'node' user with config at /home/node/.openclaw
 
@@ -16,6 +17,9 @@ RUN chmod +x /usr/local/bin/automna-entrypoint.sh
 
 # Copy file server (use .cjs for CommonJS in ESM environment)
 COPY file-server.cjs /app/file-server.cjs
+
+# Copy default workspace files (will be copied to user workspace on first run)
+COPY workspace/ /app/default-workspace/
 
 # Expose file server port (internal, not public)
 EXPOSE 8080
