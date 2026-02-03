@@ -10,7 +10,7 @@
 
 Allow users to browse, view, edit, and manage files in their agent's workspace through the web dashboard.
 
-## Current State (2026-02-02 22:00 UTC)
+## Current State (2026-02-02 23:55 UTC)
 
 **✅ Implemented:**
 - `FileBrowser.tsx` - Full UI component with tree view, preview panel
@@ -19,11 +19,28 @@ Allow users to browse, view, edit, and manage files in their agent's workspace t
 - All CRUD operations working (list, read, write, delete, mkdir, move, upload, download)
 - Per-user gateway lookup from Turso database
 - Path security validation
+- **File uploads working end-to-end** ✅
 
 **⏳ Testing needed:**
-- UI integration testing (Files tab in dashboard)
-- Error handling edge cases
-- Large file handling
+- Large file handling (>5MB)
+
+---
+
+## Important: Upload Path Fix (2026-02-02 23:55 UTC)
+
+**Problem:** File uploads returned 500 errors from Vercel.
+
+**Root Cause:** Vercel blocks HTTP connections to external services. Our file server was running on HTTP.
+
+**Attempted Fixes (didn't work):**
+- Switching from streaming to buffer approach
+- Hard refresh to get latest deployment
+
+**Actual Fix:**
+1. Added TLS/HTTPS to the file server on port 8080
+2. Updated the Vercel API routes to use HTTPS instead of HTTP
+
+**Key Learning:** When proxying from Vercel to external services (Fly.io, etc.), **always use HTTPS**. Vercel's security policies block outbound HTTP to external hosts.
 
 ---
 

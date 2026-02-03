@@ -8,6 +8,7 @@ import { ChatSkeleton } from "@/components/ChatSkeleton";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { FileProvider } from "@/lib/file-context";
 import { FileBrowser } from "@/components/FileBrowser";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type TabView = 'chat' | 'files';
 
@@ -413,9 +414,9 @@ export default function DashboardPage() {
   // Gateway configured - show chat as main interface
   if (gatewayInfo) {
     return (
-      <div className="h-screen bg-zinc-50 flex flex-col">
+      <div className="h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col transition-colors">
         {/* Persistent nav header */}
-        <nav className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center sticky top-0 z-20">
+        <nav className="border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center sticky top-0 z-20">
           <div className="flex items-center gap-3">
             {/* Mobile: Hamburger button */}
             {sidebarHidden && (
@@ -425,7 +426,7 @@ export default function DashboardPage() {
                   e.preventDefault();
                   setSidebarHidden(false);
                 }}
-                className="p-3 -ml-1 text-zinc-500 hover:text-zinc-900 active:text-zinc-900 hover:bg-zinc-100 active:bg-zinc-100 rounded-lg transition-colors md:hidden touch-manipulation"
+                className="p-3 -ml-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white active:text-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 active:bg-zinc-100 rounded-lg transition-colors md:hidden touch-manipulation"
                 title="Open sidebar"
               >
                 <svg className="w-5 h-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -434,10 +435,11 @@ export default function DashboardPage() {
               </button>
             )}
             <Link href="/" className="text-xl font-bold tracking-tight">
-              <span className="text-purple-600">Auto</span><span className="text-zinc-900">mna</span>
+              <span className="text-purple-600 dark:text-purple-400">Auto</span><span className="text-zinc-900 dark:text-white">mna</span>
             </Link>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
             <UserButton>
               <UserButton.MenuItems>
                 <UserButton.Action
@@ -553,15 +555,15 @@ export default function DashboardPage() {
           
           {/* Main content area with tabs */}
           <FileProvider gatewayUrl={gatewayInfo.gatewayUrl}>
-            <div className="flex-1 flex flex-col bg-white">
+            <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 transition-colors">
               {/* Tab bar */}
-              <div className="flex border-b border-zinc-200 bg-zinc-50/50">
+              <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
                 <button
                   onClick={() => setActiveTab('chat')}
                   className={`px-4 py-3 text-sm font-medium transition-colors ${
                     activeTab === 'chat'
-                      ? 'text-zinc-900 border-b-2 border-purple-600'
-                      : 'text-zinc-500 hover:text-zinc-900'
+                      ? 'text-zinc-900 dark:text-white border-b-2 border-purple-600 dark:border-purple-400'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
                   }`}
                 >
                   💬 Chat
@@ -570,8 +572,8 @@ export default function DashboardPage() {
                   onClick={() => setActiveTab('files')}
                   className={`px-4 py-3 text-sm font-medium transition-colors ${
                     activeTab === 'files'
-                      ? 'text-zinc-900 border-b-2 border-purple-600'
-                      : 'text-zinc-500 hover:text-zinc-900'
+                      ? 'text-zinc-900 dark:text-white border-b-2 border-purple-600 dark:border-purple-400'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
                   }`}
                 >
                   📁 Files

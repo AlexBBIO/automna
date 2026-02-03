@@ -1,21 +1,11 @@
 'use client';
 
 /**
- * FileBrowser - File tree and preview panel
- * 
- * Features:
- * - Directory tree with expand/collapse
- * - File preview (markdown, code, images)
- * - Upload button
- * - Live polling for updates
+ * FileBrowser - File tree and preview panel (Light Theme)
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFiles, getFileIcon, formatFileSize, formatDate, type FileItem } from '@/lib/file-context';
-
-// ============================================
-// MAIN COMPONENT
-// ============================================
 
 interface FileBrowserProps {
   isVisible?: boolean;
@@ -87,7 +77,6 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       }
     };
     
-    // Only load text files (not images/binaries)
     const textExtensions = ['md', 'txt', 'json', 'yaml', 'yml', 'js', 'ts', 'jsx', 'tsx', 'py', 'css', 'html', 'xml', 'toml', 'ini', 'env', 'sh', 'bash'];
     const ext = selectedFile.extension?.toLowerCase() || '';
     
@@ -117,7 +106,6 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       console.error('Upload failed:', err);
     }
     
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -157,7 +145,6 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       await writeFile(selectedFile.path, editContent);
       setFileContent(editContent);
       setIsEditing(false);
-      // Refresh to update modified time
       refresh();
     } catch (err) {
       console.error('Save failed:', err);
@@ -197,30 +184,28 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
     }
   };
   
-  // Breadcrumb path segments
-  // OpenClaw workspace is at /home/node/.openclaw
   const WORKSPACE_ROOT = '/home/node/.openclaw';
   const pathSegments = currentPath.split('/').filter(Boolean);
   const workspaceSegmentCount = WORKSPACE_ROOT.split('/').filter(Boolean).length;
   
   return (
-    <div className="h-full flex flex-col bg-gray-950 text-white">
+    <div className="h-full flex flex-col bg-white text-zinc-900">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 bg-zinc-50">
         <div className="flex items-center gap-2 text-sm">
           {/* Breadcrumbs */}
           <button 
             onClick={() => navigateTo(WORKSPACE_ROOT)}
-            className="text-gray-400 hover:text-white"
+            className="text-zinc-500 hover:text-zinc-900"
           >
             📁 workspace
           </button>
           {pathSegments.slice(workspaceSegmentCount).map((segment, i) => (
             <span key={i} className="flex items-center gap-2">
-              <span className="text-gray-600">/</span>
+              <span className="text-zinc-300">/</span>
               <button
                 onClick={() => navigateTo('/' + pathSegments.slice(0, workspaceSegmentCount + i + 1).join('/'))}
-                className="text-gray-400 hover:text-white"
+                className="text-zinc-500 hover:text-zinc-900"
               >
                 {segment}
               </button>
@@ -232,7 +217,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
+            className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors disabled:opacity-50"
             title="Refresh"
           >
             <svg className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -242,7 +227,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           
           <button
             onClick={() => setShowNewFolderModal(true)}
-            className="flex items-center gap-1 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
+            className="flex items-center gap-1 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm rounded-lg transition-colors"
             title="New Folder"
           >
             <span>📁</span>
@@ -251,7 +236,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           
           <button
             onClick={() => setShowNewFileModal(true)}
-            className="flex items-center gap-1 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
+            className="flex items-center gap-1 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm rounded-lg transition-colors"
             title="New File"
           >
             <span>📄</span>
@@ -260,7 +245,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition-colors"
+            className="flex items-center gap-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
           >
             <span>⬆️</span>
             <span>Upload</span>
@@ -276,7 +261,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       
       {/* Error message */}
       {error && (
-        <div className="px-4 py-2 bg-red-900/50 border-b border-red-800 text-red-200 text-sm">
+        <div className="px-4 py-2 bg-red-50 border-b border-red-200 text-red-700 text-sm">
           {error}
         </div>
       )}
@@ -284,12 +269,12 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* File list */}
-        <div className="w-1/2 border-r border-gray-800 overflow-y-auto">
+        <div className="w-1/2 border-r border-zinc-200 overflow-y-auto">
           {/* Up button */}
           {currentPath !== '/home/node/.openclaw' && (
             <button
               onClick={navigateUp}
-              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-800/50 text-gray-400 border-b border-gray-800/50"
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-zinc-50 text-zinc-500 border-b border-zinc-100"
             >
               <span>📂</span>
               <span>..</span>
@@ -298,7 +283,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           
           {/* Files */}
           {files.length === 0 && !isLoading && (
-            <div className="px-4 py-8 text-center text-gray-500">
+            <div className="px-4 py-8 text-center text-zinc-400">
               Empty directory
             </div>
           )}
@@ -306,15 +291,15 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           {files.map((file) => (
             <div
               key={file.path}
-              className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-800/50 cursor-pointer group ${
-                selectedFile?.path === file.path ? 'bg-purple-900/30' : ''
+              className={`flex items-center gap-3 px-4 py-2 hover:bg-zinc-50 cursor-pointer group ${
+                selectedFile?.path === file.path ? 'bg-purple-50 border-l-2 border-purple-500' : ''
               }`}
               onClick={() => handleFileClick(file)}
             >
               <span className="text-lg">{getFileIcon(file.name, file.type)}</span>
               <div className="flex-1 min-w-0">
-                <div className="truncate text-sm">{file.name}</div>
-                <div className="text-xs text-gray-500">
+                <div className="truncate text-sm text-zinc-800">{file.name}</div>
+                <div className="text-xs text-zinc-400">
                   {file.type === 'directory' ? 'Folder' : formatFileSize(file.size)}
                   {' · '}
                   {formatDate(file.modified)}
@@ -326,7 +311,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
                 {file.type === 'file' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); downloadFile(file.path); }}
-                    className="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+                    className="p-1 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded"
                     title="Download"
                   >
                     ⬇️
@@ -334,7 +319,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(file); }}
-                  className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded"
+                  className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded"
                   title="Delete"
                 >
                   🗑️
@@ -345,9 +330,9 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
         </div>
         
         {/* Preview panel */}
-        <div className="w-1/2 overflow-y-auto bg-gray-900/30">
+        <div className="w-1/2 overflow-y-auto bg-zinc-50">
           {!selectedFile ? (
-            <div className="h-full flex items-center justify-center text-gray-500">
+            <div className="h-full flex items-center justify-center text-zinc-400">
               <div className="text-center">
                 <div className="text-4xl mb-2">📄</div>
                 <div>Select a file to preview</div>
@@ -355,7 +340,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
             </div>
           ) : isLoadingContent ? (
             <div className="h-full flex items-center justify-center">
-              <div className="text-gray-400">Loading...</div>
+              <div className="text-zinc-500">Loading...</div>
             </div>
           ) : (
             <FilePreview 
@@ -376,28 +361,28 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       
       {/* New File Modal */}
       {showNewFileModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 w-96 border border-gray-700">
-            <h3 className="text-lg font-semibold mb-4">Create New File</h3>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 border border-zinc-200 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4 text-zinc-900">Create New File</h3>
             <input
               type="text"
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
               placeholder="filename.md"
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100"
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleCreateFile()}
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => { setShowNewFileModal(false); setNewItemName(''); }}
-                className="px-4 py-2 text-gray-400 hover:text-white"
+                className="px-4 py-2 text-zinc-500 hover:text-zinc-900"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateFile}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
               >
                 Create
               </button>
@@ -408,28 +393,28 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       
       {/* New Folder Modal */}
       {showNewFolderModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 w-96 border border-gray-700">
-            <h3 className="text-lg font-semibold mb-4">Create New Folder</h3>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 border border-zinc-200 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4 text-zinc-900">Create New Folder</h3>
             <input
               type="text"
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
               placeholder="folder-name"
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100"
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => { setShowNewFolderModal(false); setNewItemName(''); }}
-                className="px-4 py-2 text-gray-400 hover:text-white"
+                className="px-4 py-2 text-zinc-500 hover:text-zinc-900"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateFolder}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
               >
                 Create
               </button>
@@ -472,25 +457,23 @@ function FilePreview({
 }: FilePreviewProps) {
   const ext = file.extension?.toLowerCase() || '';
   
-  // Check if file is editable
   const editableExtensions = ['md', 'txt', 'json', 'yaml', 'yml', 'js', 'ts', 'jsx', 'tsx', 'py', 'css', 'html', 'xml', 'toml', 'ini', 'env', 'sh', 'bash'];
   const isEditable = editableExtensions.includes(ext) || !ext;
   
-  // Image preview
   const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
   if (imageExtensions.includes(ext)) {
     return (
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-medium">{file.name}</h3>
+          <h3 className="font-medium text-zinc-900">{file.name}</h3>
           <button
             onClick={onDownload}
-            className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-sm rounded-lg"
+            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg"
           >
             ⬇️ Download
           </button>
         </div>
-        <div className="text-center text-gray-500">
+        <div className="text-center text-zinc-400">
           <div className="text-6xl mb-4">🖼️</div>
           <div>Image preview not yet implemented</div>
           <div className="text-sm mt-2">Click download to view</div>
@@ -499,30 +482,29 @@ function FilePreview({
     );
   }
   
-  // Text/code preview or edit
   if (content !== null) {
     const isMarkdown = ext === 'md';
     const isCode = ['js', 'ts', 'jsx', 'tsx', 'py', 'json', 'yaml', 'yml', 'css', 'html', 'xml', 'sh', 'bash'].includes(ext);
     
     return (
       <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800">
-          <h3 className="font-medium text-sm">{file.name}</h3>
+        <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-200 bg-white">
+          <h3 className="font-medium text-sm text-zinc-900">{file.name}</h3>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">{formatFileSize(file.size)}</span>
+            <span className="text-xs text-zinc-400">{formatFileSize(file.size)}</span>
             {isEditing ? (
               <>
                 <button
                   onClick={onCancelEdit}
                   disabled={isSaving}
-                  className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded disabled:opacity-50"
+                  className="px-2 py-1 text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={onSave}
                   disabled={isSaving}
-                  className="px-2 py-1 text-xs bg-green-600 hover:bg-green-500 rounded disabled:opacity-50"
+                  className="px-2 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded disabled:opacity-50"
                 >
                   {isSaving ? 'Saving...' : '💾 Save'}
                 </button>
@@ -532,14 +514,14 @@ function FilePreview({
                 {isEditable && (
                   <button
                     onClick={onStartEdit}
-                    className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 rounded"
+                    className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
                   >
                     ✏️ Edit
                   </button>
                 )}
                 <button
                   onClick={onDownload}
-                  className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded"
+                  className="px-2 py-1 text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded"
                 >
                   ⬇️
                 </button>
@@ -552,15 +534,15 @@ function FilePreview({
             <textarea
               value={editContent}
               onChange={(e) => onEditChange(e.target.value)}
-              className="w-full h-full p-4 bg-gray-950 text-gray-300 font-mono text-sm resize-none focus:outline-none"
+              className="w-full h-full p-4 bg-zinc-900 text-zinc-100 font-mono text-sm resize-none focus:outline-none"
               spellCheck={false}
             />
           ) : isMarkdown ? (
-            <div className="p-4 prose prose-invert prose-sm max-w-none">
+            <div className="p-4 prose prose-sm max-w-none">
               <MarkdownPreview content={content} />
             </div>
           ) : (
-            <pre className={`p-4 text-sm font-mono whitespace-pre-wrap break-words ${isCode ? 'text-green-300' : 'text-gray-300'}`}>
+            <pre className={`p-4 text-sm font-mono whitespace-pre-wrap break-words ${isCode ? 'bg-zinc-900 text-emerald-400' : 'text-zinc-700'}`}>
               {content}
             </pre>
           )}
@@ -569,19 +551,18 @@ function FilePreview({
     );
   }
   
-  // Binary/unknown file
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-medium">{file.name}</h3>
+        <h3 className="font-medium text-zinc-900">{file.name}</h3>
         <button
           onClick={onDownload}
-          className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-sm rounded-lg"
+          className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg"
         >
           ⬇️ Download
         </button>
       </div>
-      <div className="text-center text-gray-500 py-8">
+      <div className="text-center text-zinc-400 py-8">
         <div className="text-6xl mb-4">{getFileIcon(file.name, 'file')}</div>
         <div>{file.extension?.toUpperCase() || 'Unknown'} file</div>
         <div className="text-sm mt-1">{formatFileSize(file.size)}</div>
@@ -595,29 +576,23 @@ function FilePreview({
 // ============================================
 
 function MarkdownPreview({ content }: { content: string }) {
-  // Very basic markdown rendering - just handle common patterns
-  // For production, use react-markdown or similar
-  
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
   
   let inCodeBlock = false;
   let codeBlockContent: string[] = [];
-  let codeBlockLang = '';
   
   lines.forEach((line, i) => {
-    // Code blocks
     if (line.startsWith('```')) {
       if (inCodeBlock) {
         elements.push(
-          <pre key={i} className="bg-gray-800 p-3 rounded-lg overflow-x-auto my-2">
-            <code className="text-sm text-green-300">{codeBlockContent.join('\n')}</code>
+          <pre key={i} className="bg-zinc-900 p-3 rounded-lg overflow-x-auto my-2">
+            <code className="text-sm text-emerald-400">{codeBlockContent.join('\n')}</code>
           </pre>
         );
         codeBlockContent = [];
         inCodeBlock = false;
       } else {
-        codeBlockLang = line.slice(3);
         inCodeBlock = true;
       }
       return;
@@ -628,40 +603,36 @@ function MarkdownPreview({ content }: { content: string }) {
       return;
     }
     
-    // Headers
     if (line.startsWith('### ')) {
-      elements.push(<h3 key={i} className="text-lg font-semibold mt-4 mb-2">{line.slice(4)}</h3>);
+      elements.push(<h3 key={i} className="text-lg font-semibold mt-4 mb-2 text-zinc-900">{line.slice(4)}</h3>);
       return;
     }
     if (line.startsWith('## ')) {
-      elements.push(<h2 key={i} className="text-xl font-semibold mt-4 mb-2">{line.slice(3)}</h2>);
+      elements.push(<h2 key={i} className="text-xl font-semibold mt-4 mb-2 text-zinc-900">{line.slice(3)}</h2>);
       return;
     }
     if (line.startsWith('# ')) {
-      elements.push(<h1 key={i} className="text-2xl font-bold mt-4 mb-2">{line.slice(2)}</h1>);
+      elements.push(<h1 key={i} className="text-2xl font-bold mt-4 mb-2 text-zinc-900">{line.slice(2)}</h1>);
       return;
     }
     
-    // Lists
     if (line.startsWith('- ') || line.startsWith('* ')) {
-      elements.push(<li key={i} className="ml-4">{line.slice(2)}</li>);
+      elements.push(<li key={i} className="ml-4 text-zinc-700">{line.slice(2)}</li>);
       return;
     }
     
-    // Empty lines
     if (!line.trim()) {
       elements.push(<div key={i} className="h-2" />);
       return;
     }
     
-    // Regular paragraphs with basic formatting
     let formatted = line
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/`(.+?)`/g, '<code class="bg-gray-800 px-1 rounded text-purple-300">$1</code>');
+      .replace(/`(.+?)`/g, '<code class="bg-zinc-200 px-1 rounded text-purple-700">$1</code>');
     
     elements.push(
-      <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: formatted }} />
+      <p key={i} className="my-1 text-zinc-700" dangerouslySetInnerHTML={{ __html: formatted }} />
     );
   });
   

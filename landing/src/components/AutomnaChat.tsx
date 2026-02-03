@@ -1,16 +1,7 @@
 'use client';
 
 /**
- * AutomnaChat - Polished Chat Interface
- * 
- * UI Improvements (2026-02-01):
- * - Assistant avatar with Automna branding
- * - Visible timestamps (subtle)
- * - Message actions on hover (Copy, Retry)
- * - Fade-in animations for messages
- * - Improved empty state with suggestions
- * - Larger, more inviting input area
- * - Better colors and spacing
+ * AutomnaChat - Polished Chat Interface (Light Theme)
  */
 
 import { useClawdbotRuntime } from '@/lib/clawdbot-runtime';
@@ -32,7 +23,7 @@ interface AutomnaChatProps {
 // Assistant avatar component
 function AssistantAvatar() {
   return (
-    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 shadow-lg">
+    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md">
       <span className="text-white text-sm font-bold">A</span>
     </div>
   );
@@ -43,18 +34,18 @@ function ChatSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
       <div className="flex justify-end">
-        <div className="bg-purple-900/20 rounded-2xl h-12 w-52" />
+        <div className="bg-purple-100 rounded-2xl h-12 w-52" />
       </div>
       <div className="flex gap-3 items-start">
-        <div className="w-8 h-8 rounded-full bg-gray-800" />
-        <div className="bg-gray-800/50 rounded-2xl h-20 w-72" />
+        <div className="w-8 h-8 rounded-full bg-zinc-200" />
+        <div className="bg-zinc-100 rounded-2xl h-20 w-72" />
       </div>
       <div className="flex justify-end">
-        <div className="bg-purple-900/20 rounded-2xl h-12 w-36" />
+        <div className="bg-purple-100 rounded-2xl h-12 w-36" />
       </div>
       <div className="flex gap-3 items-start">
-        <div className="w-8 h-8 rounded-full bg-gray-800" />
-        <div className="bg-gray-800/50 rounded-2xl h-28 w-80" />
+        <div className="w-8 h-8 rounded-full bg-zinc-200" />
+        <div className="bg-zinc-100 rounded-2xl h-28 w-80" />
       </div>
     </div>
   );
@@ -65,7 +56,7 @@ function TypingIndicator() {
   return (
     <div className="flex gap-3 items-start animate-fadeIn">
       <AssistantAvatar />
-      <div className="bg-gray-800/80 rounded-2xl px-4 py-3 shadow-sm">
+      <div className="bg-zinc-100 rounded-2xl px-4 py-3 shadow-sm border border-zinc-200">
         <div className="flex gap-1.5">
           <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
           <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -82,7 +73,7 @@ function ConnectionStatus({ phase, error }: { phase: string; error: string | nul
     return (
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-red-500" />
-        <span className="text-sm text-red-400">{error || 'Connection error'}</span>
+        <span className="text-sm text-red-600">{error || 'Connection error'}</span>
       </div>
     );
   }
@@ -90,8 +81,8 @@ function ConnectionStatus({ phase, error }: { phase: string; error: string | nul
   if (phase === 'connecting') {
     return (
       <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-        <span className="text-sm text-yellow-400">Connecting...</span>
+        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+        <span className="text-sm text-amber-600">Connecting...</span>
       </div>
     );
   }
@@ -100,15 +91,15 @@ function ConnectionStatus({ phase, error }: { phase: string; error: string | nul
     return (
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-        <span className="text-sm text-blue-400">Loading...</span>
+        <span className="text-sm text-blue-600">Loading...</span>
       </div>
     );
   }
   
   return (
     <div className="flex items-center gap-2">
-      <div className="w-2 h-2 rounded-full bg-green-500" />
-      <span className="text-sm text-gray-500">Online</span>
+      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+      <span className="text-sm text-zinc-500">Online</span>
     </div>
   );
 }
@@ -129,11 +120,11 @@ function MessageActions({
     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
       <button
         onClick={onCopy}
-        className="p-1 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 rounded transition-colors"
+        className="p-1 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded transition-colors"
         title="Copy message"
       >
         {copied ? (
-          <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
           </svg>
         ) : (
@@ -145,7 +136,7 @@ function MessageActions({
       {showRetry && onRetry && (
         <button
           onClick={onRetry}
-          className="p-1 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 rounded transition-colors"
+          className="p-1 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded transition-colors"
           title="Regenerate response"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -168,11 +159,11 @@ function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) =
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-4 animate-fadeIn">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mb-6 shadow-lg">
+      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center mb-6 shadow-lg">
         <span className="text-3xl">✨</span>
       </div>
-      <h2 className="text-xl font-semibold text-white mb-2">Hey there!</h2>
-      <p className="text-gray-400 mb-8 max-w-md">
+      <h2 className="text-xl font-semibold text-zinc-900 mb-2">Hey there!</h2>
+      <p className="text-zinc-500 mb-8 max-w-md">
         I'm your AI assistant. Ask me anything or try one of these:
       </p>
       <div className="grid grid-cols-2 gap-3 max-w-md w-full">
@@ -180,10 +171,10 @@ function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) =
           <button
             key={i}
             onClick={() => onSuggestionClick(s.prompt)}
-            className="flex items-center gap-3 p-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-purple-500/50 rounded-xl text-left transition-all group"
+            className="flex items-center gap-3 p-4 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-purple-300 rounded-xl text-left transition-all group shadow-sm"
           >
             <span className="text-2xl">{s.icon}</span>
-            <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{s.text}</span>
+            <span className="text-sm text-zinc-600 group-hover:text-zinc-900 transition-colors">{s.text}</span>
           </button>
         ))}
       </div>
@@ -260,16 +251,16 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     if (pendingFiles.length > 0) {
       setIsUploading(true);
       try {
-        const uploadedPaths: string[] = [];
+        const uploadedPaths: { path: string; isImage: boolean }[] = [];
         for (const file of pendingFiles) {
           const path = await uploadFileToWorkspace(file);
-          uploadedPaths.push(path);
+          const isImage = file.type.startsWith('image/');
+          uploadedPaths.push({ path, isImage });
         }
         
-        // Add file references to the message
-        const fileRefs = uploadedPaths.map(p => {
-          const filename = p.split('/').pop();
-          return `[Attached: ${filename} at ${p}]`;
+        // Use [[image:/path]] or [[file:/path]] syntax for inline rendering
+        const fileRefs = uploadedPaths.map(({ path, isImage }) => {
+          return isImage ? `[[image:${path}]]` : `[[file:${path}]]`;
         }).join('\n');
         
         messageText = messageText 
@@ -294,7 +285,6 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     });
     setInput('');
     
-    // Reset textarea height
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
     }
@@ -305,7 +295,6 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     if (files.length > 0) {
       setPendingFiles(prev => [...prev, ...files]);
     }
-    // Reset input so same file can be selected again
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -338,21 +327,20 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-950 text-white">
+    <div className="flex flex-col h-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white transition-colors">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800/50 bg-gray-900/30">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
         <ConnectionStatus phase={loadingPhase} error={error} />
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium uppercase tracking-wide">
             {sessionKey === 'main' ? 'General' : sessionKey}
           </span>
         </div>
       </div>
       
-      {/* Clear confirmation modal */}
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        {/* Empty state - show immediately, even while loading */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-zinc-50/30 dark:bg-zinc-950/30">
+        {/* Empty state */}
         {messages.length === 0 && (
           <EmptyState onSuggestionClick={handleSuggestionClick} />
         )}
@@ -375,7 +363,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
                     className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 shadow-sm ${
                       message.role === 'user'
                         ? 'bg-purple-600 text-white'
-                        : 'bg-gray-800/80 text-gray-100'
+                        : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700'
                     }`}
                   >
                     {message.content.map((part, i) => {
@@ -395,7 +383,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
                   {/* Timestamp and actions */}
                   <div className="flex items-center gap-2 mt-1 px-1">
                     <span className={`text-xs ${
-                      message.role === 'user' ? 'text-gray-500' : 'text-gray-600'
+                      message.role === 'user' ? 'text-zinc-400' : 'text-zinc-400'
                     }`}>
                       {formatTime(message.createdAt)}
                     </span>
@@ -420,7 +408,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
       </div>
 
       {/* Input area */}
-      <div className="p-4 border-t border-gray-800/50 bg-gray-900/50">
+      <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 transition-colors">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
           {/* Pending files preview */}
           {pendingFiles.length > 0 && (
@@ -428,16 +416,16 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
               {pendingFiles.map((file, i) => (
                 <div 
                   key={i}
-                  className="flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-1.5 text-sm"
+                  className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg px-3 py-1.5 text-sm border border-zinc-200 dark:border-zinc-700"
                 >
-                  <span className="text-gray-400">
+                  <span className="text-zinc-500 dark:text-zinc-400">
                     {file.type.startsWith('image/') ? '🖼️' : '📄'}
                   </span>
-                  <span className="text-gray-300 max-w-[150px] truncate">{file.name}</span>
+                  <span className="text-zinc-700 dark:text-zinc-300 max-w-[150px] truncate">{file.name}</span>
                   <button
                     type="button"
                     onClick={() => removePendingFile(i)}
-                    className="text-gray-500 hover:text-red-400 ml-1"
+                    className="text-zinc-400 hover:text-red-500 ml-1"
                   >
                     ✕
                   </button>
@@ -446,15 +434,15 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
             </div>
           )}
           
-          <div className={`flex items-end gap-3 bg-gray-800/80 rounded-2xl p-3 border-2 transition-colors ${
-            input.trim() || pendingFiles.length > 0 ? 'border-purple-500/50' : 'border-transparent'
+          <div className={`flex items-end gap-3 bg-zinc-100 dark:bg-zinc-800 rounded-2xl p-3 border-2 transition-colors ${
+            input.trim() || pendingFiles.length > 0 ? 'border-purple-300 dark:border-purple-500/50' : 'border-transparent'
           }`}>
             {/* File upload button */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isRunning || isUploading}
-              className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-colors flex-shrink-0 disabled:opacity-50"
+              className="p-3 text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl transition-colors flex-shrink-0 disabled:opacity-50"
               title="Attach file"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -477,7 +465,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
               onKeyDown={handleKeyDown}
               placeholder={pendingFiles.length > 0 ? "Add a message (optional)..." : "Ask anything..."}
               rows={1}
-              className="flex-1 bg-transparent text-white placeholder-gray-500 focus:outline-none resize-none px-1 py-2 text-base min-h-[44px] max-h-[200px] leading-relaxed"
+              className="flex-1 bg-transparent text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none resize-none px-1 py-2 text-base min-h-[44px] max-h-[200px] leading-relaxed"
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -488,7 +476,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
               <button
                 type="button"
                 onClick={cancel}
-                className="p-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl transition-colors flex-shrink-0"
+                className="p-3 bg-red-100 dark:bg-red-500/20 hover:bg-red-200 dark:hover:bg-red-500/30 text-red-600 dark:text-red-400 rounded-xl transition-colors flex-shrink-0"
                 title="Stop (Esc)"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -501,8 +489,8 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
                 disabled={(!input.trim() && pendingFiles.length === 0) || isUploading}
                 className={`p-3 rounded-xl transition-all flex-shrink-0 ${
                   (input.trim() || pendingFiles.length > 0) && !isUploading
-                    ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/25'
-                    : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-200 dark:shadow-purple-500/25'
+                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-400 dark:text-zinc-500 cursor-not-allowed'
                 }`}
                 title="Send (Enter)"
               >
@@ -519,7 +507,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
               </button>
             )}
           </div>
-          <p className="text-xs text-gray-600 mt-2 text-center">
+          <p className="text-xs text-zinc-400 mt-2 text-center">
             {isUploading ? 'Uploading files...' : isRunning ? 'Press Esc to stop' : 'Enter to send, Shift+Enter for new line'}
           </p>
         </form>

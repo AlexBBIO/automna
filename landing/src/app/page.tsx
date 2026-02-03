@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 // Conversation data for the animated demo
 const conversationSteps = [
@@ -122,22 +123,23 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900 antialiased">
+    <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white antialiased transition-colors">
       {/* Subtle gradient background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-50/50 via-transparent to-violet-50/30 pointer-events-none" />
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-50/50 via-transparent to-violet-50/30 dark:from-purple-950/20 dark:via-transparent dark:to-indigo-950/10 pointer-events-none" />
       
       {/* Nav */}
       <nav className="relative z-10 container mx-auto px-6 py-5 flex justify-between items-center">
         <div className="text-xl font-semibold tracking-tight">
-          <span className="text-purple-600">Auto</span>mna
+          <span className="text-purple-600 dark:text-purple-400">Auto</span>mna
         </div>
-        <div className="flex items-center gap-6">
-          <button onClick={scrollToDemo} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors hidden sm:block">
+        <div className="flex items-center gap-4">
+          <button onClick={scrollToDemo} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors hidden sm:block">
             How it works
           </button>
-          <Link href="/sign-in" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
+          <Link href="/sign-in" className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
             Sign in
           </Link>
+          <ThemeToggle />
         </div>
       </nav>
 
@@ -147,25 +149,25 @@ export default function Landing() {
           <div className={`max-w-3xl mx-auto text-center transform transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             
             {/* Trust badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 border border-purple-200 text-purple-700 text-xs font-medium mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-medium mb-8">
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-600"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-600 dark:bg-purple-500"></span>
               </span>
               {waitlistCount > 0 ? `${waitlistCount.toLocaleString()} on the waitlist` : 'Early access now open'}
             </div>
 
             {/* Headline */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-5 leading-[1.1] tracking-tight text-zinc-900">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-5 leading-[1.1] tracking-tight text-zinc-900 dark:text-white">
               Your AI employee.
               <br />
-              <span className="bg-gradient-to-r from-purple-600 via-violet-600 to-purple-700 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-purple-600 via-violet-600 to-purple-700 dark:from-purple-400 dark:via-violet-400 dark:to-purple-500 bg-clip-text text-transparent">
                 Always on. Always ready.
               </span>
             </h1>
             
             {/* Subheadline */}
-            <p className="text-lg md:text-xl text-zinc-600 mb-8 max-w-xl mx-auto leading-relaxed">
+            <p className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 mb-8 max-w-xl mx-auto leading-relaxed">
               Delegate real work to an AI that browses, emails, codes, and executes—autonomously 
               or with your approval. Running 24/7 in the cloud.
             </p>

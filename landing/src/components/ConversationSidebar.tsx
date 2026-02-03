@@ -52,11 +52,11 @@ export function ConversationSidebar({
   // Collapsed view - just show icons
   if (isCollapsed) {
     return (
-      <div className="w-14 h-full bg-gray-900 border-r border-gray-800 flex flex-col">
+      <div className="w-14 h-full bg-white border-r border-zinc-200 flex flex-col">
         {/* Expand button */}
         <button
           onClick={onToggleCollapse}
-          className="p-3 border-b border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+          className="p-3 border-b border-zinc-200 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 transition-colors"
           title="Expand sidebar"
         >
           <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -72,8 +72,8 @@ export function ConversationSidebar({
               onClick={() => onConversationChange(conv.key)}
               className={`w-full p-3 flex items-center justify-center transition-colors ${
                 currentConversation === conv.key
-                  ? 'bg-purple-900/50 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900'
               }`}
               title={conv.name}
             >
@@ -83,13 +83,13 @@ export function ConversationSidebar({
         </div>
 
         {/* New conversation button */}
-        <div className="p-2 border-t border-gray-800">
+        <div className="p-2 border-t border-zinc-200">
           <button
             onClick={() => {
               onToggleCollapse();
               setTimeout(() => setIsCreating(true), 100);
             }}
-            className="w-full p-2 flex items-center justify-center text-gray-400 hover:bg-gray-800 hover:text-gray-200 rounded-lg transition-colors"
+            className="w-full p-2 flex items-center justify-center text-zinc-400 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg transition-colors"
             title="New Conversation"
           >
             <span className="text-lg">+</span>
@@ -101,13 +101,13 @@ export function ConversationSidebar({
 
   // Expanded view
   return (
-    <div className="w-56 h-full bg-gray-900 border-r border-gray-800 flex flex-col">
+    <div className="w-56 h-full bg-white border-r border-zinc-200 flex flex-col">
       {/* Header with collapse button */}
-      <div className="p-3 border-b border-gray-800 flex items-center justify-between">
+      <div className="p-3 border-b border-zinc-200 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-gray-200 text-sm">Conversations</h2>
+          <h2 className="font-semibold text-zinc-700 text-sm">Conversations</h2>
           {isLoading && (
-            <svg className="w-3 h-3 text-gray-500 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 text-zinc-400 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
             </svg>
@@ -117,7 +117,7 @@ export function ConversationSidebar({
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="text-gray-400 hover:text-white transition-colors p-1"
+              className="text-zinc-400 hover:text-zinc-700 transition-colors p-1"
               title="Refresh conversations"
               disabled={isLoading}
             >
@@ -128,7 +128,7 @@ export function ConversationSidebar({
           )}
           <button
             onClick={onToggleCollapse}
-            className="text-gray-400 hover:text-white transition-colors p-1"
+            className="text-zinc-400 hover:text-zinc-700 transition-colors p-1"
             title="Collapse sidebar"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -146,8 +146,8 @@ export function ConversationSidebar({
             onClick={() => onConversationChange(conv.key)}
             className={`w-full px-3 py-2 text-left flex items-center gap-2 transition-colors ${
               currentConversation === conv.key
-                ? 'bg-purple-900/50 text-white'
-                : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                ? 'bg-purple-100 text-purple-700'
+                : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
             }`}
           >
             <span className="text-base">{conv.icon}</span>
@@ -157,7 +157,7 @@ export function ConversationSidebar({
       </div>
 
       {/* Create new conversation */}
-      <div className="p-2 border-t border-gray-800">
+      <div className="p-2 border-t border-zinc-200">
         {isCreating ? (
           <div className="flex flex-col gap-2">
             <input
@@ -166,14 +166,14 @@ export function ConversationSidebar({
               onChange={(e) => setNewConversationName(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Conversation name..."
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100"
               autoFocus
             />
             <div className="flex gap-2">
               <button
                 onClick={handleCreate}
                 disabled={!newConversationName.trim()}
-                className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
+                className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-zinc-200 disabled:cursor-not-allowed text-white disabled:text-zinc-400 text-sm rounded-lg transition-colors"
               >
                 Create
               </button>
@@ -182,7 +182,7 @@ export function ConversationSidebar({
                   setIsCreating(false);
                   setNewConversationName('');
                 }}
-                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded-lg transition-colors"
+                className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 text-sm rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -191,7 +191,7 @@ export function ConversationSidebar({
         ) : (
           <button
             onClick={() => setIsCreating(true)}
-            className="w-full px-3 py-2 text-left flex items-center gap-2 text-gray-400 hover:bg-gray-800 hover:text-gray-200 rounded-lg transition-colors"
+            className="w-full px-3 py-2 text-left flex items-center gap-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg transition-colors"
           >
             <span className="text-lg">+</span>
             <span className="text-sm">New Conversation</span>
