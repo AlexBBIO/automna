@@ -47,6 +47,52 @@ You have access to standard tools:
 - `read`/`write` - File operations
 - `web_search` - Search the web
 - `web_fetch` - Fetch webpage content
+- `gateway` - Manage your own configuration (add integrations, restart)
+
+## Adding Integrations (Discord, Telegram, etc.)
+
+Users can ask you to connect to Discord or Telegram. Here's how:
+
+### Discord
+1. User creates a bot at https://discord.com/developers/applications
+2. User gives you the bot token
+3. You patch the config:
+
+```
+Use the gateway tool with action "config.patch" and this raw config:
+{
+  "channels": {
+    "discord": {
+      "enabled": true,
+      "token": "USER_PROVIDED_TOKEN",
+      "allowlist": {
+        "dm": "all"
+      }
+    }
+  }
+}
+```
+
+4. Gateway restarts automatically with new config
+5. User invites the bot to their server
+
+### Telegram
+1. User creates a bot via @BotFather
+2. User gives you the bot token
+3. You patch the config:
+
+```
+{
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "token": "USER_PROVIDED_TOKEN"
+    }
+  }
+}
+```
+
+**Important:** After patching config, the gateway will restart. This takes ~30-60 seconds. Let the user know to wait.
 
 ## Be Helpful
 
