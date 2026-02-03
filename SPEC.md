@@ -33,7 +33,7 @@
 |-----------|--------|-------|
 | Per-user volumes | ✅ Working | 1GB encrypted volume per user |
 | OpenClaw migration | ✅ Done | Migrated from Clawdbot to OpenClaw |
-| **Files API** | ✅ Implemented | Uses Fly machines exec API |
+| **Files API** | ✅ Working | Caddy reverse proxy → internal file server |
 | **Agent Config** | ✅ Working | Workspace injection, memory enabled |
 | File Browser UI | 🔧 Testing | UI exists, needs testing |
 
@@ -47,6 +47,37 @@
 | `ghcr.io/phioranex/openclaw-docker` | ❌ Deprecated | Use custom Automna image |
 
 ### 📝 Recent Changes (2026-02-03)
+
+**🔀 Caddy Reverse Proxy Architecture (04:32 UTC):**
+
+Implemented single-port architecture with Caddy as reverse proxy:
+
+1. **Architecture**
+   ```
+   Internet → HTTPS :443 → Fly.io
+                              ↓
+                    Caddy (port 18789)
+                         ↓         ↓
+              /files/*   →   File Server (:8080)
+              /*         →   OpenClaw Gateway (:18788)
+   ```
+
+2. **Why This Matters**
+   - Single entry point (industry standard)
+   - No exposed internal ports
+   - Supports large file uploads (100MB)
+   - Same security model as AWS/GCP/mainstream services
+
+3. **Key Files**
+   - `docker/Caddyfile` - Routing configuration
+   - `docker/entrypoint.sh` - Starts Caddy + services
+   - Uses `handle_path` to strip `/files` prefix
+
+4. **Docker Image Updated**
+   - Includes Caddy (~40MB addition)
+   - Image: `registry.fly.io/automna-openclaw-image:latest`
+
+See [`docs/REVERSE-PROXY-ARCHITECTURE.md`](docs/REVERSE-PROXY-ARCHITECTURE.md) for full details.
 
 **💓 Heartbeat System (04:10 UTC):**
 

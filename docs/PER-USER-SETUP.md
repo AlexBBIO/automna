@@ -1,6 +1,6 @@
 # Per-User Instance Setup
 
-**Last Updated:** 2026-02-02 22:30 UTC  
+**Last Updated:** 2026-02-03 04:32 UTC  
 **Status:** Production (MVP)
 
 This document covers everything needed to provision, configure, and troubleshoot per-user OpenClaw instances on Fly.io.
@@ -27,26 +27,43 @@ User signs up → Dashboard visit → Provision API → Fly app created → User
 
 ## Docker Image (Custom Automna Build)
 
-We use a **custom Docker image** that extends the community OpenClaw image with a session key fixer.
+We use a **custom Docker image** that extends the community OpenClaw image with:
+- Caddy reverse proxy (single entry point)
+- File server for uploads
+- Session key fixer
+- Default workspace files (AGENTS.md, HEARTBEAT.md, etc.)
 
 | Component | Value |
 |-----------|-------|
 | **Image** | `registry.fly.io/automna-openclaw-image:latest` |
 | Base image | `ghcr.io/phioranex/openclaw-docker:latest` |
-| Source | `docker/Dockerfile` + `docker/entrypoint.sh` |
+| Source | `docker/Dockerfile` + `docker/entrypoint.sh` + `docker/Caddyfile` |
 | npm package | `openclaw@2026.1.30` (from base) |
 | Config directory | `/home/node/.openclaw` (runs as `node` user) |
-| Gateway port | 18789 |
-| Default model | Claude (via ANTHROPIC_API_KEY) |
+| External port | 18789 (Caddy) |
+| Internal ports | 18788 (Gateway), 8080 (File Server) |
+| Default model | anthropic/claude-opus-4-5 |
+
+### Architecture
+
+```
+Internet → HTTPS :443 → Fly.io
+                           ↓
+                 Caddy (port 18789)
+                      ↓         ↓
+           /files/*   →   File Server (:8080)
+           /*         →   OpenClaw Gateway (:18788)
+```
+
+See [`REVERSE-PROXY-ARCHITECTURE.md`](REVERSE-PROXY-ARCHITECTURE.md) for full details.
 
 ### Why Custom Image?
 
-OpenClaw has a bug where sessions are stored with key `main` but looked up with canonical key `agent:main:main`. Our custom image includes a background fixer that:
-
-1. Runs every 3 seconds
-2. Detects non-canonical session keys
-3. Converts them to canonical form
-4. Works for all conversations (main, work, etc.)
+1. **Single-port architecture** - Caddy proxies all traffic, no exposed internal ports
+2. **File server** - Handles large uploads (up to 100MB)
+3. **Session key fixer** - Workaround for OpenClaw bug
+4. **Default workspace** - AGENTS.md, HEARTBEAT.md pre-configured
+5. **Heartbeat enabled** - 30-minute check-ins by default
 
 ### Rebuilding the Image
 
