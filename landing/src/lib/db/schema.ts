@@ -27,6 +27,7 @@ export const machines = sqliteTable("machines", {
   gatewayToken: text("gateway_token"), // Per-user gateway auth token
   browserbaseContextId: text("browserbase_context_id"), // Browserbase persistent context for this user
   agentmailInboxId: text("agentmail_inbox_id"), // Agentmail inbox for this user (e.g., automna-abc123@agentmail.to)
+  plan: text("plan").default("starter"), // User's subscription plan: free, starter, pro, business
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   lastActiveAt: integer("last_active_at", { mode: "timestamp" }),
@@ -61,6 +62,83 @@ export const secrets = sqliteTable("secrets", {
   userNameUnique: index("idx_secrets_user_name").on(table.userId, table.name),
 }));
 
+// ============================================
+// LLM USAGE TRACKING
+// ============================================
+
+// LLM usage logs - track every API call
+export const llmUsage = sqliteTable("llm_usage", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull(),
+  timestamp: integer("timestamp").notNull().$defaultFn(() => Math.floor(Date.now() / 1000)),
+  
+  // Request details
+  provider: text("provider").notNull(), // 'anthropic' | 'gemini' | 'openai'
+  model: text("model").notNull(),       // 'claude-opus-4-5' | 'claude-sonnet-4' | etc.
+  endpoint: text("endpoint").notNull(), // 'chat' | 'embed'
+  
+  // Token counts
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  
+  // Cost in microdollars (1 USD = 1,000,000 microdollars)
+  costMicrodollars: integer("cost_microdollars").notNull().default(0),
+  
+  // Request metadata
+  sessionKey: text("session_key"),      // Which conversation
+  requestId: text("request_id"),        // For debugging
+  durationMs: integer("duration_ms"),   // How long the request took
+  
+  // Error tracking
+  error: text("error"),                 // Error message if failed
+}, (table) => ({
+  userTimestampIdx: index("idx_llm_usage_user_timestamp").on(table.userId, table.timestamp),
+}));
+
+// Rate limit tracking - per-minute counters
+export const llmRateLimits = sqliteTable("llm_rate_limits", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().unique(),
+  
+  // Current minute tracking (for RPM limits)
+  currentMinute: integer("current_minute").notNull().default(0),
+  requestsThisMinute: integer("requests_this_minute").notNull().default(0),
+  tokensThisMinute: integer("tokens_this_minute").notNull().default(0),
+  
+  // Last reset timestamp
+  lastReset: integer("last_reset").notNull().$defaultFn(() => Math.floor(Date.now() / 1000)),
+});
+
+// Plan limits (stored in code for simplicity)
+export const PLAN_LIMITS = {
+  free: {
+    monthlyTokens: 100_000,        // 100K tokens
+    monthlyCostCents: 100,         // $1 cap
+    requestsPerMinute: 5,
+    tokensPerMinute: 10_000,
+  },
+  starter: {
+    monthlyTokens: 2_000_000,      // 2M tokens
+    monthlyCostCents: 2000,        // $20 cap
+    requestsPerMinute: 20,
+    tokensPerMinute: 50_000,
+  },
+  pro: {
+    monthlyTokens: 10_000_000,     // 10M tokens
+    monthlyCostCents: 10000,       // $100 cap
+    requestsPerMinute: 60,
+    tokensPerMinute: 150_000,
+  },
+  business: {
+    monthlyTokens: 50_000_000,     // 50M tokens
+    monthlyCostCents: 50000,       // $500 cap
+    requestsPerMinute: 120,
+    tokensPerMinute: 300_000,
+  },
+} as const;
+
+export type PlanType = keyof typeof PLAN_LIMITS;
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -70,3 +148,6 @@ export type MachineEvent = typeof machineEvents.$inferSelect;
 export type NewMachineEvent = typeof machineEvents.$inferInsert;
 export type Secret = typeof secrets.$inferSelect;
 export type NewSecret = typeof secrets.$inferInsert;
+export type LlmUsage = typeof llmUsage.$inferSelect;
+export type NewLlmUsage = typeof llmUsage.$inferInsert;
+export type LlmRateLimit = typeof llmRateLimits.$inferSelect;
