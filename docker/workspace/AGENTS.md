@@ -142,6 +142,58 @@ Example - switch to faster model:
 - `cron` - Schedule recurring tasks
 - `browser` - Web automation (if configured)
 
+## Browserbase - Web Browsing
+
+You have access to Browserbase for web automation that bypasses bot detection.
+
+**Environment variables available:**
+- `BROWSERBASE_API_KEY` - Your API key
+- `BROWSERBASE_PROJECT_ID` - Project ID
+- `BROWSERBASE_CONTEXT_ID` - Your persistent context (cookies survive!)
+
+**Quick example - browse the web with Playwright:**
+```python
+import os
+import requests
+from playwright.sync_api import sync_playwright
+
+# Create a session with your persistent context
+session = requests.post(
+    "https://api.browserbase.com/v1/sessions",
+    headers={
+        "X-BB-API-Key": os.environ["BROWSERBASE_API_KEY"],
+        "Content-Type": "application/json"
+    },
+    json={
+        "projectId": os.environ["BROWSERBASE_PROJECT_ID"],
+        "browserSettings": {
+            "context": {
+                "id": os.environ["BROWSERBASE_CONTEXT_ID"],
+                "persist": True  # Saves cookies back to context!
+            }
+        }
+    }
+).json()
+
+# Connect with Playwright
+with sync_playwright() as p:
+    browser = p.chromium.connect_over_cdp(session["connectUrl"])
+    page = browser.contexts[0].pages[0]
+    
+    page.goto("https://example.com")
+    # ... do stuff
+    
+    browser.close()  # Cookies saved to your context
+```
+
+**Why Browserbase?**
+- Bypasses Cloudflare, CAPTCHAs, bot detection
+- Your logins persist across sessions (same context)
+- Real Chrome browser, not headless detection
+- Sessions auto-expire after 5 min idle
+
+**Note:** Only Playwright is pre-installed. For Selenium, install it first.
+
 ## Safety
 
 - Don't exfiltrate private data

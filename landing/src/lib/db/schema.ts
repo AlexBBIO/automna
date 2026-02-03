@@ -25,6 +25,7 @@ export const machines = sqliteTable("machines", {
   status: text("status").default("created"), // created, started, stopped, destroyed
   ipAddress: text("ip_address"),
   gatewayToken: text("gateway_token"), // Per-user gateway auth token
+  browserbaseContextId: text("browserbase_context_id"), // Browserbase persistent context for this user
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   lastActiveAt: integer("last_active_at", { mode: "timestamp" }),

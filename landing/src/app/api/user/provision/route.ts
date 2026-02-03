@@ -25,6 +25,10 @@ const FLY_API_BASE = "https://api.machines.dev/v1";
 // Falls back to community image if not set
 const OPENCLAW_IMAGE = process.env.OPENCLAW_IMAGE || "registry.fly.io/automna-openclaw-image:latest";
 
+// Browserbase config for persistent browser sessions
+const BROWSERBASE_API_KEY = process.env.BROWSERBASE_API_KEY;
+const BROWSERBASE_PROJECT_ID = process.env.BROWSERBASE_PROJECT_ID;
+
 /**
  * Get the personal organization ID from Fly API
  */
@@ -47,6 +51,37 @@ async function getPersonalOrgId(): Promise<string> {
     throw new Error(`Failed to get org ID: ${JSON.stringify(data.errors)}`);
   }
   return data.data.personalOrganization.id;
+}
+
+/**
+ * Create a Browserbase context for persistent browser sessions
+ * Each user gets their own context so cookies/logins persist and are isolated
+ */
+async function createBrowserbaseContext(): Promise<string | null> {
+  if (!BROWSERBASE_API_KEY || !BROWSERBASE_PROJECT_ID) {
+    console.log("[provision] Browserbase not configured, skipping context creation");
+    return null;
+  }
+
+  const response = await fetch("https://api.browserbase.com/v1/contexts", {
+    method: "POST",
+    headers: {
+      "X-BB-API-Key": BROWSERBASE_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      projectId: BROWSERBASE_PROJECT_ID,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error("[provision] Failed to create Browserbase context:", await response.text());
+    return null; // Non-fatal - user can still use the bot without browser
+  }
+
+  const data = await response.json();
+  console.log(`[provision] Created Browserbase context: ${data.id}`);
+  return data.id;
 }
 
 interface FlyApp {
@@ -222,8 +257,29 @@ function buildInitCommand(gatewayToken: string): string[] {
 /**
  * Create and start a machine in the app
  */
-async function createMachine(appName: string, volumeId: string, gatewayToken: string): Promise<FlyMachine> {
+async function createMachine(
+  appName: string,
+  volumeId: string,
+  gatewayToken: string,
+  browserbaseContextId: string | null
+): Promise<FlyMachine> {
   
+  // Build env vars - only include Browserbase if configured
+  const env: Record<string, string> = {
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
+    OPENCLAW_GATEWAY_TOKEN: gatewayToken,
+  };
+  
+  // Add Browserbase config if available
+  if (BROWSERBASE_API_KEY && BROWSERBASE_PROJECT_ID) {
+    env.BROWSERBASE_API_KEY = BROWSERBASE_API_KEY;
+    env.BROWSERBASE_PROJECT_ID = BROWSERBASE_PROJECT_ID;
+    if (browserbaseContextId) {
+      env.BROWSERBASE_CONTEXT_ID = browserbaseContextId;
+    }
+  }
+
   const config = {
     image: OPENCLAW_IMAGE,
     guest: {
@@ -246,12 +302,7 @@ async function createMachine(appName: string, volumeId: string, gatewayToken: st
         internal_port: 18789,
       },
     ],
-    env: {
-      // API keys and config passed as env vars (secrets deploy doesn't work for Machines API)
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
-      GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
-      OPENCLAW_GATEWAY_TOKEN: gatewayToken,
-    },
+    env,
     mounts: [
       {
         volume: volumeId,
@@ -443,14 +494,17 @@ export async function POST() {
       console.log(`[provision] App ${appName} already exists`);
     }
 
-    // Step 2: Create volume
+    // Step 2: Create volume and Browserbase context in parallel
     const gatewayToken = crypto.randomUUID();
     console.log(`[provision] Creating volume for ${appName}`);
-    const volume = await createVolume(appName);
+    const [volume, browserbaseContextId] = await Promise.all([
+      createVolume(appName),
+      createBrowserbaseContext(),
+    ]);
 
     // Step 3: Create machine (env vars passed directly, no Fly secrets needed)
     console.log(`[provision] Creating machine for ${appName}`);
-    const machine = await createMachine(appName, volume.id, gatewayToken);
+    const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId);
 
     // Step 4: Wait for machine to be ready
     console.log(`[provision] Waiting for machine ${machine.id} to start`);
@@ -466,6 +520,7 @@ export async function POST() {
       status: "started",
       ipAddress: readyMachine.private_ip,
       gatewayToken,
+      browserbaseContextId,
       lastActiveAt: new Date(),
     });
 
