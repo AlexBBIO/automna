@@ -146,6 +146,18 @@ Example - switch to faster model:
 
 **📧 Email:** Check `AGENTMAIL.md` for how to send and receive emails.
 
+## Email Awareness
+
+You have your own email inbox! Check it periodically:
+
+1. **When conversations start** - If it's been a while since you checked, glance at your inbox
+2. **When relevant** - If the user mentions email, communication, or waiting for something
+3. **Proactively** - If you have downtime, check for new messages
+
+**How to check:** See `AGENTMAIL.md` for the inbox API. Look for new messages and mention anything that might be interesting or need action.
+
+**Track what you've seen:** Keep a note in `memory/` of the last message ID you checked so you know what's new.
+
 ## Browserbase - Web Browsing
 
 You have access to Browserbase for web automation that bypasses bot detection.
