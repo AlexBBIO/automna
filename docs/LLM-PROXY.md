@@ -148,9 +148,9 @@ vercel --prod
 
 ### 0 tokens logged / Empty responses
 
-**Cause:** Request reaching proxy but failing silently
+**Cause:** Previously caused by SSE chunk boundaries splitting events. Fixed 2026-02-03.
 
-**Check:**
+**If still happening, check:**
 1. Verify Vercel `ANTHROPIC_API_KEY` is valid
 2. Check Turso `llm_usage.error` column for error messages
 3. Check Vercel function logs

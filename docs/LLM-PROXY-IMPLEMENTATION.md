@@ -52,6 +52,8 @@ The LLM proxy is fully implemented and working.
 
 ## Next Steps
 
-- [ ] Implement rate limiting based on user plan
-- [ ] Add usage dashboard in admin panel
+- [x] ~~Implement rate limiting based on user plan~~ (Done - checks monthly tokens/cost + per-minute requests)
+- [x] ~~Add usage dashboard in admin panel~~ (Done - /admin/usage with charts)
+- [x] ~~Fix streaming token extraction~~ (Done - 2026-02-03, buffered SSE parsing)
 - [ ] Alert on unusual usage patterns
+- [ ] Per-user usage view in admin panel
