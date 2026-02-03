@@ -1,16 +1,21 @@
 /**
  * Files API Routes
  * 
- * Provides file operations for the user's agent workspace.
- * Uses exec commands via WebSocket to the user's Fly gateway.
+ * Proxies file operations through the user's gateway to the internal file server.
+ * The gateway (Caddy) routes /files/* to the file server internally.
+ * 
+ * Architecture:
+ *   Vercel → Gateway (:443) → Caddy (:18789) → /files/* → File Server (:8080)
  * 
  * Endpoints:
- * - GET /api/files/list?path=/root/clawd - List directory
- * - GET /api/files/read?path=/root/clawd/file.md - Read file
- * - POST /api/files/write - Write file
- * - POST /api/files/mkdir - Create directory
- * - DELETE /api/files?path=/root/clawd/file.md - Delete file
- * - GET /api/files/download?path=/root/clawd/file.png - Download file
+ * - GET /api/files/list?path=/home/node/.openclaw/workspace - List directory
+ * - GET /api/files/read?path=/home/node/.openclaw/workspace/file.md - Read file
+ * - POST /api/files/write - Write file { path, content }
+ * - POST /api/files/mkdir - Create directory { path }
+ * - POST /api/files/move - Move file { from, to }
+ * - POST /api/files/upload - Upload file (multipart)
+ * - DELETE /api/files?path=... - Delete file
+ * - GET /api/files/download?path=... - Download file
  */
 
 import { auth } from "@clerk/nextjs/server";
@@ -19,28 +24,9 @@ import { db } from "@/lib/db";
 import { machines } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-// Allowed base paths for file operations
-// OpenClaw stores data in /home/node/.openclaw
-const ALLOWED_PATHS = ['/home/node/.openclaw', '/home/node/clawd', '/root/clawd'];
-
-// Max file size for read operations (5MB)
-const MAX_READ_SIZE = 5 * 1024 * 1024;
-
 // ============================================
 // UTILITIES
 // ============================================
-
-function validatePath(path: string): boolean {
-  // Must start with allowed path
-  if (!ALLOWED_PATHS.some(base => path.startsWith(base))) {
-    return false;
-  }
-  // No path traversal
-  if (path.includes('..')) {
-    return false;
-  }
-  return true;
-}
 
 async function getUserGateway(clerkId: string) {
   const userMachine = await db.query.machines.findFirst({
@@ -53,108 +39,23 @@ async function getUserGateway(clerkId: string) {
   
   return {
     appName: userMachine.appName,
-    machineId: userMachine.id, // Fly machine ID
+    machineId: userMachine.id,
     token: userMachine.gatewayToken,
   };
 }
 
-async function execCommand(appName: string, machineId: string, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
-  // Use Fly machines exec API
-  const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
-  
-  if (!FLY_API_TOKEN) {
-    throw new Error('FLY_API_TOKEN not configured');
+function getFileServerUrl(appName: string, endpoint: string, token: string, params?: Record<string, string>) {
+  // Route through gateway - Caddy proxies /files/* to internal file server
+  const url = new URL(`https://${appName}.fly.dev/files${endpoint}`);
+  url.searchParams.set('token', token);
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  
-  const url = `https://api.machines.dev/v1/apps/${appName}/machines/${machineId}/exec`;
-  
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${FLY_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        command: ['/bin/sh', '-c', command],
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
-    
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('[files] Fly exec error:', response.status, text);
-      throw new Error(`Fly exec failed: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return {
-      stdout: data.stdout || '',
-      stderr: data.stderr || '',
-      code: data.exit_code || 0,
-    };
-  } catch (err) {
-    console.error('[files] Exec error:', err);
-    throw err;
-  }
-}
-
-// Parse ls -la output into file objects
-function parseLsOutput(output: string, basePath: string): Array<{
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  size: number;
-  modified: string;
-  extension?: string;
-}> {
-  const lines = output.trim().split('\n');
-  const files = [];
-  
-  for (const line of lines) {
-    // Skip total line and empty lines
-    if (line.startsWith('total') || !line.trim()) continue;
-    
-    // Parse: drwxr-xr-x 2 node node 4096 2026-02-02 17:30 dirname
-    // Or:   -rw-r--r-- 1 node node 2048 2026-02-02 15:00 filename.md
-    const parts = line.split(/\s+/);
-    if (parts.length < 9) continue;
-    
-    const permissions = parts[0];
-    const size = parseInt(parts[4], 10) || 0;
-    const date = parts[5]; // 2026-02-02
-    const time = parts[6]; // 17:30
-    const name = parts.slice(8).join(' ');
-    
-    // Skip . and ..
-    if (name === '.' || name === '..') continue;
-    
-    const isDirectory = permissions.startsWith('d');
-    const ext = isDirectory ? undefined : name.split('.').pop();
-    
-    files.push({
-      name,
-      path: `${basePath}/${name}`.replace(/\/+/g, '/'),
-      type: isDirectory ? 'directory' as const : 'file' as const,
-      size,
-      modified: `${date}T${time}:00Z`,
-      extension: ext,
-    });
-  }
-  
-  // Sort: directories first, then by name
-  files.sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === 'directory' ? -1 : 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
-  
-  return files;
+  return url.toString();
 }
 
 // ============================================
-// HANDLERS
+// GET HANDLERS
 // ============================================
 
 export async function GET(
@@ -163,7 +64,7 @@ export async function GET(
 ) {
   const { path: pathSegments } = await params;
   const operation = pathSegments[0];
-  const filePath = request.nextUrl.searchParams.get('path') || '/root/clawd';
+  const filePath = request.nextUrl.searchParams.get('path') || '/home/node/.openclaw/workspace';
   
   try {
     const { userId: clerkId } = await auth();
@@ -176,98 +77,48 @@ export async function GET(
       return NextResponse.json({ error: 'No gateway configured' }, { status: 404 });
     }
     
-    if (!validatePath(filePath)) {
-      return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+    const fileServerUrl = getFileServerUrl(
+      gateway.appName,
+      `/${operation}`,
+      gateway.token,
+      { path: filePath }
+    );
+    
+    console.log(`[files] ${operation.toUpperCase()} ${filePath}`);
+    
+    const response = await fetch(fileServerUrl, {
+      signal: AbortSignal.timeout(30000),
+    });
+    
+    // For downloads, stream the response
+    if (operation === 'download') {
+      if (!response.ok) {
+        const error = await response.json();
+        return NextResponse.json(error, { status: response.status });
+      }
+      
+      return new NextResponse(response.body, {
+        headers: {
+          'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream',
+          'Content-Disposition': response.headers.get('Content-Disposition') || 'attachment',
+          'Content-Length': response.headers.get('Content-Length') || '',
+        },
+      });
     }
     
-    switch (operation) {
-      case 'list': {
-        try {
-          const result = await execCommand(
-            gateway.appName,
-            gateway.machineId,
-            `ls -la --time-style=long-iso "${filePath}"`
-          );
-          
-          const files = parseLsOutput(result.stdout, filePath);
-          return NextResponse.json({ files });
-        } catch (err) {
-          // Exec not available - return mock data for now
-          console.warn('[files] Exec failed, returning empty:', err);
-          return NextResponse.json({ 
-            files: [],
-            error: 'File listing not yet available - gateway exec endpoint needed'
-          });
-        }
-      }
-      
-      case 'read': {
-        try {
-          // Check file size first
-          const statResult = await execCommand(
-            gateway.appName,
-            gateway.machineId,
-            `stat -c %s "${filePath}" 2>/dev/null || echo 0`
-          );
-          
-          const size = parseInt(statResult.stdout.trim(), 10) || 0;
-          if (size > MAX_READ_SIZE) {
-            return NextResponse.json(
-              { error: `File too large (${size} bytes, max ${MAX_READ_SIZE})` },
-              { status: 413 }
-            );
-          }
-          
-          const result = await execCommand(
-            gateway.appName,
-            gateway.machineId,
-            `cat "${filePath}"`
-          );
-          
-          return NextResponse.json({
-            content: result.stdout,
-            size,
-            encoding: 'utf-8',
-          });
-        } catch (err) {
-          console.warn('[files] Read failed:', err);
-          return NextResponse.json({ error: 'Failed to read file' }, { status: 500 });
-        }
-      }
-      
-      case 'download': {
-        try {
-          // For binary files, base64 encode
-          const result = await execCommand(
-            gateway.appName,
-            gateway.machineId,
-            `base64 "${filePath}"`
-          );
-          
-          const buffer = Buffer.from(result.stdout.trim(), 'base64');
-          const filename = filePath.split('/').pop() || 'download';
-          
-          return new NextResponse(buffer, {
-            headers: {
-              'Content-Type': 'application/octet-stream',
-              'Content-Disposition': `attachment; filename="${filename}"`,
-              'Content-Length': buffer.length.toString(),
-            },
-          });
-        } catch (err) {
-          console.warn('[files] Download failed:', err);
-          return NextResponse.json({ error: 'Failed to download file' }, { status: 500 });
-        }
-      }
-      
-      default:
-        return NextResponse.json({ error: 'Unknown operation' }, { status: 400 });
-    }
+    // For JSON responses
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+    
   } catch (error) {
     console.error('[files] Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// ============================================
+// POST HANDLERS
+// ============================================
 
 export async function POST(
   request: NextRequest,
@@ -292,96 +143,128 @@ export async function POST(
         const body = await request.json();
         const { path: filePath, content } = body;
         
-        if (!filePath || !validatePath(filePath)) {
-          return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+        if (!filePath) {
+          return NextResponse.json({ error: 'Path required' }, { status: 400 });
         }
         
-        try {
-          // Use heredoc for multi-line content
-          const escapedContent = content.replace(/'/g, "'\\''");
-          await execCommand(
-            gateway.appName,
-            gateway.machineId,
-            `cat > "${filePath}" << 'AUTOMNA_EOF'\n${escapedContent}\nAUTOMNA_EOF`
-          );
-          
-          return NextResponse.json({ success: true, path: filePath });
-        } catch (err) {
-          console.warn('[files] Write failed:', err);
-          return NextResponse.json({ error: 'Failed to write file' }, { status: 500 });
-        }
+        const fileServerUrl = getFileServerUrl(
+          gateway.appName,
+          '/write',
+          gateway.token,
+          { path: filePath }
+        );
+        
+        console.log(`[files] WRITE ${filePath}`);
+        
+        const response = await fetch(fileServerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+          signal: AbortSignal.timeout(30000),
+        });
+        
+        const data = await response.json();
+        return NextResponse.json(data, { status: response.status });
       }
       
       case 'mkdir': {
         const body = await request.json();
         const { path: dirPath } = body;
         
-        if (!dirPath || !validatePath(dirPath)) {
-          return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+        if (!dirPath) {
+          return NextResponse.json({ error: 'Path required' }, { status: 400 });
         }
         
-        try {
-          await execCommand(
-            gateway.appName,
-            gateway.machineId,
-            `mkdir -p "${dirPath}"`
-          );
-          
-          return NextResponse.json({ success: true, path: dirPath });
-        } catch (err) {
-          console.warn('[files] Mkdir failed:', err);
-          return NextResponse.json({ error: 'Failed to create directory' }, { status: 500 });
-        }
+        const fileServerUrl = getFileServerUrl(
+          gateway.appName,
+          '/mkdir',
+          gateway.token,
+          { path: dirPath }
+        );
+        
+        console.log(`[files] MKDIR ${dirPath}`);
+        
+        const response = await fetch(fileServerUrl, {
+          method: 'POST',
+          signal: AbortSignal.timeout(30000),
+        });
+        
+        const data = await response.json();
+        return NextResponse.json(data, { status: response.status });
       }
       
       case 'move': {
         const body = await request.json();
         const { from, to } = body;
         
-        if (!from || !to || !validatePath(from) || !validatePath(to)) {
-          return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+        if (!from || !to) {
+          return NextResponse.json({ error: 'From and to paths required' }, { status: 400 });
         }
         
-        try {
-          await execCommand(
-            gateway.appName,
-            gateway.machineId,
-            `mv "${from}" "${to}"`
-          );
-          
-          return NextResponse.json({ success: true });
-        } catch (err) {
-          console.warn('[files] Move failed:', err);
-          return NextResponse.json({ error: 'Failed to move file' }, { status: 500 });
-        }
+        const fileServerUrl = getFileServerUrl(
+          gateway.appName,
+          '/move',
+          gateway.token
+        );
+        
+        console.log(`[files] MOVE ${from} -> ${to}`);
+        
+        const response = await fetch(fileServerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from, to }),
+          signal: AbortSignal.timeout(30000),
+        });
+        
+        const data = await response.json();
+        return NextResponse.json(data, { status: response.status });
       }
       
       case 'upload': {
-        // Handle multipart form data
+        // Get the file from form data
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
         const filePath = formData.get('path') as string | null;
         
-        if (!file || !filePath || !validatePath(filePath)) {
-          return NextResponse.json({ error: 'Invalid upload' }, { status: 400 });
+        if (!file || !filePath) {
+          return NextResponse.json({ error: 'File and path required' }, { status: 400 });
         }
         
+        console.log(`[files] UPLOAD ${filePath} (${file.size} bytes)`);
+        
+        const fileServerUrl = getFileServerUrl(
+          gateway.appName,
+          '/upload',
+          gateway.token,
+          { path: filePath }
+        );
+        
         try {
-          // Convert file to base64
-          const buffer = await file.arrayBuffer();
-          const base64 = Buffer.from(buffer).toString('base64');
+          // Convert file to buffer
+          const buffer = Buffer.from(await file.arrayBuffer());
           
-          // Write via base64 decode
-          await execCommand(
-            gateway.appName,
-            gateway.machineId,
-            `echo "${base64}" | base64 -d > "${filePath}"`
-          );
+          const response = await fetch(fileServerUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/octet-stream',
+              'Content-Length': buffer.length.toString(),
+            },
+            body: buffer,
+            signal: AbortSignal.timeout(120000), // 2 min for large files
+          });
           
-          return NextResponse.json({ success: true, path: filePath });
+          const data = await response.json();
+          
+          if (response.ok) {
+            console.log(`[files] UPLOAD success: ${filePath}`);
+          } else {
+            console.error(`[files] UPLOAD failed:`, data);
+          }
+          
+          return NextResponse.json(data, { status: response.status });
         } catch (err) {
-          console.warn('[files] Upload failed:', err);
-          return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+          console.error(`[files] UPLOAD error:`, err);
+          return NextResponse.json({ error: 'Upload failed: ' + (err instanceof Error ? err.message : 'unknown') }, { status: 500 });
         }
       }
       
@@ -393,6 +276,10 @@ export async function POST(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// ============================================
+// DELETE HANDLER
+// ============================================
 
 export async function DELETE(request: NextRequest) {
   const filePath = request.nextUrl.searchParams.get('path');
@@ -408,23 +295,27 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'No gateway configured' }, { status: 404 });
     }
     
-    if (!filePath || !validatePath(filePath)) {
-      return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+    if (!filePath) {
+      return NextResponse.json({ error: 'Path required' }, { status: 400 });
     }
     
-    try {
-      // Use trash if available, otherwise rm
-      await execCommand(
-        gateway.appName,
-        gateway.machineId,
-        `trash "${filePath}" 2>/dev/null || rm -rf "${filePath}"`
-      );
-      
-      return NextResponse.json({ success: true });
-    } catch (err) {
-      console.warn('[files] Delete failed:', err);
-      return NextResponse.json({ error: 'Failed to delete file' }, { status: 500 });
-    }
+    const fileServerUrl = getFileServerUrl(
+      gateway.appName,
+      '/delete',
+      gateway.token,
+      { path: filePath }
+    );
+    
+    console.log(`[files] DELETE ${filePath}`);
+    
+    const response = await fetch(fileServerUrl, {
+      method: 'DELETE',
+      signal: AbortSignal.timeout(30000),
+    });
+    
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+    
   } catch (error) {
     console.error('[files] Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

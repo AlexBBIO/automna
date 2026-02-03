@@ -1,0 +1,32 @@
+# Automna Reverse Proxy Configuration
+# Routes all traffic through single port with internal services
+
+:18789 {
+    # Large file uploads (100MB max)
+    request_body {
+        max_size 100MB
+    }
+
+    # File server routes
+    handle /files/* {
+        reverse_proxy localhost:8080
+    }
+
+    # Everything else goes to OpenClaw gateway
+    handle {
+        reverse_proxy localhost:18788 {
+            # WebSocket support
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Logging
+    log {
+        output stdout
+        format console
+        level WARN
+    }
+}

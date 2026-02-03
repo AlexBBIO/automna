@@ -1,23 +1,29 @@
 #!/bin/sh
 # Automna Entrypoint Script
-# Fixes OpenClaw session key mismatch with background monitor
+# 
+# Architecture:
+#   Caddy (:18789) → /files/* → File Server (:8080)
+#                  → /*       → OpenClaw Gateway (:18788)
 #
-# The bug: OpenClaw stores webchat sessions with key "main", "work", etc.
-# but looks them up with canonical key "agent:main:main", "agent:main:work", etc.
-# This script runs a background fixer that monitors and corrects keys.
+# Components:
+#   1. Caddy reverse proxy (main entry point)
+#   2. OpenClaw gateway (internal)
+#   3. File server (internal)
+#   4. Session key fixer (background)
 
 OPENCLAW_DIR="${OPENCLAW_HOME:-/home/node/.openclaw}"
 SESSIONS_DIR="$OPENCLAW_DIR/agents/main/sessions"
 SESSIONS_FILE="$SESSIONS_DIR/sessions.json"
 
-# Function to fix session keys
+# Internal ports (Caddy is the only external-facing service)
+GATEWAY_INTERNAL_PORT=18788
+FILE_SERVER_PORT=8080
+
+# Function to fix session keys (OpenClaw bug workaround)
 fix_session_keys() {
     [ ! -f "$SESSIONS_FILE" ] && return
     
-    # Check if any non-canonical keys exist (keys without "agent:main:" prefix that have data)
-    # We look for keys like "main", "work" etc. that should be "agent:main:main", "agent:main:work"
     if grep -qE '"[^"]+":.*"sessionId"' "$SESSIONS_FILE" 2>/dev/null; then
-        # Use node to properly fix the JSON (more reliable than sed for complex JSON)
         node -e "
             const fs = require('fs');
             const file = '$SESSIONS_FILE';
@@ -27,21 +33,13 @@ fix_session_keys() {
                 const fixed = {};
                 
                 for (const [key, value] of Object.entries(data)) {
-                    // Skip already canonical keys
                     if (key.startsWith('agent:main:')) {
                         fixed[key] = value;
                         continue;
                     }
+                    if (!value.sessionId) continue;
                     
-                    // Skip empty sessions (our pre-created ones)
-                    if (!value.sessionId) {
-                        continue;
-                    }
-                    
-                    // Convert to canonical form
                     const canonicalKey = 'agent:main:' + key;
-                    
-                    // Only fix if canonical key doesn't already exist with data
                     if (!fixed[canonicalKey] || !fixed[canonicalKey].sessionId) {
                         fixed[canonicalKey] = value;
                         changed = true;
@@ -52,9 +50,7 @@ fix_session_keys() {
                 if (changed) {
                     fs.writeFileSync(file, JSON.stringify(fixed, null, 2));
                 }
-            } catch (e) {
-                // Ignore errors (file might be being written)
-            }
+            } catch (e) {}
         " 2>/dev/null
     fi
 }
@@ -83,7 +79,6 @@ if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initializ
 fi
 
 # Create config file if it doesn't exist
-# This configures workspace injection so the agent sees AGENTS.md, SOUL.md, etc.
 CONFIG_FILE="$OPENCLAW_DIR/clawdbot.json"
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "[automna] Creating default config..."
@@ -139,10 +134,10 @@ if [ ! -f "$CONFIG_FILE" ]; then
   }
 }
 EOF
-    echo "[automna] Config created at $CONFIG_FILE"
+    echo "[automna] Config created"
 fi
 
-# Initial fix
+# Initial session key fix
 echo "[automna] Initial session key check..."
 fix_session_keys
 
@@ -151,18 +146,44 @@ run_fixer &
 FIXER_PID=$!
 echo "[automna] Session fixer running (PID: $FIXER_PID)"
 
-# Start file server
+# Start file server (internal only)
 if [ -f "/app/file-server.cjs" ]; then
-    echo "[automna] Starting file server on port ${FILE_SERVER_PORT:-8080}..."
-    node /app/file-server.cjs &
+    echo "[automna] Starting file server on port $FILE_SERVER_PORT (internal)..."
+    FILE_SERVER_PORT=$FILE_SERVER_PORT node /app/file-server.cjs &
     FILE_SERVER_PID=$!
     echo "[automna] File server running (PID: $FILE_SERVER_PID)"
-else
-    echo "[automna] Warning: file-server.cjs not found, skipping"
 fi
 
-echo "[automna] Starting gateway..."
+# Start Caddy reverse proxy (main entry point)
+echo "[automna] Starting Caddy reverse proxy on port 18789..."
+caddy run --config /etc/caddy/Caddyfile &
+CADDY_PID=$!
+echo "[automna] Caddy running (PID: $CADDY_PID)"
 
-# Execute the gateway (pass through all args)
-# The phioranex image has the entry at /app/dist/entry.js (loaded via /app/openclaw.mjs)
-exec node /app/dist/entry.js "$@"
+# Wait for Caddy to be ready
+sleep 1
+
+# Extract gateway token from args (we need to pass it to gateway on internal port)
+# Args come in as: gateway --allow-unconfigured --bind lan --auth token --token <TOKEN>
+# We need to change the port to 18788
+GATEWAY_TOKEN=""
+for arg in "$@"; do
+    if [ "$prev_was_token" = "1" ]; then
+        GATEWAY_TOKEN="$arg"
+        break
+    fi
+    if [ "$arg" = "--token" ]; then
+        prev_was_token=1
+    fi
+done
+
+echo "[automna] Starting OpenClaw gateway on port $GATEWAY_INTERNAL_PORT (internal)..."
+
+# Start gateway on internal port
+# Override the default port by setting environment variable and passing args
+exec node /app/dist/entry.js gateway \
+    --allow-unconfigured \
+    --bind lan \
+    --port $GATEWAY_INTERNAL_PORT \
+    --auth token \
+    --token "$GATEWAY_TOKEN"
