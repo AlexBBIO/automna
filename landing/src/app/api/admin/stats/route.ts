@@ -89,9 +89,9 @@ export async function GET() {
       activeUsers24h: activeUsersResult[0]?.count ?? 0,
       activeMachines: Number(machineStatsResult[0]?.active ?? 0),
       totalMachines: machineStatsResult[0]?.total ?? 0,
-      // Convert microdollars to cents
-      apiCostToday: Math.round((Number(apiCostTodayResult[0]?.total ?? 0)) / 10000),
-      apiCostMonth: Math.round((Number(apiCostMonthResult[0]?.total ?? 0)) / 10000),
+      // Return microdollars - UI will convert to dollars
+      apiCostTodayMicro: Number(apiCostTodayResult[0]?.total ?? 0),
+      apiCostMonthMicro: Number(apiCostMonthResult[0]?.total ?? 0),
       emailsToday: emailsTodayResult[0]?.count ?? 0,
       emailsMonth: emailsMonthResult[0]?.count ?? 0,
       tokensToday: Number(tokensTodayResult[0]?.total ?? 0),

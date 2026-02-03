@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
       date: day.date,
       inputTokens: Number(day.inputTokens),
       outputTokens: Number(day.outputTokens),
-      cost: Math.round(Number(day.cost) / 10000), // cents
+      costMicro: Number(day.cost), // microdollars
       requests: Number(day.requests),
       emails: emailsMap.get(day.date) || 0,
     }));
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
       range,
       totals: {
         tokens: Number(totals?.totalTokens ?? 0),
-        cost: Math.round(Number(totals?.totalCost ?? 0) / 10000), // cents
+        costMicro: Number(totals?.totalCost ?? 0), // microdollars
         requests: Number(totals?.totalRequests ?? 0),
         uniqueUsers: Number(totals?.uniqueUsers ?? 0),
         emails: Number(emailTotals?.totalEmails ?? 0),
@@ -159,14 +159,14 @@ export async function GET(request: NextRequest) {
       byModel: byModel.map(m => ({
         model: m.model,
         tokens: Number(m.tokens),
-        cost: Math.round(Number(m.cost) / 10000),
+        costMicro: Number(m.cost), // microdollars
         requests: Number(m.requests),
       })),
       topUsers: topUsersByCost.map(u => ({
         userId: u.userId,
         email: emailMap.get(u.userId) || "Unknown",
         tokens: Number(u.tokens),
-        cost: Math.round(Number(u.cost) / 10000),
+        costMicro: Number(u.cost), // microdollars
         requests: Number(u.requests),
       })),
       topEmailSenders: topEmailSenders.map(u => ({

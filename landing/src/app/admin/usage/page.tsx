@@ -21,7 +21,7 @@ interface UsageData {
   range: string;
   totals: {
     tokens: number;
-    cost: number;
+    costMicro: number;  // microdollars
     requests: number;
     uniqueUsers: number;
     emails: number;
@@ -31,21 +31,21 @@ interface UsageData {
     date: string;
     inputTokens: number;
     outputTokens: number;
-    cost: number;
+    costMicro: number;  // microdollars
     requests: number;
     emails: number;
   }>;
   byModel: Array<{
     model: string;
     tokens: number;
-    cost: number;
+    costMicro: number;  // microdollars
     requests: number;
   }>;
   topUsers: Array<{
     userId: string;
     email: string;
     tokens: number;
-    cost: number;
+    costMicro: number;  // microdollars
     requests: number;
   }>;
   topEmailSenders: Array<{
@@ -53,6 +53,15 @@ interface UsageData {
     email: string;
     count: number;
   }>;
+}
+
+// Convert microdollars to dollars string
+function formatMicrodollars(micro: number): string {
+  const dollars = micro / 1000000;
+  if (dollars < 0.01) {
+    return `$${dollars.toFixed(4)}`;
+  }
+  return `$${dollars.toFixed(2)}`;
 }
 
 const COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#f97316", "#10b981", "#6366f1"];
@@ -173,7 +182,7 @@ export default function UsagePage() {
         />
         <StatCard
           title="Total Cost"
-          value={`$${((data?.totals.cost ?? 0) / 100).toFixed(2)}`}
+          value={formatMicrodollars(data?.totals.costMicro ?? 0)}
           subtitle={`${data?.totals.requests ?? 0} requests`}
           icon={DollarSign}
         />
@@ -208,7 +217,7 @@ export default function UsagePage() {
                 <YAxis 
                   stroke="#71717a"
                   fontSize={12}
-                  tickFormatter={(v) => `$${(v / 100).toFixed(0)}`}
+                  tickFormatter={(v) => formatMicrodollars(v)}
                 />
                 <Tooltip
                   contentStyle={{ 
@@ -217,11 +226,11 @@ export default function UsagePage() {
                     borderRadius: "8px",
                   }}
                   labelFormatter={(label) => formatDate(String(label))}
-                  formatter={(value) => [`$${(Number(value) / 100).toFixed(2)}`, "Cost"]}
+                  formatter={(value) => [formatMicrodollars(Number(value)), "Cost"]}
                 />
                 <Area
                   type="monotone"
-                  dataKey="cost"
+                  dataKey="costMicro"
                   stroke="#3b82f6"
                   fill="#3b82f6"
                   fillOpacity={0.2}
@@ -304,7 +313,7 @@ export default function UsagePage() {
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-mono">
-                      ${(model.cost / 100).toFixed(2)}
+                      {formatMicrodollars(model.costMicro)}
                     </div>
                     <div className="text-xs text-zinc-500">
                       {(model.tokens / 1000).toFixed(0)}k tokens
@@ -332,7 +341,7 @@ export default function UsagePage() {
                     <div className="text-sm truncate">{user.email}</div>
                   </div>
                   <div className="text-sm font-mono">
-                    ${(user.cost / 100).toFixed(2)}
+                    {formatMicrodollars(user.costMicro)}
                   </div>
                 </div>
               ))}

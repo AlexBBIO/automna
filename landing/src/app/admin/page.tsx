@@ -8,12 +8,21 @@ interface DashboardStats {
   activeUsers24h: number;
   activeMachines: number;
   totalMachines: number;
-  apiCostToday: number;
-  apiCostMonth: number;
+  apiCostTodayMicro: number;  // microdollars
+  apiCostMonthMicro: number;  // microdollars
   emailsToday: number;
   emailsMonth: number;
   tokensToday: number;
   tokensMonth: number;
+}
+
+// Convert microdollars to dollars string
+function formatMicrodollars(micro: number): string {
+  const dollars = micro / 1000000;
+  if (dollars < 0.01) {
+    return `$${dollars.toFixed(4)}`;
+  }
+  return `$${dollars.toFixed(2)}`;
 }
 
 function StatCard({ 
@@ -119,8 +128,8 @@ export default function AdminDashboard() {
         />
         <StatCard
           title="API Cost Today"
-          value={`$${((stats?.apiCostToday ?? 0) / 100).toFixed(2)}`}
-          subtitle={`$${((stats?.apiCostMonth ?? 0) / 100).toFixed(2)} this month`}
+          value={formatMicrodollars(stats?.apiCostTodayMicro ?? 0)}
+          subtitle={`${formatMicrodollars(stats?.apiCostMonthMicro ?? 0)} this month`}
           icon={DollarSign}
           color="orange"
         />
