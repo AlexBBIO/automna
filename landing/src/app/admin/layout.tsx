@@ -11,7 +11,8 @@ import {
   CreditCard, 
   Activity,
   Settings,
-  ArrowLeft
+  ArrowLeft,
+  Megaphone
 } from "lucide-react";
 
 // Admin user IDs - add your Clerk user ID here
@@ -22,6 +23,7 @@ const ADMIN_USER_IDS = [
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
   { href: "/admin/usage", label: "Usage", icon: BarChart3 },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/health", label: "Health", icon: Activity },

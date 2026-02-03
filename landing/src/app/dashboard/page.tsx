@@ -9,6 +9,7 @@ import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { FileProvider } from "@/lib/file-context";
 import { FileBrowser } from "@/components/FileBrowser";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AnnouncementModal } from "@/components/AnnouncementModal";
 
 type TabView = 'chat' | 'files';
 
@@ -622,6 +623,9 @@ export default function DashboardPage() {
             </div>
           </FileProvider>
         </div>
+        
+        {/* Announcement Modal - shows on first login or for updates */}
+        <AnnouncementModal />
       </div>
     );
   }

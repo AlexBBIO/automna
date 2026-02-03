@@ -157,6 +157,41 @@ export type PlanType = keyof typeof PLAN_LIMITS;
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+// ============================================
+// ANNOUNCEMENTS (Onboarding + Updates)
+// ============================================
+
+// Announcement types: 'new_user' (first provision) or 'all_users' (broadcast)
+export const announcements = sqliteTable("announcements", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  type: text("type").notNull(), // 'new_user' | 'all_users'
+  title: text("title").notNull(),
+  content: text("content").notNull(), // Markdown content
+  enabled: integer("enabled", { mode: "boolean" }).default(true),
+  version: integer("version").default(1), // Increment to re-show to users who dismissed
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+}, (table) => ({
+  typeIdx: index("idx_announcements_type").on(table.type),
+}));
+
+// Track which users have dismissed which announcement versions
+export const announcementDismissals = sqliteTable("announcement_dismissals", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  announcementId: text("announcement_id").notNull().references(() => announcements.id),
+  dismissedVersion: integer("dismissed_version").notNull(), // Version they dismissed
+  dismissedAt: integer("dismissed_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+}, (table) => ({
+  userAnnouncementIdx: index("idx_dismissals_user_announcement").on(table.userId, table.announcementId),
+}));
+
+// ============================================
+// TYPE EXPORTS
+// ============================================
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 export type Machine = typeof machines.$inferSelect;
 export type NewMachine = typeof machines.$inferInsert;
 export type MachineEvent = typeof machineEvents.$inferSelect;
@@ -168,3 +203,6 @@ export type NewLlmUsage = typeof llmUsage.$inferInsert;
 export type LlmRateLimit = typeof llmRateLimits.$inferSelect;
 export type EmailSend = typeof emailSends.$inferSelect;
 export type NewEmailSend = typeof emailSends.$inferInsert;
+export type Announcement = typeof announcements.$inferSelect;
+export type NewAnnouncement = typeof announcements.$inferInsert;
+export type AnnouncementDismissal = typeof announcementDismissals.$inferSelect;
