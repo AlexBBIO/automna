@@ -2,31 +2,65 @@
  * Email Send API with Rate Limiting
  * 
  * Proxies email sends through Agentmail with a 50/day limit per user.
+ * 
+ * Auth: Either Clerk session OR gateway token in Authorization header.
+ * This allows both dashboard and agent access.
  */
 
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines } from "@/lib/db/schema";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY;
 const DAILY_EMAIL_LIMIT = 50;
 
+/**
+ * Authenticate request - supports both Clerk and gateway token
+ */
+async function authenticateRequest(request: NextRequest): Promise<{ userId: string; machine: typeof machines.$inferSelect } | null> {
+  // Try Clerk auth first
+  const { userId: clerkUserId } = await auth();
+  
+  if (clerkUserId) {
+    const userMachine = await db.query.machines.findFirst({
+      where: eq(machines.userId, clerkUserId),
+    });
+    if (userMachine) {
+      return { userId: clerkUserId, machine: userMachine };
+    }
+  }
+  
+  // Try gateway token auth (for agents)
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    
+    // Look up machine by gateway token
+    const machine = await db.query.machines.findFirst({
+      where: eq(machines.gatewayToken, token),
+    });
+    
+    if (machine) {
+      return { userId: machine.userId, machine };
+    }
+  }
+  
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    const authResult = await authenticateRequest(request);
     
-    if (!userId) {
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's machine (for inbox ID)
-    const userMachine = await db.query.machines.findFirst({
-      where: eq(machines.userId, userId),
-    });
+    const { userId, machine: userMachine } = authResult;
 
-    if (!userMachine?.agentmailInboxId) {
+    if (!userMachine.agentmailInboxId) {
       return NextResponse.json(
         { error: "Email not configured for this user" },
         { status: 400 }

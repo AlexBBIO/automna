@@ -1,43 +1,54 @@
 # Agentmail - Email Capabilities
 
-You have access to Agentmail for sending and receiving emails.
+You have access to email through Automna's email API.
 
-**Environment variables available:**
-- `AGENTMAIL_API_KEY` - Your API key
-- `AGENTMAIL_INBOX_ID` - Your inbox address (e.g., automna-abc123@agentmail.to)
+**Your email address:** Check the `AGENTMAIL_INBOX_ID` environment variable (e.g., `swiftfox@mail.automna.ai`)
+
+**Rate Limit:** 50 emails per day (resets at midnight UTC)
 
 ## Send Email
+
+Use the Automna email API with your gateway token:
 
 ```python
 import os
 import requests
 
+# Your gateway token is in OPENCLAW_GATEWAY_TOKEN
+GATEWAY_TOKEN = os.environ["OPENCLAW_GATEWAY_TOKEN"]
+API_BASE = "https://automna.ai/api/user/email"
+
 response = requests.post(
-    f"https://api.agentmail.to/v0/inboxes/{os.environ['AGENTMAIL_INBOX_ID']}/messages",
+    f"{API_BASE}/send",
     headers={
-        "Authorization": f"Bearer {os.environ['AGENTMAIL_API_KEY']}",
+        "Authorization": f"Bearer {GATEWAY_TOKEN}",
         "Content-Type": "application/json"
     },
     json={
-        "to": [{"email": "recipient@example.com"}],
+        "to": "recipient@example.com",
         "subject": "Hello from your AI agent",
         "text": "This is the email body."
     }
 )
-print(response.json())
+
+result = response.json()
+if result.get("success"):
+    print(f"Sent! Remaining today: {result['remaining']}")
+else:
+    print(f"Error: {result.get('error')}")
 ```
 
-**With HTML and attachments:**
+**With HTML and CC:**
 ```python
 response = requests.post(
-    f"https://api.agentmail.to/v0/inboxes/{os.environ['AGENTMAIL_INBOX_ID']}/messages",
+    f"{API_BASE}/send",
     headers={
-        "Authorization": f"Bearer {os.environ['AGENTMAIL_API_KEY']}",
+        "Authorization": f"Bearer {GATEWAY_TOKEN}",
         "Content-Type": "application/json"
     },
     json={
         "to": [{"email": "recipient@example.com", "name": "John Doe"}],
-        "cc": [{"email": "cc@example.com"}],
+        "cc": "cc@example.com",
         "subject": "Report attached",
         "text": "Please find the report attached.",
         "html": "<p>Please find the report <b>attached</b>.</p>"
@@ -45,67 +56,44 @@ response = requests.post(
 )
 ```
 
-## Check Inbox
+## Check Your Quota
+
+```python
+response = requests.get(
+    f"{API_BASE}/send",
+    headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"}
+)
+quota = response.json()
+print(f"Sent today: {quota['sent']}/{quota['limit']}")
+print(f"Remaining: {quota['remaining']}")
+```
+
+## Check Inbox (Receive Emails)
+
+To check for incoming emails, use the Agentmail API directly:
 
 ```python
 import os
 import requests
 
-# List messages
-response = requests.get(
-    f"https://api.agentmail.to/v0/inboxes/{os.environ['AGENTMAIL_INBOX_ID']}/messages",
-    headers={"Authorization": f"Bearer {os.environ['AGENTMAIL_API_KEY']}"}
-)
-messages = response.json()
+AGENTMAIL_KEY = os.environ.get("AGENTMAIL_API_KEY")
+INBOX_ID = os.environ["AGENTMAIL_INBOX_ID"]
 
-for msg in messages.get("messages", []):
-    print(f"From: {msg['from']}")
-    print(f"Subject: {msg['subject']}")
-    print(f"Date: {msg['created_at']}")
-    print("---")
+if AGENTMAIL_KEY:
+    response = requests.get(
+        f"https://api.agentmail.to/v0/inboxes/{INBOX_ID}/messages",
+        headers={"Authorization": f"Bearer {AGENTMAIL_KEY}"}
+    )
+    messages = response.json()
+    for msg in messages.get("messages", []):
+        print(f"From: {msg['from']}, Subject: {msg['subject']}")
 ```
 
-**Get specific message:**
-```python
-message_id = "msg_abc123"
-response = requests.get(
-    f"https://api.agentmail.to/v0/inboxes/{os.environ['AGENTMAIL_INBOX_ID']}/messages/{message_id}",
-    headers={"Authorization": f"Bearer {os.environ['AGENTMAIL_API_KEY']}"}
-)
-message = response.json()
-print(message["text"])  # Plain text body
-print(message["html"])  # HTML body (if available)
-```
-
-## Reply to Email
-
-```python
-import os
-import requests
-
-# Reply in thread
-original_message_id = "msg_abc123"
-response = requests.post(
-    f"https://api.agentmail.to/v0/inboxes/{os.environ['AGENTMAIL_INBOX_ID']}/messages/{original_message_id}/reply",
-    headers={
-        "Authorization": f"Bearer {os.environ['AGENTMAIL_API_KEY']}",
-        "Content-Type": "application/json"
-    },
-    json={
-        "text": "Thanks for your email! Here's my reply..."
-    }
-)
-```
-
-## Rate Limits
-
-**You can send up to 50 emails per day.** This resets at midnight UTC.
-
-Be mindful of this limit when automating email tasks. If you need to send many emails, batch them over multiple days or ask your human to request a limit increase.
+**Note:** Reading emails doesn't count against your daily limit. Only sending does.
 
 ## Notes
 
-- Your inbox address is in `AGENTMAIL_INBOX_ID` (e.g., swiftfox@mail.automna.ai)
-- Emails sent from this address will show that as the sender
-- Replies to your emails will arrive in your inbox
-- Check inbox periodically for new messages or set up webhooks for real-time
+- Your email address is in `AGENTMAIL_INBOX_ID`
+- Sending is rate-limited to protect deliverability
+- Check your quota before bulk operations
+- Replies to your emails arrive in your inbox

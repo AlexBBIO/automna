@@ -372,10 +372,10 @@ async function createMachine(
     }
   }
 
-  // Add Agentmail config if available
-  if (AGENTMAIL_API_KEY && agentmailInboxId) {
-    env.AGENTMAIL_API_KEY = AGENTMAIL_API_KEY;
+  // Add Agentmail inbox ID (agents use our proxy API for sending, not direct Agentmail)
+  if (agentmailInboxId) {
     env.AGENTMAIL_INBOX_ID = agentmailInboxId;
+    // Note: AGENTMAIL_API_KEY intentionally NOT passed to enforce rate limits via our proxy
   }
 
   const config = {
