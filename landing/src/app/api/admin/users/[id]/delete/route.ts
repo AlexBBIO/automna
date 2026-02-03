@@ -24,7 +24,7 @@ const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY?.replace(/[\r\n]+$/, "")
 
 // Admin user IDs (Clerk IDs)
 const ADMIN_IDS = [
-  "user_2pEBdvjqZSMgpPMdKLCIHMt5kBc", // Alex
+  "user_38uauJcurhCOJznltOKvU12RCdK", // Alex (Automna)
 ];
 
 interface DeleteResult {
