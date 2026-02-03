@@ -88,9 +88,39 @@ async function createBrowserbaseContext(): Promise<string | null> {
   return data.id;
 }
 
+// Word lists for friendly email usernames
+const ADJECTIVES = [
+  "happy", "swift", "clever", "bright", "calm", "bold", "warm", "cool", "wild", "gentle",
+  "quick", "smart", "brave", "kind", "wise", "keen", "fair", "true", "free", "glad",
+  "crisp", "fresh", "vivid", "eager", "noble", "proud", "sweet", "merry", "lively", "jolly",
+  "cosmic", "stellar", "lunar", "solar", "misty", "foggy", "sunny", "breezy", "stormy", "snowy",
+  "golden", "silver", "copper", "bronze", "crystal", "velvet", "silk", "satin", "cotton", "linen",
+  "ancient", "mystic", "hidden", "secret", "silent", "peaceful", "tranquil", "serene", "graceful", "elegant"
+];
+
+const NOUNS = [
+  "fox", "owl", "wolf", "bear", "deer", "hawk", "crow", "swan", "dove", "hare",
+  "oak", "pine", "maple", "cedar", "birch", "willow", "aspen", "elm", "ash", "spruce",
+  "moon", "star", "sun", "cloud", "wind", "rain", "snow", "storm", "wave", "stream",
+  "stone", "river", "lake", "hill", "vale", "glen", "grove", "meadow", "field", "path",
+  "flame", "spark", "ember", "glow", "flash", "beam", "ray", "gleam", "shimmer", "glint",
+  "dream", "wish", "hope", "dawn", "dusk", "mist", "shade", "echo", "whisper", "song"
+];
+
+/**
+ * Generate a friendly username like "swiftfox" or "calmriver"
+ */
+function generateFriendlyUsername(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  // Add random digits to reduce collision chance
+  const digits = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `${adj}${noun}${digits}`;
+}
+
 /**
  * Create an Agentmail inbox for email capabilities
- * Each user gets their own inbox like automna-{shortId}@agentmail.to (or custom domain)
+ * Each user gets a friendly email like swiftfox123@mail.automna.ai
  */
 async function createAgentmailInbox(shortId: string): Promise<string | null> {
   if (!AGENTMAIL_API_KEY) {
@@ -98,10 +128,10 @@ async function createAgentmailInbox(shortId: string): Promise<string | null> {
     return null;
   }
 
-  const username = `automna-${shortId}`;
+  const username = generateFriendlyUsername();
   const requestBody: Record<string, string> = {
     username,
-    display_name: `Automna User ${shortId}`,
+    display_name: `Automna Agent`,
   };
   
   // Use custom domain if configured (domain must be verified with Agentmail first)
