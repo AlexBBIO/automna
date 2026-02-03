@@ -222,7 +222,8 @@ function parseContent(text: string): Segment[] {
   
   const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
   const inlineCodeRegex = /`([^`\n]+)`/g;
-  const fileRefRegex = /\[\[(file|image):([^\]]+)\]\]/g;
+  // Support both [[file:/path]] and MEDIA:/path formats (OpenClaw uses MEDIA:)
+  const fileRefRegex = /\[\[(file|image):([^\]]+)\]\]|(?:^|\s)MEDIA:\s*`?([^\n`]+)`?/gim;
   
   let lastIndex = 0;
   let match;
@@ -252,11 +253,30 @@ function parseContent(text: string): Segment[] {
     const textContent = segment.content;
     fileRefRegex.lastIndex = 0;
     while ((match = fileRefRegex.exec(textContent)) !== null) {
-      if (match.index > textLastIndex) {
-        withFiles.push({ type: 'text', content: textContent.slice(textLastIndex, match.index) });
+      // Handle [[file:/path]] or [[image:/path]] format
+      if (match[1] && match[2]) {
+        if (match.index > textLastIndex) {
+          withFiles.push({ type: 'text', content: textContent.slice(textLastIndex, match.index) });
+        }
+        withFiles.push({ type: 'file', path: match[2].trim() });
+        textLastIndex = match.index + match[0].length;
       }
-      withFiles.push({ type: 'file', path: match[2].trim() });
-      textLastIndex = match.index + match[0].length;
+      // Handle MEDIA:/path format (OpenClaw native)
+      else if (match[3]) {
+        // Include any leading whitespace that was captured
+        const leadingWhitespace = match[0].match(/^(\s*)/)?.[1] || '';
+        if (match.index + leadingWhitespace.length > textLastIndex) {
+          withFiles.push({ type: 'text', content: textContent.slice(textLastIndex, match.index + leadingWhitespace.length) });
+        }
+        // Clean up the path (remove quotes, backticks, trailing punctuation)
+        let path = match[3].trim().replace(/^[`"']+/, '').replace(/[`"'.,;:!?]+$/, '');
+        // Handle file:// prefix
+        if (path.startsWith('file://')) {
+          path = path.replace('file://', '');
+        }
+        withFiles.push({ type: 'file', path });
+        textLastIndex = match.index + match[0].length;
+      }
     }
     if (textLastIndex < textContent.length) {
       withFiles.push({ type: 'text', content: textContent.slice(textLastIndex) });

@@ -251,17 +251,14 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     if (pendingFiles.length > 0) {
       setIsUploading(true);
       try {
-        const uploadedPaths: { path: string; isImage: boolean }[] = [];
+        const uploadedPaths: string[] = [];
         for (const file of pendingFiles) {
           const path = await uploadFileToWorkspace(file);
-          const isImage = file.type.startsWith('image/');
-          uploadedPaths.push({ path, isImage });
+          uploadedPaths.push(path);
         }
         
-        // Use [[image:/path]] or [[file:/path]] syntax for inline rendering
-        const fileRefs = uploadedPaths.map(({ path, isImage }) => {
-          return isImage ? `[[image:${path}]]` : `[[file:${path}]]`;
-        }).join('\n');
+        // Use MEDIA:/path syntax (OpenClaw native format) for inline rendering
+        const fileRefs = uploadedPaths.map(path => `MEDIA:${path}`).join('\n');
         
         messageText = messageText 
           ? `${messageText}\n\n${fileRefs}`
