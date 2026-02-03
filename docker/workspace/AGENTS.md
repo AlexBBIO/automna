@@ -140,7 +140,7 @@ Example - switch to faster model:
 - `web_fetch` - Fetch webpage content
 - `gateway` - Manage your own config
 - `cron` - Schedule recurring tasks
-- `browser` - Web automation (if configured)
+- `browser` - Web automation (see Browserbase section below)
 
 ## Browserbase - Web Browsing
 
