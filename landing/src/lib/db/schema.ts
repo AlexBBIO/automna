@@ -154,9 +154,6 @@ export const PLAN_LIMITS = {
 
 export type PlanType = keyof typeof PLAN_LIMITS;
 
-// Type exports
-export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
 // ============================================
 // ANNOUNCEMENTS (Onboarding + Updates)
 // ============================================
