@@ -45,6 +45,20 @@ export const machineEvents = sqliteTable("machine_events", {
   machineIdIdx: index("idx_machine_events_machine_id").on(table.machineId),
 }));
 
+// Secrets table - encrypted user secrets (API keys, tokens, etc.)
+export const secrets = sqliteTable("secrets", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(), // e.g., "discord_token", "browserbase_key"
+  encryptedValue: text("encrypted_value").notNull(), // AES-256-GCM encrypted
+  iv: text("iv").notNull(), // Initialization vector
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+}, (table) => ({
+  userIdIdx: index("idx_secrets_user_id").on(table.userId),
+  userNameUnique: index("idx_secrets_user_name").on(table.userId, table.name),
+}));
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -52,3 +66,5 @@ export type Machine = typeof machines.$inferSelect;
 export type NewMachine = typeof machines.$inferInsert;
 export type MachineEvent = typeof machineEvents.$inferSelect;
 export type NewMachineEvent = typeof machineEvents.$inferInsert;
+export type Secret = typeof secrets.$inferSelect;
+export type NewSecret = typeof secrets.$inferInsert;
