@@ -35,6 +35,7 @@
 | OpenClaw migration | ✅ Done | Migrated from Clawdbot to OpenClaw |
 | **Files API** | ✅ Working | Caddy reverse proxy → internal file server |
 | **Agent Config** | ✅ Working | Workspace injection, memory enabled |
+| **LLM Proxy** | ✅ Working | Centralized API, usage tracking, rate limits |
 | File Browser UI | 🔧 Testing | UI exists, needs testing |
 
 ### ❌ Deprecated
@@ -47,6 +48,35 @@
 | `ghcr.io/phioranex/openclaw-docker` | ❌ Deprecated | Use custom Automna image |
 
 ### 📝 Recent Changes (2026-02-03)
+
+**🤖 LLM Proxy (05:17 UTC):**
+
+Implemented centralized LLM API proxy at `https://automna.ai/api/llm/*`:
+
+1. **Endpoints**
+   - `POST /api/llm/chat` - Anthropic Messages API proxy
+   - `POST /api/llm/embed` - Embedding API (placeholder)
+   - `GET /api/llm/usage` - Usage statistics
+
+2. **Features**
+   - **Gateway token auth** - Same tokens used for Clawdbot access
+   - **Usage tracking** - Every request logged with tokens/cost to `llm_usage` table
+   - **Rate limiting** - Per-minute (5-60 RPM) and monthly (100K-5M tokens) by plan
+   - **Streaming support** - Full SSE passthrough with token counting
+   - **Cost calculation** - Microdollar precision, per-model pricing
+
+3. **Plan Limits**
+   | Plan | Monthly Tokens | Monthly Cap | RPM |
+   |------|----------------|-------------|-----|
+   | Free | 100K | $1 | 5 |
+   | Starter | 500K | $5 | 20 |
+   | Pro | 5M | $50 | 60 |
+
+4. **Database Tables**
+   - `llm_usage` - Request logs with tokens, cost, duration
+   - `llm_rate_limits` - Per-minute counters
+
+See [`docs/LLM-PROXY.md`](docs/LLM-PROXY.md) for full implementation guide.
 
 **🔀 Caddy Reverse Proxy Architecture (04:32 UTC):**
 
