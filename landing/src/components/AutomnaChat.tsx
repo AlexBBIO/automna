@@ -209,6 +209,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoWakeSentRef = useRef(false);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -219,6 +220,25 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Auto-wake on first connect with empty history (triggers BOOTSTRAP flow)
+  useEffect(() => {
+    if (
+      loadingPhase === 'ready' &&
+      messages.length === 0 &&
+      !autoWakeSentRef.current &&
+      !isRunning &&
+      sessionKey === 'main' // Only auto-wake on main session
+    ) {
+      autoWakeSentRef.current = true;
+      console.log('[chat] Auto-waking agent (empty history, fresh session)');
+      // Send a friendly greeting to trigger the agent's BOOTSTRAP response
+      append({
+        role: 'user',
+        content: [{ type: 'text', text: 'Hey!' }],
+      });
+    }
+  }, [loadingPhase, messages.length, isRunning, sessionKey, append]);
 
   const uploadFileToWorkspace = async (file: File): Promise<string> => {
     const timestamp = Date.now();
