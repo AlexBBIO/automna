@@ -104,7 +104,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "defaults": {
       "workspace": "/home/node/.openclaw/workspace",
       "model": {
-        "primary": "anthropic/claude-sonnet-4"
+        "primary": "anthropic/claude-3-5-sonnet-20241022"
       },
       "userTimezone": "America/Los_Angeles",
       "contextPruning": {
@@ -134,6 +134,13 @@ if [ -f "$CONFIG_FILE" ] && ! grep -q '"trustedProxies"' "$CONFIG_FILE" 2>/dev/n
         fs.writeFileSync('$CONFIG_FILE', JSON.stringify(config, null, 2));
         console.log('[automna] trustedProxies added');
     " 2>/dev/null || echo "[automna] Warning: trustedProxies migration failed"
+fi
+
+# Migration: Fix model name (claude-sonnet-4 -> claude-3-5-sonnet-20241022)
+if [ -f "$CONFIG_FILE" ] && grep -q 'claude-sonnet-4' "$CONFIG_FILE" 2>/dev/null; then
+    echo "[automna] Migrating config: fixing model name..."
+    sed -i 's/claude-sonnet-4/claude-3-5-sonnet-20241022/g' "$CONFIG_FILE"
+    echo "[automna] Model name fixed"
 fi
 
 # Initial session key fix
