@@ -97,6 +97,9 @@ if [ ! -f "$CONFIG_FILE" ]; then
     echo "[automna] Creating default config..."
     cat > "$CONFIG_FILE" << 'EOF'
 {
+  "gateway": {
+    "trustedProxies": ["127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fd00::/8"]
+  },
   "agents": {
     "defaults": {
       "workspace": "/home/node/.openclaw/workspace",
@@ -116,6 +119,21 @@ if [ ! -f "$CONFIG_FILE" ]; then
 }
 EOF
     echo "[automna] Config created"
+fi
+
+# Migration: Add trustedProxies if missing
+if [ -f "$CONFIG_FILE" ] && ! grep -q '"trustedProxies"' "$CONFIG_FILE" 2>/dev/null; then
+    echo "[automna] Migrating config: adding trustedProxies..."
+    node -e "
+        const fs = require('fs');
+        const config = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf8'));
+        if (!config.gateway) config.gateway = {};
+        if (!config.gateway.trustedProxies) {
+            config.gateway.trustedProxies = ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fd00::/8'];
+        }
+        fs.writeFileSync('$CONFIG_FILE', JSON.stringify(config, null, 2));
+        console.log('[automna] trustedProxies added');
+    " 2>/dev/null || echo "[automna] Warning: trustedProxies migration failed"
 fi
 
 # Initial session key fix
