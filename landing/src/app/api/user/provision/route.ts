@@ -29,6 +29,9 @@ const OPENCLAW_IMAGE = process.env.OPENCLAW_IMAGE || "registry.fly.io/automna-op
 const BROWSERBASE_API_KEY = process.env.BROWSERBASE_API_KEY;
 const BROWSERBASE_PROJECT_ID = process.env.BROWSERBASE_PROJECT_ID;
 
+// Agentmail config for email capabilities
+const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY;
+
 /**
  * Get the personal organization ID from Fly API
  */
@@ -82,6 +85,39 @@ async function createBrowserbaseContext(): Promise<string | null> {
   const data = await response.json();
   console.log(`[provision] Created Browserbase context: ${data.id}`);
   return data.id;
+}
+
+/**
+ * Create an Agentmail inbox for email capabilities
+ * Each user gets their own inbox like automna-{shortId}@agentmail.to
+ */
+async function createAgentmailInbox(shortId: string): Promise<string | null> {
+  if (!AGENTMAIL_API_KEY) {
+    console.log("[provision] Agentmail not configured, skipping inbox creation");
+    return null;
+  }
+
+  const username = `automna-${shortId}`;
+  const response = await fetch("https://api.agentmail.to/v0/inboxes", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${AGENTMAIL_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      username,
+      display_name: `Automna User ${shortId}`,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error("[provision] Failed to create Agentmail inbox:", await response.text());
+    return null; // Non-fatal - user can still use the bot without email
+  }
+
+  const data = await response.json();
+  console.log(`[provision] Created Agentmail inbox: ${data.inbox_id}`);
+  return data.inbox_id;
 }
 
 interface FlyApp {
@@ -261,10 +297,11 @@ async function createMachine(
   appName: string,
   volumeId: string,
   gatewayToken: string,
-  browserbaseContextId: string | null
+  browserbaseContextId: string | null,
+  agentmailInboxId: string | null
 ): Promise<FlyMachine> {
   
-  // Build env vars - only include Browserbase if configured
+  // Build env vars - only include integrations if configured
   const env: Record<string, string> = {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
@@ -278,6 +315,12 @@ async function createMachine(
     if (browserbaseContextId) {
       env.BROWSERBASE_CONTEXT_ID = browserbaseContextId;
     }
+  }
+
+  // Add Agentmail config if available
+  if (AGENTMAIL_API_KEY && agentmailInboxId) {
+    env.AGENTMAIL_API_KEY = AGENTMAIL_API_KEY;
+    env.AGENTMAIL_INBOX_ID = agentmailInboxId;
   }
 
   const config = {
@@ -494,17 +537,18 @@ export async function POST() {
       console.log(`[provision] App ${appName} already exists`);
     }
 
-    // Step 2: Create volume and Browserbase context in parallel
+    // Step 2: Create volume, Browserbase context, and Agentmail inbox in parallel
     const gatewayToken = crypto.randomUUID();
-    console.log(`[provision] Creating volume for ${appName}`);
-    const [volume, browserbaseContextId] = await Promise.all([
+    console.log(`[provision] Creating volume and integrations for ${appName}`);
+    const [volume, browserbaseContextId, agentmailInboxId] = await Promise.all([
       createVolume(appName),
       createBrowserbaseContext(),
+      createAgentmailInbox(shortId),
     ]);
 
     // Step 3: Create machine (env vars passed directly, no Fly secrets needed)
     console.log(`[provision] Creating machine for ${appName}`);
-    const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId);
+    const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId, agentmailInboxId);
 
     // Step 4: Wait for machine to be ready
     console.log(`[provision] Waiting for machine ${machine.id} to start`);
@@ -521,6 +565,7 @@ export async function POST() {
       ipAddress: readyMachine.private_ip,
       gatewayToken,
       browserbaseContextId,
+      agentmailInboxId,
       lastActiveAt: new Date(),
     });
 

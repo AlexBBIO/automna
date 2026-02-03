@@ -142,6 +142,10 @@ Example - switch to faster model:
 - `cron` - Schedule recurring tasks
 - `browser` - Web automation (see Browserbase section below)
 
+**🌐 Web Browsing:** Check `BROWSERBASE.md` for how to browse the web with persistent cookies and bot detection bypass.
+
+**📧 Email:** Check `AGENTMAIL.md` for how to send and receive emails.
+
 ## Browserbase - Web Browsing
 
 You have access to Browserbase for web automation that bypasses bot detection.

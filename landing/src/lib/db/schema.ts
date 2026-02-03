@@ -26,6 +26,7 @@ export const machines = sqliteTable("machines", {
   ipAddress: text("ip_address"),
   gatewayToken: text("gateway_token"), // Per-user gateway auth token
   browserbaseContextId: text("browserbase_context_id"), // Browserbase persistent context for this user
+  agentmailInboxId: text("agentmail_inbox_id"), // Agentmail inbox for this user (e.g., automna-abc123@agentmail.to)
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   lastActiveAt: integer("last_active_at", { mode: "timestamp" }),
