@@ -404,12 +404,12 @@ export default function DashboardPage() {
     const skeletonPhase = skeletonPhaseMap[loadPhase] || 'connecting';
     
     return (
-      <div className="h-screen bg-zinc-50 flex flex-col">
-        <nav className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
+      <div className="h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col transition-colors">
+        <nav className="border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
           <Link href="/" className="text-xl font-bold tracking-tight">
-            <span className="text-purple-600">Auto</span><span className="text-zinc-900">mna</span>
+            <span className="text-purple-600">Auto</span><span className="text-zinc-900 dark:text-white">mna</span>
           </Link>
-          <div className="w-8 h-8 rounded-full bg-zinc-200 animate-pulse"></div>
+          <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 animate-pulse"></div>
         </nav>
         <div className="flex-1">
           <ChatSkeleton phase={skeletonPhase} />

@@ -17,9 +17,16 @@ const provisioningSteps = [
   { text: 'Almost ready...', duration: 20000 },
 ];
 
+function formatElapsedTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProps) {
   const [provisionStep, setProvisionStep] = useState(0);
   const [animatedProgress, setAnimatedProgress] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Cycle through provisioning steps
   useEffect(() => {
@@ -74,6 +81,20 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
 
     const animationId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationId);
+  }, [phase]);
+
+  // Elapsed time counter during provisioning
+  useEffect(() => {
+    if (phase !== 'provisioning') {
+      setElapsedSeconds(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, [phase]);
 
   const phases = {
@@ -136,9 +157,21 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
           </div>
           
           {/* Status text */}
-          <div className="flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
-            <div className="animate-spin h-4 w-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>
-            <span>{message || current.text}</span>
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
+              <div className="animate-spin h-4 w-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+              <span>{message || current.text}</span>
+            </div>
+            
+            {/* Provisioning timer and estimate */}
+            {phase === 'provisioning' && (
+              <div className="flex items-center gap-3 text-xs text-zinc-400 dark:text-zinc-500">
+                <span>This usually takes about 2 minutes</span>
+                <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
+                  {formatElapsedTime(elapsedSeconds)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
