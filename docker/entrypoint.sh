@@ -100,6 +100,14 @@ if [ ! -f "$CONFIG_FILE" ]; then
   "gateway": {
     "trustedProxies": ["127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fd00::/8"]
   },
+  "models": {
+    "providers": {
+      "anthropic": {
+        "baseUrl": "https://automna.ai/api/llm",
+        "models": []
+      }
+    }
+  },
   "agents": {
     "defaults": {
       "workspace": "/home/node/.openclaw/workspace",
@@ -141,6 +149,26 @@ if [ -f "$CONFIG_FILE" ] && grep -qE 'claude-sonnet-4|claude-3-5-sonnet' "$CONFI
     echo "[automna] Migrating config: setting model to Opus 4.5..."
     sed -i 's/claude-sonnet-4/claude-opus-4-5/g; s/claude-3-5-sonnet-[0-9]*/claude-opus-4-5/g' "$CONFIG_FILE"
     echo "[automna] Model set to Opus 4.5"
+fi
+
+# Migration: Add models.providers.anthropic.baseUrl for LLM proxy routing
+# This is required because OpenClaw/pi-ai does NOT read ANTHROPIC_BASE_URL env var
+if [ -f "$CONFIG_FILE" ] && ! grep -q '"providers"' "$CONFIG_FILE" 2>/dev/null; then
+    echo "[automna] Migrating config: adding anthropic proxy baseUrl..."
+    node -e "
+        const fs = require('fs');
+        const config = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf8'));
+        if (!config.models) config.models = {};
+        if (!config.models.providers) config.models.providers = {};
+        if (!config.models.providers.anthropic) {
+            config.models.providers.anthropic = {
+                baseUrl: 'https://automna.ai/api/llm',
+                models: []
+            };
+        }
+        fs.writeFileSync('$CONFIG_FILE', JSON.stringify(config, null, 2));
+        console.log('[automna] anthropic proxy baseUrl added');
+    " 2>/dev/null || echo "[automna] Warning: anthropic proxy migration failed"
 fi
 
 # Initial session key fix
