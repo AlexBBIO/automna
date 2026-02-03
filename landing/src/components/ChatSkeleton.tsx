@@ -87,47 +87,47 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
   const current = phases[phase] || phases.connecting;
 
   return (
-    <div className="h-full flex flex-col bg-zinc-50">
+    <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 transition-colors">
       {/* Skeleton messages */}
       <div className="flex-1 p-4 space-y-4 overflow-hidden">
         {/* User message skeleton */}
         <div className="flex justify-end">
-          <div className="bg-purple-100 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse">
-            <div className="h-4 bg-purple-200 rounded w-48"></div>
+          <div className="bg-purple-100 dark:bg-purple-900/30 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse">
+            <div className="h-4 bg-purple-200 dark:bg-purple-800/50 rounded w-48"></div>
           </div>
         </div>
         
         {/* Assistant message skeleton */}
         <div className="flex justify-start">
-          <div className="bg-white border border-zinc-200 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse space-y-2 shadow-sm">
-            <div className="h-4 bg-zinc-200 rounded w-64"></div>
-            <div className="h-4 bg-zinc-200 rounded w-56"></div>
-            <div className="h-4 bg-zinc-200 rounded w-40"></div>
+          <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse space-y-2 shadow-sm">
+            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-64"></div>
+            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-56"></div>
+            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-40"></div>
           </div>
         </div>
 
         {/* Another user message */}
         <div className="flex justify-end">
-          <div className="bg-purple-100 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse">
-            <div className="h-4 bg-purple-200 rounded w-32"></div>
+          <div className="bg-purple-100 dark:bg-purple-900/30 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse">
+            <div className="h-4 bg-purple-200 dark:bg-purple-800/50 rounded w-32"></div>
           </div>
         </div>
 
         {/* Another assistant message */}
         <div className="flex justify-start">
-          <div className="bg-white border border-zinc-200 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse space-y-2 shadow-sm">
-            <div className="h-4 bg-zinc-200 rounded w-72"></div>
-            <div className="h-4 bg-zinc-200 rounded w-48"></div>
+          <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse space-y-2 shadow-sm">
+            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-72"></div>
+            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-48"></div>
           </div>
         </div>
       </div>
 
       {/* Loading indicator */}
-      <div className="border-t border-zinc-200 p-4 bg-white">
+      <div className="border-t border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900 transition-colors">
         <div className="max-w-2xl mx-auto">
           {/* Progress bar */}
           <div className="mb-3">
-            <div className="h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-purple-500 to-violet-500 transition-all duration-500 ease-out"
                 style={{ width: `${current.progress}%` }}
@@ -136,7 +136,7 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
           </div>
           
           {/* Status text */}
-          <div className="flex items-center justify-center gap-2 text-zinc-500 text-sm">
+          <div className="flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
             <div className="animate-spin h-4 w-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>
             <span>{message || current.text}</span>
           </div>
@@ -144,11 +144,11 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
       </div>
 
       {/* Disabled input skeleton */}
-      <div className="border-t border-zinc-200 p-4 bg-white">
+      <div className="border-t border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900 transition-colors">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-2 bg-zinc-100 rounded-xl p-3 opacity-50">
-            <div className="flex-1 h-6 bg-zinc-200 rounded"></div>
-            <div className="w-10 h-10 bg-zinc-200 rounded-lg"></div>
+          <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-3 opacity-50">
+            <div className="flex-1 h-6 bg-zinc-200 dark:bg-zinc-700 rounded"></div>
+            <div className="w-10 h-10 bg-zinc-200 dark:bg-zinc-700 rounded-lg"></div>
           </div>
         </div>
       </div>

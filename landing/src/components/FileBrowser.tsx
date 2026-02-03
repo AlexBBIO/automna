@@ -189,23 +189,23 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
   const workspaceSegmentCount = WORKSPACE_ROOT.split('/').filter(Boolean).length;
   
   return (
-    <div className="h-full flex flex-col bg-white text-zinc-900">
+    <div className="h-full flex flex-col bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white transition-colors">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 bg-zinc-50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
         <div className="flex items-center gap-2 text-sm">
           {/* Breadcrumbs */}
           <button 
             onClick={() => navigateTo(WORKSPACE_ROOT)}
-            className="text-zinc-500 hover:text-zinc-900"
+            className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
           >
             📁 workspace
           </button>
           {pathSegments.slice(workspaceSegmentCount).map((segment, i) => (
             <span key={i} className="flex items-center gap-2">
-              <span className="text-zinc-300">/</span>
+              <span className="text-zinc-300 dark:text-zinc-600">/</span>
               <button
                 onClick={() => navigateTo('/' + pathSegments.slice(0, workspaceSegmentCount + i + 1).join('/'))}
-                className="text-zinc-500 hover:text-zinc-900"
+                className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
               >
                 {segment}
               </button>
@@ -217,7 +217,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors disabled:opacity-50"
+            className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
             title="Refresh"
           >
             <svg className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -227,7 +227,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           
           <button
             onClick={() => setShowNewFolderModal(true)}
-            className="flex items-center gap-1 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm rounded-lg transition-colors"
+            className="flex items-center gap-1 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm rounded-lg transition-colors"
             title="New Folder"
           >
             <span>📁</span>
@@ -236,7 +236,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           
           <button
             onClick={() => setShowNewFileModal(true)}
-            className="flex items-center gap-1 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm rounded-lg transition-colors"
+            className="flex items-center gap-1 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm rounded-lg transition-colors"
             title="New File"
           >
             <span>📄</span>
@@ -261,7 +261,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       
       {/* Error message */}
       {error && (
-        <div className="px-4 py-2 bg-red-50 border-b border-red-200 text-red-700 text-sm">
+        <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
           {error}
         </div>
       )}
@@ -269,12 +269,12 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* File list */}
-        <div className="w-1/2 border-r border-zinc-200 overflow-y-auto">
+        <div className="w-1/2 border-r border-zinc-200 dark:border-zinc-800 overflow-y-auto">
           {/* Up button */}
           {currentPath !== '/home/node/.openclaw' && (
             <button
               onClick={navigateUp}
-              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-zinc-50 text-zinc-500 border-b border-zinc-100"
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-zinc-800"
             >
               <span>📂</span>
               <span>..</span>
@@ -291,14 +291,14 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
           {files.map((file) => (
             <div
               key={file.path}
-              className={`flex items-center gap-3 px-4 py-2 hover:bg-zinc-50 cursor-pointer group ${
-                selectedFile?.path === file.path ? 'bg-purple-50 border-l-2 border-purple-500' : ''
+              className={`flex items-center gap-3 px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer group ${
+                selectedFile?.path === file.path ? 'bg-purple-50 dark:bg-purple-900/30 border-l-2 border-purple-500' : ''
               }`}
               onClick={() => handleFileClick(file)}
             >
               <span className="text-lg">{getFileIcon(file.name, file.type)}</span>
               <div className="flex-1 min-w-0">
-                <div className="truncate text-sm text-zinc-800">{file.name}</div>
+                <div className="truncate text-sm text-zinc-800 dark:text-zinc-200">{file.name}</div>
                 <div className="text-xs text-zinc-400">
                   {file.type === 'directory' ? 'Folder' : formatFileSize(file.size)}
                   {' · '}
@@ -311,7 +311,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
                 {file.type === 'file' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); downloadFile(file.path); }}
-                    className="p-1 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded"
+                    className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                     title="Download"
                   >
                     ⬇️
@@ -319,7 +319,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(file); }}
-                  className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded"
+                  className="p-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
                   title="Delete"
                 >
                   🗑️
@@ -330,7 +330,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
         </div>
         
         {/* Preview panel */}
-        <div className="w-1/2 overflow-y-auto bg-zinc-50">
+        <div className="w-1/2 overflow-y-auto bg-zinc-50 dark:bg-zinc-950/50">
           {!selectedFile ? (
             <div className="h-full flex items-center justify-center text-zinc-400">
               <div className="text-center">
@@ -340,7 +340,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
             </div>
           ) : isLoadingContent ? (
             <div className="h-full flex items-center justify-center">
-              <div className="text-zinc-500">Loading...</div>
+              <div className="text-zinc-500 dark:text-zinc-400">Loading...</div>
             </div>
           ) : (
             <FilePreview 
@@ -362,21 +362,21 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       {/* New File Modal */}
       {showNewFileModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 border border-zinc-200 shadow-xl">
-            <h3 className="text-lg font-semibold mb-4 text-zinc-900">Create New File</h3>
+          <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 w-96 border border-zinc-200 dark:border-zinc-700 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4 text-zinc-900 dark:text-white">Create New File</h3>
             <input
               type="text"
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
               placeholder="filename.md"
-              className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100"
+              className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-purple-400 dark:focus:border-purple-500 focus:ring-1 focus:ring-purple-100 dark:focus:ring-purple-900"
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleCreateFile()}
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => { setShowNewFileModal(false); setNewItemName(''); }}
-                className="px-4 py-2 text-zinc-500 hover:text-zinc-900"
+                className="px-4 py-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
               >
                 Cancel
               </button>
@@ -394,21 +394,21 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       {/* New Folder Modal */}
       {showNewFolderModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 border border-zinc-200 shadow-xl">
-            <h3 className="text-lg font-semibold mb-4 text-zinc-900">Create New Folder</h3>
+          <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 w-96 border border-zinc-200 dark:border-zinc-700 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4 text-zinc-900 dark:text-white">Create New Folder</h3>
             <input
               type="text"
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
               placeholder="folder-name"
-              className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100"
+              className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-purple-400 dark:focus:border-purple-500 focus:ring-1 focus:ring-purple-100 dark:focus:ring-purple-900"
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => { setShowNewFolderModal(false); setNewItemName(''); }}
-                className="px-4 py-2 text-zinc-500 hover:text-zinc-900"
+                className="px-4 py-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
               >
                 Cancel
               </button>
