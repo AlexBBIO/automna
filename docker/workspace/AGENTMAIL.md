@@ -97,9 +97,15 @@ response = requests.post(
 )
 ```
 
+## Rate Limits
+
+**You can send up to 50 emails per day.** This resets at midnight UTC.
+
+Be mindful of this limit when automating email tasks. If you need to send many emails, batch them over multiple days or ask your human to request a limit increase.
+
 ## Notes
 
-- Your inbox address is in `AGENTMAIL_INBOX_ID` (e.g., automna-abc123@agentmail.to)
+- Your inbox address is in `AGENTMAIL_INBOX_ID` (e.g., swiftfox@mail.automna.ai)
 - Emails sent from this address will show that as the sender
 - Replies to your emails will arrive in your inbox
 - Check inbox periodically for new messages or set up webhooks for real-time
