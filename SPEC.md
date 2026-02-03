@@ -2,9 +2,9 @@
 
 > **Note:** Original name was "Automna" but changed to "Automna" (K spelling) to avoid trademark conflict with Agent IQ (USPTO #99399937). Domain automna.ai confirmed available 2026-01-28.
 
-**Version:** 0.4  
+**Version:** 0.5  
 **Date:** 2026-02-03  
-**Status:** MVP In Progress (Media Rendering Complete)
+**Status:** MVP In Progress (Heartbeat + Media Complete)
 
 ---
 
@@ -26,6 +26,7 @@
 | Anthropic integration | ✅ Working | API key configured |
 | Optimistic UI | ✅ Working | Chat skeleton, animated loading |
 | **Media rendering** | ✅ Working | Inline images, file uploads, MEDIA: syntax |
+| **Heartbeat system** | ✅ Working | 30-min periodic checks, email awareness |
 
 ### 🔧 In Progress
 | Component | Status | Notes |
@@ -46,6 +47,34 @@
 | `ghcr.io/phioranex/openclaw-docker` | ❌ Deprecated | Use custom Automna image |
 
 ### 📝 Recent Changes (2026-02-03)
+
+**💓 Heartbeat System (04:10 UTC):**
+
+Agents now have periodic heartbeats for proactive awareness:
+
+1. **Configuration**
+   - 30-minute interval
+   - Opus 4.5 model (same as default)
+   - Enabled by default for all new users
+
+2. **How It Works**
+   - Every 30 min, gateway sends heartbeat poll to agent
+   - Agent reads `HEARTBEAT.md` for tasks (check email, etc.)
+   - Agent updates `heartbeat-state.json` with what it's seen
+   - On next user chat, agent mentions new emails naturally
+
+3. **Files Added to Workspace**
+   - `HEARTBEAT.md` - Instructions for periodic tasks
+   - `heartbeat-state.json` - State tracking
+
+4. **Docker Image Updated**
+   - Config includes heartbeat settings
+   - Workspace files copied on first boot
+   - Image: `registry.fly.io/automna-openclaw-image:latest`
+
+5. **Documentation**
+   - Created `docs/HEARTBEAT-IMPLEMENTATION.md`
+   - Updated `docker/workspace/AGENTS.md`
 
 **🖼️ Inline Media Rendering (00:15 UTC):**
 
