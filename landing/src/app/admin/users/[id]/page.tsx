@@ -13,7 +13,8 @@ import {
   Mail,
   Zap,
   DollarSign,
-  MessageSquare
+  MessageSquare,
+  Trash2
 } from "lucide-react";
 
 interface UserDetail {
@@ -167,6 +168,38 @@ export default function UserDetailPage() {
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
+  }
+
+  async function handleDeleteUser() {
+    const confirmed = confirm(
+      `⚠️ DELETE USER?\n\nThis will permanently delete:\n- Fly machine and app\n- Browserbase context\n- Agentmail inbox\n- All agent data\n\nThis cannot be undone. Continue?`
+    );
+    if (!confirmed) return;
+    
+    const doubleConfirm = confirm(
+      `Are you ABSOLUTELY sure?\n\nUser: ${user?.email}\nApp: ${user?.appName}\n\nType OK in the next prompt to confirm.`
+    );
+    if (!doubleConfirm) return;
+
+    setActionLoading("delete");
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/delete`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        alert("User deleted successfully. Redirecting...");
+        router.push("/admin/users");
+      } else {
+        alert(`Deletion ${data.success ? "partially" : ""} failed:\n${JSON.stringify(data.results, null, 2)}`);
+        await fetchUser();
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   if (loading) {
@@ -329,6 +362,18 @@ export default function UserDetailPage() {
                     <RefreshCw className="w-4 h-4" />
                   )}
                   Regenerate Token
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={actionLoading !== null}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-red-900/50 text-red-400 rounded-lg text-sm hover:bg-red-900 disabled:opacity-50 ml-auto"
+                >
+                  {actionLoading === "delete" ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  Delete User
                 </button>
               </div>
             </>
