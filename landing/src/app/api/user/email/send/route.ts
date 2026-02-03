@@ -10,8 +10,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { machines } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { machines, emailSends } from "@/lib/db/schema";
+import { eq, and, gte, count } from "drizzle-orm";
 
 const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY;
 const DAILY_EMAIL_LIMIT = 50;
@@ -72,9 +72,13 @@ export async function POST(request: NextRequest) {
     todayStart.setUTCHours(0, 0, 0, 0);
     const todayStartUnix = Math.floor(todayStart.getTime() / 1000);
 
-    const countResult = await db.all<{ count: number }>(
-      sql`SELECT COUNT(*) as count FROM email_sends WHERE user_id = ${userId} AND sent_at >= ${todayStartUnix}`
-    );
+    const countResult = await db
+      .select({ count: count() })
+      .from(emailSends)
+      .where(and(
+        eq(emailSends.userId, userId),
+        gte(emailSends.sentAt, todayStartUnix)
+      ));
     const todayCount = countResult[0]?.count || 0;
 
     if (todayCount >= DAILY_EMAIL_LIMIT) {
@@ -101,8 +105,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Send via Agentmail
+    // Note: Agentmail API uses /messages/send endpoint with simple string recipients
     const agentmailResponse = await fetch(
-      `https://api.agentmail.to/v0/inboxes/${encodeURIComponent(userMachine.agentmailInboxId)}/messages`,
+      `https://api.agentmail.to/v0/inboxes/${encodeURIComponent(userMachine.agentmailInboxId!)}/messages/send`,
       {
         method: "POST",
         headers: {
@@ -110,12 +115,12 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          to: Array.isArray(to) ? to : [{ email: to }],
+          to: Array.isArray(to) ? to.join(", ") : to,
           subject,
           text,
           html,
-          cc: cc ? (Array.isArray(cc) ? cc : [{ email: cc }]) : undefined,
-          bcc: bcc ? (Array.isArray(bcc) ? bcc : [{ email: bcc }]) : undefined,
+          cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc) : undefined,
+          bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc) : undefined,
         }),
       }
     );
@@ -132,9 +137,12 @@ export async function POST(request: NextRequest) {
     const result = await agentmailResponse.json();
 
     // Record the send
-    await db.run(
-      sql`INSERT INTO email_sends (user_id, sent_at, recipient, subject) VALUES (${userId}, ${Math.floor(Date.now() / 1000)}, ${Array.isArray(to) ? to[0]?.email || to[0] : to}, ${subject})`
-    );
+    await db.insert(emailSends).values({
+      userId,
+      sentAt: Math.floor(Date.now() / 1000),
+      recipient: Array.isArray(to) ? to[0] : to,
+      subject,
+    });
 
     return NextResponse.json({
       success: true,
@@ -164,9 +172,13 @@ export async function GET() {
     todayStart.setUTCHours(0, 0, 0, 0);
     const todayStartUnix = Math.floor(todayStart.getTime() / 1000);
 
-    const countResult = await db.all<{ count: number }>(
-      sql`SELECT COUNT(*) as count FROM email_sends WHERE user_id = ${userId} AND sent_at >= ${todayStartUnix}`
-    );
+    const countResult = await db
+      .select({ count: count() })
+      .from(emailSends)
+      .where(and(
+        eq(emailSends.userId, userId),
+        gte(emailSends.sentAt, todayStartUnix)
+      ));
     const todayCount = countResult[0]?.count || 0;
 
     return NextResponse.json({

@@ -109,6 +109,21 @@ export const llmRateLimits = sqliteTable("llm_rate_limits", {
   lastReset: integer("last_reset").notNull().$defaultFn(() => Math.floor(Date.now() / 1000)),
 });
 
+// ============================================
+// EMAIL TRACKING
+// ============================================
+
+// Email sends - track outgoing emails for rate limiting
+export const emailSends = sqliteTable("email_sends", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull(),
+  sentAt: integer("sent_at").notNull().$defaultFn(() => Math.floor(Date.now() / 1000)),
+  recipient: text("recipient").notNull(),
+  subject: text("subject"),
+}, (table) => ({
+  userSentAtIdx: index("idx_email_sends_user_sent_at").on(table.userId, table.sentAt),
+}));
+
 // Plan limits (stored in code for simplicity)
 export const PLAN_LIMITS = {
   free: {
@@ -151,3 +166,5 @@ export type NewSecret = typeof secrets.$inferInsert;
 export type LlmUsage = typeof llmUsage.$inferSelect;
 export type NewLlmUsage = typeof llmUsage.$inferInsert;
 export type LlmRateLimit = typeof llmRateLimits.$inferSelect;
+export type EmailSend = typeof emailSends.$inferSelect;
+export type NewEmailSend = typeof emailSends.$inferInsert;
