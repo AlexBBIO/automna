@@ -34,23 +34,19 @@ export async function GET() {
       });
     }
     
-    // Build gateway URL - use history endpoint as health probe
+    // Build gateway URL - just check if it responds
     const gatewayBase = `https://${userMachine.appName}.fly.dev`;
-    const historyUrl = `${gatewayBase}/ws/api/history?sessionKey=main&token=${encodeURIComponent(userMachine.gatewayToken)}`;
     
     try {
-      const response = await fetch(historyUrl, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        // Short timeout - we just want to know if it's responding
+      // Simple health check - any response means the server is up
+      const response = await fetch(gatewayBase, {
+        method: "HEAD", // Just check if reachable
         signal: AbortSignal.timeout(5000),
       });
       
-      // Any response (including 401, 404) means the gateway is up
+      // Any response means the gateway is up (even redirects, 404s, etc.)
       // Only network errors mean it's not ready
-      const ready = response.ok || response.status < 500;
+      const ready = response.status > 0;
       
       return NextResponse.json({
         ready,
