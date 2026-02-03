@@ -66,6 +66,9 @@ export async function GET() {
       // No session prefix needed - entire app is user-isolated
       sessionKey: "main",
       userId: clerkId,
+      // Integration info
+      agentEmail: userMachine.agentmailInboxId || null,
+      browserbaseContextId: userMachine.browserbaseContextId || null,
     });
   } catch (error) {
     console.error("[api/user/gateway] Error:", error);

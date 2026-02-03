@@ -31,6 +31,7 @@ const BROWSERBASE_PROJECT_ID = process.env.BROWSERBASE_PROJECT_ID;
 
 // Agentmail config for email capabilities
 const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY;
+const AGENTMAIL_DOMAIN = process.env.AGENTMAIL_DOMAIN || "agentmail.to"; // Custom domain support
 
 /**
  * Get the personal organization ID from Fly API
@@ -89,7 +90,7 @@ async function createBrowserbaseContext(): Promise<string | null> {
 
 /**
  * Create an Agentmail inbox for email capabilities
- * Each user gets their own inbox like automna-{shortId}@agentmail.to
+ * Each user gets their own inbox like automna-{shortId}@agentmail.to (or custom domain)
  */
 async function createAgentmailInbox(shortId: string): Promise<string | null> {
   if (!AGENTMAIL_API_KEY) {
@@ -98,16 +99,23 @@ async function createAgentmailInbox(shortId: string): Promise<string | null> {
   }
 
   const username = `automna-${shortId}`;
+  const requestBody: Record<string, string> = {
+    username,
+    display_name: `Automna User ${shortId}`,
+  };
+  
+  // Use custom domain if configured (domain must be verified with Agentmail first)
+  if (AGENTMAIL_DOMAIN !== "agentmail.to") {
+    requestBody.domain = AGENTMAIL_DOMAIN;
+  }
+
   const response = await fetch("https://api.agentmail.to/v0/inboxes", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${AGENTMAIL_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      username,
-      display_name: `Automna User ${shortId}`,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
