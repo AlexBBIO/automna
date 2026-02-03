@@ -11,17 +11,29 @@ export interface AuthenticatedUser {
 
 /**
  * Authenticate a request using the gateway token.
- * The gateway token is passed as a Bearer token in the Authorization header.
+ * 
+ * Supports two auth methods:
+ * 1. Authorization: Bearer <token> (standard Bearer auth)
+ * 2. x-api-key: <token> (Anthropic SDK style)
+ * 
+ * The Anthropic SDK sends the API key in x-api-key header, so we need to support both.
  */
 export async function authenticateGatewayToken(
   request: Request
 ): Promise<AuthenticatedUser | null> {
+  // Try Authorization header first (Bearer token)
   const authHeader = request.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return null;
+  let token: string | null = null;
+  
+  if (authHeader?.startsWith("Bearer ")) {
+    token = authHeader.slice(7).trim();
   }
-
-  const token = authHeader.slice(7).trim();
+  
+  // Fall back to x-api-key header (Anthropic SDK style)
+  if (!token) {
+    token = request.headers.get("x-api-key")?.trim() ?? null;
+  }
+  
   if (!token) {
     return null;
   }
