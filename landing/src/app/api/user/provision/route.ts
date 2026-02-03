@@ -109,18 +109,18 @@ const NOUNS = [
 
 /**
  * Generate a friendly username like "swiftfox" or "calmriver"
+ * No numbers for cleaner look - collisions handled by retry
  */
 function generateFriendlyUsername(): string {
   const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
   const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  // Add random digits to reduce collision chance
-  const digits = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `${adj}${noun}${digits}`;
+  return `${adj}${noun}`;
 }
 
 /**
  * Create an Agentmail inbox for email capabilities
- * Each user gets a friendly email like swiftfox123@mail.automna.ai
+ * Each user gets a friendly email like swiftfox@mail.automna.ai
+ * Retries with number suffix if name is taken
  */
 async function createAgentmailInbox(shortId: string): Promise<string | null> {
   if (!AGENTMAIL_API_KEY) {
@@ -128,34 +128,51 @@ async function createAgentmailInbox(shortId: string): Promise<string | null> {
     return null;
   }
 
-  const username = generateFriendlyUsername();
-  const requestBody: Record<string, string> = {
-    username,
-    display_name: `Automna Agent`,
-  };
-  
-  // Use custom domain if configured (domain must be verified with Agentmail first)
-  if (AGENTMAIL_DOMAIN !== "agentmail.to") {
-    requestBody.domain = AGENTMAIL_DOMAIN;
+  // Try up to 5 times with different usernames
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const baseUsername = generateFriendlyUsername();
+    // First attempt: no number. Subsequent: add number
+    const username = attempt === 0 ? baseUsername : `${baseUsername}${attempt}`;
+    
+    const requestBody: Record<string, string> = {
+      username,
+      display_name: `Automna Agent`,
+    };
+    
+    // Use custom domain if configured (domain must be verified with Agentmail first)
+    if (AGENTMAIL_DOMAIN !== "agentmail.to") {
+      requestBody.domain = AGENTMAIL_DOMAIN;
+    }
+
+    const response = await fetch("https://api.agentmail.to/v0/inboxes", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${AGENTMAIL_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`[provision] Created Agentmail inbox: ${data.inbox_id}`);
+      return data.inbox_id;
+    }
+
+    const errorText = await response.text();
+    // If it's a collision error, retry with different name
+    if (errorText.includes("already exists") || errorText.includes("taken")) {
+      console.log(`[provision] Username ${username} taken, retrying...`);
+      continue;
+    }
+    
+    // Other error - give up
+    console.error("[provision] Failed to create Agentmail inbox:", errorText);
+    return null;
   }
 
-  const response = await fetch("https://api.agentmail.to/v0/inboxes", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${AGENTMAIL_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    console.error("[provision] Failed to create Agentmail inbox:", await response.text());
-    return null; // Non-fatal - user can still use the bot without email
-  }
-
-  const data = await response.json();
-  console.log(`[provision] Created Agentmail inbox: ${data.inbox_id}`);
-  return data.inbox_id;
+  console.error("[provision] Failed to create Agentmail inbox after 5 attempts");
+  return null;
 }
 
 interface FlyApp {
