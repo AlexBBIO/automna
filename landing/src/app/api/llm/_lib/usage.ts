@@ -1,18 +1,12 @@
-/**
- * LLM Usage Logging
- * 
- * Logs all LLM API usage to the database for tracking and billing.
- */
+import { db } from "@/lib/db";
+import { llmUsage } from "@/lib/db/schema";
+import { calculateCostMicrodollars } from "./pricing";
 
-import { db } from '@/lib/db';
-import { llmUsage } from '@/lib/db/schema';
-import { calculateCost } from './pricing';
-
-export interface UsageLogParams {
+export interface UsageRecord {
   userId: string;
-  provider: 'anthropic' | 'gemini';
+  provider: string;
   model: string;
-  endpoint: 'chat' | 'embed';
+  endpoint: string;
   inputTokens: number;
   outputTokens?: number;
   sessionKey?: string;
@@ -22,70 +16,46 @@ export interface UsageLogParams {
 }
 
 /**
- * Log LLM usage to database.
- * This is non-blocking - we don't await the result.
+ * Log LLM usage to the database.
  */
-export function logUsage(params: UsageLogParams): void {
-  const {
-    userId,
-    provider,
-    model,
-    endpoint,
-    inputTokens,
-    outputTokens = 0,
-    sessionKey,
-    requestId,
-    durationMs,
-    error,
-  } = params;
-  
-  const costMicrodollars = calculateCost(provider, model, inputTokens, outputTokens);
-  
-  // Fire and forget - don't block the response
-  db.insert(llmUsage)
-    .values({
-      userId,
-      provider,
-      model,
-      endpoint,
-      inputTokens,
-      outputTokens,
+export async function logUsage(record: UsageRecord): Promise<void> {
+  const id = crypto.randomUUID();
+  const timestamp = Math.floor(Date.now() / 1000);
+  const costMicrodollars = calculateCostMicrodollars(
+    record.model,
+    record.inputTokens,
+    record.outputTokens ?? 0
+  );
+
+  try {
+    await db.insert(llmUsage).values({
+      id,
+      userId: record.userId,
+      timestamp,
+      provider: record.provider,
+      model: record.model,
+      endpoint: record.endpoint,
+      inputTokens: record.inputTokens,
+      outputTokens: record.outputTokens ?? 0,
       costMicrodollars,
-      sessionKey,
-      requestId,
-      durationMs,
-      error,
-    })
-    .then(() => {
-      console.log(`[llm/usage] Logged: ${provider}/${model} ${inputTokens}+${outputTokens} tokens`);
-    })
-    .catch((err) => {
-      console.error('[llm/usage] Failed to log usage:', err);
+      sessionKey: record.sessionKey ?? null,
+      requestId: record.requestId ?? null,
+      durationMs: record.durationMs ?? null,
+      error: record.error ?? null,
     });
+  } catch (error) {
+    // Don't fail the request if usage logging fails
+    console.error("[LLM Proxy] Failed to log usage:", error);
+  }
 }
 
 /**
- * Log usage and wait for it to complete (for testing)
+ * Log usage in background (fire and forget).
+ * This allows the response to return immediately while logging completes.
  */
-export async function logUsageSync(params: UsageLogParams): Promise<void> {
-  const costMicrodollars = calculateCost(
-    params.provider,
-    params.model,
-    params.inputTokens,
-    params.outputTokens || 0
-  );
-  
-  await db.insert(llmUsage).values({
-    userId: params.userId,
-    provider: params.provider,
-    model: params.model,
-    endpoint: params.endpoint,
-    inputTokens: params.inputTokens,
-    outputTokens: params.outputTokens || 0,
-    costMicrodollars,
-    sessionKey: params.sessionKey,
-    requestId: params.requestId,
-    durationMs: params.durationMs,
-    error: params.error,
+export function logUsageBackground(record: UsageRecord): void {
+  // Don't await - let it complete in background
+  logUsage(record).catch((error) => {
+    console.error("[LLM Proxy] Background usage logging failed:", error);
   });
 }

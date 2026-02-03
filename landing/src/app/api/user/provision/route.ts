@@ -62,7 +62,11 @@ async function getPersonalOrgId(): Promise<string> {
  * Each user gets their own context so cookies/logins persist and are isolated
  */
 async function createBrowserbaseContext(): Promise<string | null> {
-  if (!BROWSERBASE_API_KEY || !BROWSERBASE_PROJECT_ID) {
+  // Clean API key and project ID (Vercel env vars sometimes have trailing newlines)
+  const apiKey = BROWSERBASE_API_KEY?.replace(/[\r\n]+$/, "");
+  const projectId = BROWSERBASE_PROJECT_ID?.replace(/[\r\n]+$/, "");
+  
+  if (!apiKey || !projectId) {
     console.log("[provision] Browserbase not configured, skipping context creation");
     return null;
   }
@@ -70,11 +74,11 @@ async function createBrowserbaseContext(): Promise<string | null> {
   const response = await fetch("https://api.browserbase.com/v1/contexts", {
     method: "POST",
     headers: {
-      "X-BB-API-Key": BROWSERBASE_API_KEY,
+      "X-BB-API-Key": apiKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      projectId: BROWSERBASE_PROJECT_ID,
+      projectId: projectId,
     }),
   });
 
@@ -123,7 +127,11 @@ function generateFriendlyUsername(): string {
  * Retries with number suffix if name is taken
  */
 async function createAgentmailInbox(shortId: string): Promise<string | null> {
-  if (!AGENTMAIL_API_KEY) {
+  // Clean the API key (Vercel env vars sometimes have trailing newlines)
+  const apiKey = AGENTMAIL_API_KEY?.replace(/[\r\n]+$/, "");
+  const domain = AGENTMAIL_DOMAIN?.replace(/[\r\n]+$/, "") || "agentmail.to";
+  
+  if (!apiKey) {
     console.log("[provision] Agentmail not configured, skipping inbox creation");
     return null;
   }
@@ -140,14 +148,14 @@ async function createAgentmailInbox(shortId: string): Promise<string | null> {
     };
     
     // Use custom domain if configured (domain must be verified with Agentmail first)
-    if (AGENTMAIL_DOMAIN !== "agentmail.to") {
-      requestBody.domain = AGENTMAIL_DOMAIN;
+    if (domain !== "agentmail.to") {
+      requestBody.domain = domain;
     }
 
     const response = await fetch("https://api.agentmail.to/v0/inboxes", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${AGENTMAIL_API_KEY}`,
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(requestBody),
@@ -346,6 +354,13 @@ function buildInitCommand(gatewayToken: string): string[] {
 }
 
 /**
+ * Strip trailing newlines from env vars (Vercel sometimes includes them)
+ */
+function cleanEnvValue(value: string | undefined): string {
+  return (value || "").replace(/[\r\n]+$/, "");
+}
+
+/**
  * Create and start a machine in the app
  */
 async function createMachine(
@@ -357,16 +372,21 @@ async function createMachine(
 ): Promise<FlyMachine> {
   
   // Build env vars - only include integrations if configured
+  // Note: cleanEnvValue strips trailing newlines that may be in Vercel env vars
+  // 
+  // SECURITY: We intentionally DO NOT pass ANTHROPIC_API_KEY to machines.
+  // The LLM proxy (ANTHROPIC_BASE_URL) handles authentication with our key,
+  // so agents never see the real API key. This prevents users from bypassing
+  // our rate limits and usage tracking.
   const env: Record<string, string> = {
-    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
+    GEMINI_API_KEY: cleanEnvValue(process.env.GEMINI_API_KEY),
     OPENCLAW_GATEWAY_TOKEN: gatewayToken,
   };
   
   // Add Browserbase config if available
   if (BROWSERBASE_API_KEY && BROWSERBASE_PROJECT_ID) {
-    env.BROWSERBASE_API_KEY = BROWSERBASE_API_KEY;
-    env.BROWSERBASE_PROJECT_ID = BROWSERBASE_PROJECT_ID;
+    env.BROWSERBASE_API_KEY = cleanEnvValue(BROWSERBASE_API_KEY);
+    env.BROWSERBASE_PROJECT_ID = cleanEnvValue(BROWSERBASE_PROJECT_ID);
     if (browserbaseContextId) {
       env.BROWSERBASE_CONTEXT_ID = browserbaseContextId;
     }

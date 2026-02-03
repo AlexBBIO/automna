@@ -2,7 +2,11 @@
 
 > **Status:** ✅ Live in Production  
 > **Deployed:** 2026-02-03  
-> **Endpoints:** `https://automna.ai/api/llm/*`
+> **Endpoints:** 
+> - `/api/llm/v1/messages` - Anthropic Messages API (for ANTHROPIC_BASE_URL)
+> - `/api/llm/chat` - Chat endpoint (legacy)
+> - `/api/llm/embed` - Gemini embeddings
+> - `/api/llm/usage` - Usage stats
 
 ## Overview
 
@@ -301,20 +305,50 @@ TURSO_DATABASE_URL=libsql://...  # Database connection
 TURSO_AUTH_TOKEN=...             # Database auth
 ```
 
-### Clawdbot Config (on Fly):
-The agent's Clawdbot config should point to the proxy:
+### Fly Machine Configuration:
+The Docker entrypoint sets:
 
-```json
-{
-  "anthropic": {
-    "baseURL": "https://automna.ai/api/llm",
-    "apiKey": "${OPENCLAW_GATEWAY_TOKEN}"
-  }
-}
+```bash
+export ANTHROPIC_BASE_URL="https://automna.ai/api/llm"
 ```
 
-> **Note:** This requires Clawdbot to support custom baseURL for Anthropic. 
-> Current workaround: Use OpenRouter with our proxy as the base URL.
+This works because the Anthropic SDK respects `ANTHROPIC_BASE_URL` environment variable.
+The agent uses its gateway token as the API key, and our proxy handles authentication.
+
+### How It Works:
+1. Agent calls Anthropic SDK with `ANTHROPIC_BASE_URL=https://automna.ai/api/llm`
+2. SDK sends request to `https://automna.ai/api/llm/v1/messages`
+3. Our proxy authenticates via the gateway token in the `Authorization: Bearer <token>` header
+4. Proxy forwards to real Anthropic API
+5. Proxy logs usage to Turso database
+6. Response returned to agent
+
+## Security
+
+The LLM proxy is designed to prevent users from bypassing rate limits or accessing the Anthropic API directly.
+
+### Key Principles:
+
+1. **No API keys on user machines** - `ANTHROPIC_API_KEY` is NEVER passed to Fly machines. Only the proxy (on Vercel) has the real key.
+
+2. **Gateway token auth** - Agents authenticate to the proxy using their unique gateway token. This token is tied to their user account for usage tracking.
+
+3. **Forced routing** - The Docker entrypoint sets `ANTHROPIC_BASE_URL` to route all LLM traffic through the proxy. Agents cannot call Anthropic directly.
+
+4. **Rate limiting** - The proxy enforces per-minute and monthly limits based on the user's plan tier.
+
+### What's Protected:
+
+| Resource | Protected? | How |
+|----------|------------|-----|
+| Anthropic API | ✅ Yes | Key only on Vercel, traffic routed through proxy |
+| Agentmail | ✅ Yes | Key only on Vercel, agents use `/api/user/email/send` |
+| Browserbase | ⚠️ Partial | Key on machines for browser automation |
+| Gemini | ⚠️ Partial | Key on machines for embeddings |
+
+### Future Work:
+- Proxy Browserbase through our API for full control
+- Proxy Gemini embeddings for usage tracking
 
 ## Testing
 

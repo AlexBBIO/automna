@@ -1156,13 +1156,27 @@ Future tasks → Load contextId, already authenticated
 
 | Layer | Implementation |
 |-------|----------------|
-| API Keys | Encrypted at rest (AES-256), never logged |
-| User Isolation | Separate containers, no shared filesystems |
+| **LLM API Keys** | **Never on user machines** - proxied via `/api/llm/v1/messages` |
+| User Isolation | Separate Fly.io apps, no shared filesystems |
 | Browser Sessions | Browserbase contexts, isolated per customer |
-| Network | Internal Docker network, only exposed via Traefik |
-| Access | Cloudflare Access for admin, JWT for users |
-| Secrets | HashiCorp Vault or encrypted env vars |
-| Backups | Encrypted daily snapshots to Hetzner Storage Box |
+| Email | Proxied via `/api/user/email/send` with rate limits |
+| Network | Fly.io private networking, exposed via public URL |
+| Auth | Gateway token per user, Clerk for dashboard |
+| Backups | Fly.io volumes with automatic snapshots |
+
+### LLM Proxy Security (Updated 2026-02-03)
+
+User agents **cannot** access Anthropic directly:
+
+1. `ANTHROPIC_API_KEY` is NOT passed to Fly machines
+2. `ANTHROPIC_BASE_URL` routes all traffic through `https://automna.ai/api/llm`
+3. Proxy authenticates via gateway token (per-user)
+4. All usage logged to Turso for billing
+
+This prevents users from:
+- Bypassing rate limits
+- Using our API key directly
+- Avoiding usage tracking
 
 ### Gateway Authentication (Same-Origin Cookie + Proxy)
 

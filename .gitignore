@@ -4,3 +4,5 @@ config/
 config/secrets.json
 .env.production
 .env.local
+.env.prod
+.env.production

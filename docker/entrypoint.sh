@@ -78,51 +78,32 @@ if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initializ
     echo "[automna] Workspace initialized"
 fi
 
-# Create config file if it doesn't exist
+# Create/migrate config file
 CONFIG_FILE="$OPENCLAW_DIR/clawdbot.json"
+
+# Migration: Remove unsupported 'heartbeat' key if present
+if [ -f "$CONFIG_FILE" ] && grep -q '"heartbeat"' "$CONFIG_FILE" 2>/dev/null; then
+    echo "[automna] Migrating config: removing unsupported 'heartbeat' key..."
+    node -e "
+        const fs = require('fs');
+        const config = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf8'));
+        delete config.heartbeat;
+        fs.writeFileSync('$CONFIG_FILE', JSON.stringify(config, null, 2));
+        console.log('[automna] Config migrated successfully');
+    " 2>/dev/null || echo "[automna] Warning: Config migration failed"
+fi
+
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "[automna] Creating default config..."
     cat > "$CONFIG_FILE" << 'EOF'
 {
-  "heartbeat": {
-    "enabled": true,
-    "intervalMs": 1800000,
-    "prompt": "Read HEARTBEAT.md and follow instructions. If nothing needs attention, reply HEARTBEAT_OK."
-  },
   "agents": {
     "defaults": {
       "workspace": "/home/node/.openclaw/workspace",
       "model": {
-        "primary": "anthropic/claude-opus-4-5"
+        "primary": "anthropic/claude-sonnet-4"
       },
       "userTimezone": "America/Los_Angeles",
-      "memorySearch": {
-        "enabled": true,
-        "sources": ["memory", "sessions"],
-        "provider": "gemini",
-        "model": "gemini-embedding-001",
-        "experimental": {
-          "sessionMemory": true
-        },
-        "store": {
-          "vector": {
-            "enabled": true
-          }
-        },
-        "sync": {
-          "watch": true
-        },
-        "query": {
-          "hybrid": {
-            "enabled": true,
-            "vectorWeight": 0.7,
-            "textWeight": 0.3
-          }
-        },
-        "cache": {
-          "enabled": true
-        }
-      },
       "contextPruning": {
         "mode": "cache-ttl",
         "ttl": "1h"
@@ -178,6 +159,9 @@ for arg in "$@"; do
 done
 
 echo "[automna] Starting OpenClaw gateway on port $GATEWAY_INTERNAL_PORT (internal)..."
+
+# Route LLM calls through Automna proxy for usage tracking
+export ANTHROPIC_BASE_URL="https://automna.ai/api/llm"
 
 # Start gateway on internal port
 # Override the default port by setting environment variable and passing args
