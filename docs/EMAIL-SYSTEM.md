@@ -196,9 +196,14 @@ agentmail_inbox_id TEXT  -- e.g., 'swiftfox@mail.automna.ai'
 ## Agentmail Configuration
 
 **Account:** Automna's Agentmail account
-**API Key:** Stored in Vercel as `AGENTMAIL_API_KEY`
+**API Key:** Stored in Vercel as `AGENTMAIL_API_KEY` (same key as in `config/agentmail.json`)
 **Domain:** `mail.automna.ai` (verified in Agentmail dashboard)
 **Plan:** Starter (3,000 emails/month, 3 inboxes)
+
+**API Notes:**
+- Send endpoint: `POST /v0/inboxes/{inbox_id}/messages/send`
+- `to`, `cc`, `bcc` are plain strings (comma-separated for multiple)
+- Response includes `message_id` and `thread_id`
 
 **Note:** Plan limits provide a secondary backstop beyond per-user limits.
 
