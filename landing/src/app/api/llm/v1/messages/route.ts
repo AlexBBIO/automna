@@ -129,25 +129,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a transform stream to extract usage from streaming events
+    // Buffer SSE events to handle chunks that split across event boundaries
     let inputTokens = 0;
     let outputTokens = 0;
     let requestId: string | undefined;
     let errorMessage: string | undefined;
+    let sseBuffer = ""; // Buffer for incomplete SSE lines
 
     const transformStream = new TransformStream({
       transform(chunk, controller) {
-        // Pass through the chunk
+        // Pass through the chunk immediately (user sees it in real-time)
         controller.enqueue(chunk);
 
-        // Try to extract usage from the chunk
+        // Buffer and parse for usage extraction
         try {
-          const text = new TextDecoder().decode(chunk);
-          const lines = text.split("\n");
+          sseBuffer += new TextDecoder().decode(chunk);
+          
+          // Split on newlines, keep incomplete last line in buffer
+          const lines = sseBuffer.split("\n");
+          sseBuffer = lines.pop() ?? ""; // Incomplete line stays in buffer
 
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
-            const jsonStr = line.slice(6);
-            if (jsonStr === "[DONE]") continue;
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]" || jsonStr === "") continue;
 
             try {
               const event = JSON.parse(jsonStr);
@@ -180,6 +185,24 @@ export async function POST(request: NextRequest) {
         }
       },
       flush() {
+        // Process any remaining buffered data
+        if (sseBuffer.trim()) {
+          const line = sseBuffer.trim();
+          if (line.startsWith("data: ")) {
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr !== "[DONE]" && jsonStr !== "") {
+              try {
+                const event = JSON.parse(jsonStr);
+                if (event.type === "message_delta" && event.usage) {
+                  outputTokens = event.usage.output_tokens ?? 0;
+                }
+              } catch {
+                // Ignore
+              }
+            }
+          }
+        }
+
         // Log usage when stream completes
         const durationMs = Date.now() - startTime;
         logUsageBackground({
