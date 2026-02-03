@@ -237,11 +237,14 @@ export default function DashboardPage() {
     if (prewarmStarted.current) return true;
     prewarmStarted.current = true;
     
-    const MAX_WAIT_MS = 60000;
-    const POLL_INTERVAL_MS = 1000;
+    const MAX_WAIT_MS = 90000; // Extended to 90s for fresh provisions
+    const POLL_INTERVAL_MS = 1500;
+    const CONSECUTIVE_SUCCESS_NEEDED = 2; // Require 2 successful checks in a row
+    const POST_READY_BUFFER_MS = 3000; // Extra buffer after gateway reports ready
     
     console.log('[warmup] Waiting for gateway to be ready...');
     const startTime = Date.now();
+    let consecutiveSuccesses = 0;
     
     while (Date.now() - startTime < MAX_WAIT_MS) {
       try {
@@ -253,18 +256,28 @@ export default function DashboardPage() {
         const data = await response.json();
         
         if (data.ready) {
-          console.log('[warmup] Gateway is ready!');
-          return true;
+          consecutiveSuccesses++;
+          console.log(`[warmup] Health check passed (${consecutiveSuccesses}/${CONSECUTIVE_SUCCESS_NEEDED})`);
+          
+          if (consecutiveSuccesses >= CONSECUTIVE_SUCCESS_NEEDED) {
+            console.log(`[warmup] Gateway stable, waiting ${POST_READY_BUFFER_MS}ms buffer...`);
+            await new Promise(r => setTimeout(r, POST_READY_BUFFER_MS));
+            console.log('[warmup] Gateway is ready!');
+            return true;
+          }
+        } else {
+          consecutiveSuccesses = 0; // Reset on failure
+          console.log(`[warmup] Gateway not ready yet: ${data.error || 'unknown'}`);
         }
-        console.log(`[warmup] Gateway not ready yet: ${data.error || 'unknown'}`);
       } catch (err) {
+        consecutiveSuccesses = 0; // Reset on error
         console.log(`[warmup] Health check failed: ${err instanceof Error ? err.message : 'error'}`);
       }
       
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
     }
     
-    console.warn('[warmup] Timeout after 60s - proceeding anyway');
+    console.warn('[warmup] Timeout after 90s - proceeding anyway');
     return false;
   };
 
