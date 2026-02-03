@@ -70,23 +70,30 @@ print(f"Remaining: {quota['remaining']}")
 
 ## Check Inbox (Receive Emails)
 
-To check for incoming emails, use the Agentmail API directly:
-
 ```python
 import os
 import requests
 
-AGENTMAIL_KEY = os.environ.get("AGENTMAIL_API_KEY")
-INBOX_ID = os.environ["AGENTMAIL_INBOX_ID"]
+GATEWAY_TOKEN = os.environ["OPENCLAW_GATEWAY_TOKEN"]
+API_BASE = "https://automna.ai/api/user/email"
 
-if AGENTMAIL_KEY:
-    response = requests.get(
-        f"https://api.agentmail.to/v0/inboxes/{INBOX_ID}/messages",
-        headers={"Authorization": f"Bearer {AGENTMAIL_KEY}"}
-    )
-    messages = response.json()
-    for msg in messages.get("messages", []):
-        print(f"From: {msg['from']}, Subject: {msg['subject']}")
+# List messages
+response = requests.get(
+    f"{API_BASE}/inbox",
+    headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"}
+)
+messages = response.json()
+for msg in messages.get("messages", []):
+    print(f"From: {msg['from']}, Subject: {msg['subject']}")
+
+# Get specific message
+message_id = "msg_abc123"
+response = requests.get(
+    f"{API_BASE}/inbox/{message_id}",
+    headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"}
+)
+message = response.json()
+print(message.get("text"))  # Plain text body
 ```
 
 **Note:** Reading emails doesn't count against your daily limit. Only sending does.
