@@ -2,9 +2,9 @@
 
 > **Note:** Original name was "Automna" but changed to "Automna" (K spelling) to avoid trademark conflict with Agent IQ (USPTO #99399937). Domain automna.ai confirmed available 2026-01-28.
 
-**Version:** 0.3  
-**Date:** 2026-02-02  
-**Status:** MVP In Progress (Per-User Infrastructure Complete)
+**Version:** 0.4  
+**Date:** 2026-02-03  
+**Status:** MVP In Progress (Media Rendering Complete)
 
 ---
 
@@ -25,6 +25,7 @@
 | **Drizzle ORM** | ✅ Set up | `src/lib/db/` in landing project |
 | Anthropic integration | ✅ Working | API key configured |
 | Optimistic UI | ✅ Working | Chat skeleton, animated loading |
+| **Media rendering** | ✅ Working | Inline images, file uploads, MEDIA: syntax |
 
 ### 🔧 In Progress
 | Component | Status | Notes |
@@ -43,6 +44,39 @@
 | `clawdbot` npm package | ❌ Deprecated | Use `openclaw` instead |
 | `mkbehr/clawdbot` image | ❌ Deprecated | Use custom Automna image |
 | `ghcr.io/phioranex/openclaw-docker` | ❌ Deprecated | Use custom Automna image |
+
+### 📝 Recent Changes (2026-02-03)
+
+**🖼️ Inline Media Rendering (00:15 UTC):**
+
+Full implementation of image/file sharing in webchat. See [`docs/MEDIA-RENDERING.md`](docs/MEDIA-RENDERING.md) for details.
+
+1. **User Uploads**
+   - 📎 button to attach files
+   - Uploads to `/home/node/.openclaw/workspace/uploads/`
+   - Images render inline in chat
+   - Uses `MEDIA:/path` format (OpenClaw native)
+
+2. **Agent Image Sharing**
+   - Agent outputs `MEDIA:/path/to/image.png` as plain text
+   - MessageContent parses and renders inline
+   - ⚠️ Must NOT be in code blocks (parser skips fenced code)
+
+3. **Parser Updates**
+   - Supports `MEDIA:/path`, `[[image:/path]]`, `[[file:/path]]`
+   - Works for both user and agent messages
+   - Images render inline, files show download button
+
+4. **Docker Image Update**
+   - Added `AGENTS.md` with MEDIA: usage instructions
+   - Workspace initialized on first run
+   - Image: `registry.fly.io/automna-openclaw-image:latest`
+
+5. **Important Fix: HTTPS Required**
+   - Vercel blocks HTTP to external services
+   - File server must use HTTPS for uploads to work
+
+---
 
 ### 📝 Recent Changes (2026-02-02)
 
