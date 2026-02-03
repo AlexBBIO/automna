@@ -178,39 +178,6 @@ async function allocateIps(appName: string): Promise<void> {
 }
 
 /**
- * Set secrets for a Fly app
- */
-async function setAppSecrets(appName: string, secrets: Record<string, string>): Promise<void> {
-  const response = await fetch("https://api.fly.io/graphql", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${FLY_API_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      query: `
-        mutation($input: SetSecretsInput!) {
-          setSecrets(input: $input) {
-            app { id }
-          }
-        }
-      `,
-      variables: {
-        input: {
-          appId: appName,
-          secrets: Object.entries(secrets).map(([key, value]) => ({ key, value })),
-        },
-      },
-    }),
-  });
-
-  const data = await response.json();
-  if (data.errors) {
-    throw new Error(`Failed to set secrets: ${JSON.stringify(data.errors)}`);
-  }
-}
-
-/**
  * Create a volume in the app
  */
 async function createVolume(appName: string): Promise<FlyVolume> {
@@ -476,27 +443,20 @@ export async function POST() {
       console.log(`[provision] App ${appName} already exists`);
     }
 
-    // Step 2: Set secrets
+    // Step 2: Create volume
     const gatewayToken = crypto.randomUUID();
-    console.log(`[provision] Setting secrets for ${appName}`);
-    await setAppSecrets(appName, {
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
-      OPENCLAW_GATEWAY_TOKEN: gatewayToken,
-    });
-
-    // Step 3: Create volume
     console.log(`[provision] Creating volume for ${appName}`);
     const volume = await createVolume(appName);
 
-    // Step 4: Create machine (pass token so it matches what we store in DB)
+    // Step 3: Create machine (env vars passed directly, no Fly secrets needed)
     console.log(`[provision] Creating machine for ${appName}`);
     const machine = await createMachine(appName, volume.id, gatewayToken);
 
-    // Step 5: Wait for machine to be ready
+    // Step 4: Wait for machine to be ready
     console.log(`[provision] Waiting for machine ${machine.id} to start`);
     const readyMachine = await waitForMachine(appName, machine.id);
 
-    // Step 6: Store in database
+    // Step 5: Store in database
     await db.insert(machines).values({
       id: machine.id,
       userId,
