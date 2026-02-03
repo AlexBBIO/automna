@@ -374,10 +374,10 @@ async function createMachine(
   // Build env vars - only include integrations if configured
   // Note: cleanEnvValue strips trailing newlines that may be in Vercel env vars
   // 
-  // TODO: Set up LLM proxy for rate limiting and usage tracking
-  // For now, pass ANTHROPIC_API_KEY directly until proxy is ready
+  // Use LLM proxy for Anthropic - provides rate limiting and usage tracking
+  // Proxy authenticates via gateway token, no API key needed on machines
   const env: Record<string, string> = {
-    ANTHROPIC_API_KEY: cleanEnvValue(process.env.ANTHROPIC_API_KEY),
+    ANTHROPIC_BASE_URL: "https://automna.ai/api/llm",
     GEMINI_API_KEY: cleanEnvValue(process.env.GEMINI_API_KEY),
     OPENCLAW_GATEWAY_TOKEN: gatewayToken,
   };
