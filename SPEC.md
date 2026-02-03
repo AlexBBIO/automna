@@ -2,13 +2,13 @@
 
 > **Note:** Original name was "Automna" but changed to "Automna" (K spelling) to avoid trademark conflict with Agent IQ (USPTO #99399937). Domain automna.ai confirmed available 2026-01-28.
 
-**Version:** 0.5  
+**Version:** 0.6  
 **Date:** 2026-02-03  
-**Status:** MVP In Progress (Heartbeat + Media Complete)
+**Status:** MVP Core Complete (LLM Proxy + Security Hardening Done)
 
 ---
 
-## Current Status (2026-02-02)
+## Current Status (2026-02-03)
 
 ### ✅ Working
 | Component | Status | Notes |
@@ -21,22 +21,24 @@
 | WebSocket chat | ✅ Working | Token auth, canonical session keys |
 | Chat history | ✅ Working | Via WS + HTTP proxy with session guards |
 | **Multi-conversation** | ✅ Working | localStorage-based, history per conversation |
-| **Turso database** | ✅ Set up | `automna` - users/machines/events tables |
+| **Turso database** | ✅ Set up | `automna` - users/machines/events tables + llm_usage |
 | **Drizzle ORM** | ✅ Set up | `src/lib/db/` in landing project |
-| Anthropic integration | ✅ Working | API key configured |
+| **LLM Proxy** | ✅ Working | Centralized API via `/api/llm/*`, usage tracking, rate limits |
 | Optimistic UI | ✅ Working | Chat skeleton, animated loading |
 | **Media rendering** | ✅ Working | Inline images, file uploads, MEDIA: syntax |
 | **Heartbeat system** | ✅ Working | 30-min periodic checks, email awareness |
+| **Files API** | ✅ Working | Caddy reverse proxy → internal file server |
+| **Agent Config** | ✅ Working | Workspace injection, memory enabled |
+| **Security Hardening** | ✅ Complete | No API keys on user machines |
 
 ### 🔧 In Progress
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Per-user volumes | ✅ Working | 1GB encrypted volume per user |
 | OpenClaw migration | ✅ Done | Migrated from Clawdbot to OpenClaw |
-| **Files API** | ✅ Working | Caddy reverse proxy → internal file server |
-| **Agent Config** | ✅ Working | Workspace injection, memory enabled |
-| **LLM Proxy** | ✅ Working | Centralized API, usage tracking, rate limits |
 | File Browser UI | 🔧 Testing | UI exists, needs testing |
+| Discord Integration | 📝 Planned | Next priority — see NEXT-STEPS |
+| Telegram Integration | 📝 Planned | After Discord |
 
 ### ❌ Deprecated
 | Component | Status | Notes |
@@ -48,6 +50,31 @@
 | `ghcr.io/phioranex/openclaw-docker` | ❌ Deprecated | Use custom Automna image |
 
 ### 📝 Recent Changes (2026-02-03)
+
+**🔒 Security Hardening Complete (18:15 UTC):**
+
+Final deployment completed with full security hardening:
+
+1. **No API Keys on User Machines**
+   - `ANTHROPIC_API_KEY` is NEVER passed to Fly machines
+   - All LLM traffic routed through `ANTHROPIC_BASE_URL=https://automna.ai/api/llm`
+   - Proxy authenticates via gateway token
+   - Prevents users from bypassing rate limits or direct API access
+
+2. **Provisioning Updates**
+   - Removed `ANTHROPIC_API_KEY` from Fly machine env vars
+   - Added `ANTHROPIC_BASE_URL` pointing to our proxy
+   - Fixed env var newline bug that was breaking Browserbase/Agentmail setup
+
+3. **Files API Fix**
+   - Added DELETE handler at `/api/files` base route
+   - Supports both `?path=` and `?file=` query params for consistency
+
+**Test Accounts Updated:**
+- `alex@wilkinson.app` → `automna-u-wvps9xttsuka`
+  - Email: `quietmoon@mail.automna.ai` (manually configured)
+  - Browserbase context: manually created
+  - LLM Proxy: working ✅
 
 **🤖 LLM Proxy (05:17 UTC):**
 
