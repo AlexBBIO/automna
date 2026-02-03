@@ -17,6 +17,16 @@ const provisioningSteps = [
   { text: 'Almost ready...', duration: 20000 },
 ];
 
+// Tips shown during provisioning to educate users
+const provisioningTips = [
+  { icon: '🔍', title: 'Web Research', desc: 'Ask your agent to research any topic and summarize findings' },
+  { icon: '📝', title: 'Writing Help', desc: 'Get help drafting emails, documents, or creative content' },
+  { icon: '💾', title: 'File Management', desc: 'Upload files and your agent can read, analyze, and edit them' },
+  { icon: '🧠', title: 'Memory', desc: 'Your agent remembers your conversations and preferences' },
+  { icon: '💻', title: 'Code Assistance', desc: 'Get help writing, debugging, and explaining code' },
+  { icon: '🔗', title: 'Integrations', desc: 'Connect Discord or Telegram to chat from anywhere' },
+];
+
 function formatElapsedTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -27,6 +37,7 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
   const [provisionStep, setProvisionStep] = useState(0);
   const [animatedProgress, setAnimatedProgress] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [currentTip, setCurrentTip] = useState(0);
 
   // Cycle through provisioning steps
   useEffect(() => {
@@ -97,6 +108,20 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
     return () => clearInterval(interval);
   }, [phase]);
 
+  // Cycle through tips during provisioning
+  useEffect(() => {
+    if (phase !== 'provisioning') {
+      setCurrentTip(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCurrentTip(prev => (prev + 1) % provisioningTips.length);
+    }, 5000); // Change tip every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [phase]);
+
   const phases = {
     connecting: { progress: 25, text: 'Connecting to your agent...' },
     provisioning: { progress: animatedProgress, text: provisioningSteps[provisionStep].text },
@@ -109,38 +134,78 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
 
   return (
     <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 transition-colors">
-      {/* Skeleton messages */}
-      <div className="flex-1 p-4 space-y-4 overflow-hidden">
-        {/* User message skeleton */}
-        <div className="flex justify-end">
-          <div className="bg-purple-100 dark:bg-purple-900/30 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse">
-            <div className="h-4 bg-purple-200 dark:bg-purple-800/50 rounded w-48"></div>
+      {/* Content area */}
+      <div className="flex-1 p-4 overflow-hidden flex flex-col">
+        {/* Tip card during provisioning */}
+        {phase === 'provisioning' && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="max-w-sm w-full">
+              <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl p-6 shadow-lg transition-all duration-300">
+                <div className="text-center">
+                  <div className="text-4xl mb-3">{provisioningTips[currentTip].icon}</div>
+                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+                    {provisioningTips[currentTip].title}
+                  </h3>
+                  <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+                    {provisioningTips[currentTip].desc}
+                  </p>
+                </div>
+                {/* Tip indicator dots */}
+                <div className="flex justify-center gap-1.5 mt-4">
+                  {provisioningTips.map((_, i) => (
+                    <div 
+                      key={i}
+                      className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                        i === currentTip 
+                          ? 'bg-purple-500' 
+                          : 'bg-zinc-300 dark:bg-zinc-600'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-4">
+                Setting up your personal AI agent...
+              </p>
+            </div>
           </div>
-        </div>
-        
-        {/* Assistant message skeleton */}
-        <div className="flex justify-start">
-          <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse space-y-2 shadow-sm">
-            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-64"></div>
-            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-56"></div>
-            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-40"></div>
-          </div>
-        </div>
+        )}
 
-        {/* Another user message */}
-        <div className="flex justify-end">
-          <div className="bg-purple-100 dark:bg-purple-900/30 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse">
-            <div className="h-4 bg-purple-200 dark:bg-purple-800/50 rounded w-32"></div>
-          </div>
-        </div>
+        {/* Skeleton messages for non-provisioning phases */}
+        {phase !== 'provisioning' && (
+          <div className="space-y-4">
+            {/* User message skeleton */}
+            <div className="flex justify-end">
+              <div className="bg-purple-100 dark:bg-purple-900/30 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse">
+                <div className="h-4 bg-purple-200 dark:bg-purple-800/50 rounded w-48"></div>
+              </div>
+            </div>
+            
+            {/* Assistant message skeleton */}
+            <div className="flex justify-start">
+              <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse space-y-2 shadow-sm">
+                <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-64"></div>
+                <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-56"></div>
+                <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-40"></div>
+              </div>
+            </div>
 
-        {/* Another assistant message */}
-        <div className="flex justify-start">
-          <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse space-y-2 shadow-sm">
-            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-72"></div>
-            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-48"></div>
+            {/* Another user message */}
+            <div className="flex justify-end">
+              <div className="bg-purple-100 dark:bg-purple-900/30 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse">
+                <div className="h-4 bg-purple-200 dark:bg-purple-800/50 rounded w-32"></div>
+              </div>
+            </div>
+
+            {/* Another assistant message */}
+            <div className="flex justify-start">
+              <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl px-4 py-3 max-w-[70%] animate-pulse space-y-2 shadow-sm">
+                <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-72"></div>
+                <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-48"></div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Loading indicator */}
