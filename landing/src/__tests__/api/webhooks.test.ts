@@ -53,7 +53,7 @@ describe('Stripe Webhooks', () => {
         metadata: {
           clerkUserId: 'user_test123',
           // No plan specified
-        },
+        } as { clerkUserId: string; plan?: string },
       };
 
       const plan = session.metadata?.plan || 'starter';
@@ -78,7 +78,7 @@ describe('Stripe Webhooks', () => {
       const session = {
         metadata: {
           // No clerkUserId
-        },
+        } as { clerkUserId?: string },
       };
 
       const clerkUserId = session.metadata?.clerkUserId;

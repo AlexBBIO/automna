@@ -116,7 +116,7 @@ describe('Sessions API', () => {
         userId: 'user_test123',
         appName: 'automna-u-abc123',
         gatewayToken: 'token-123',
-      };
+      } as any;
 
       vi.mocked(db.query.machines.findFirst).mockResolvedValue(mockMachine);
       
@@ -306,7 +306,7 @@ describe('Sessions API', () => {
 
   describe('PATCH Validation', () => {
     it('should require key parameter', () => {
-      const body = { label: 'New Name' };
+      const body = { label: 'New Name' } as { label: string; key?: string };
       const isValid = !!body.key && typeof body.key === 'string';
       expect(isValid).toBe(false);
     });

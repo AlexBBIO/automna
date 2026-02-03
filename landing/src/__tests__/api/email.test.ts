@@ -134,13 +134,13 @@ describe('Email Send API', () => {
 
   describe('Request Validation', () => {
     it('should require to field', () => {
-      const body = { subject: 'Test' };
+      const body = { subject: 'Test' } as { to?: string; subject: string };
       const isValid = !!body.to && !!body.subject;
       expect(isValid).toBe(false);
     });
 
     it('should require subject field', () => {
-      const body = { to: 'test@example.com' };
+      const body = { to: 'test@example.com' } as { to: string; subject?: string };
       const isValid = !!body.to && !!body.subject;
       expect(isValid).toBe(false);
     });

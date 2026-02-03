@@ -84,7 +84,7 @@ describe('Files API', () => {
         id: 'machine-123',
         appName: 'automna-u-test',
         gatewayToken: 'token-123',
-      };
+      } as any;
 
       vi.mocked(db.query.machines.findFirst).mockResolvedValue(mockMachine);
       

@@ -141,7 +141,7 @@ describe('Provision API Logic', () => {
         appName: 'automna-u-abc123',
         status: 'started',
         gatewayToken: 'token-123',
-      };
+      } as any;
 
       vi.mocked(db.query.machines.findFirst).mockResolvedValue(mockMachine);
 
@@ -428,7 +428,7 @@ describe('Provision API Logic', () => {
         id: 'machine-123',
         appName: 'automna-u-test',
         status: 'started',
-      };
+      } as any;
 
       vi.mocked(db.query.machines.findFirst).mockResolvedValue(mockMachine);
       
@@ -446,7 +446,7 @@ describe('Provision API Logic', () => {
         id: 'machine-123',
         appName: 'automna-u-test',
         status: 'stopped',
-      };
+      } as any;
 
       vi.mocked(db.query.machines.findFirst).mockResolvedValue(mockMachine);
 
