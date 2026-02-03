@@ -610,6 +610,7 @@ export async function POST() {
     const readyMachine = await waitForMachine(appName, machine.id);
 
     // Step 5: Store in database
+    // Note: Heartbeat config is handled by the Docker image on first boot
     await db.insert(machines).values({
       id: machine.id,
       userId,

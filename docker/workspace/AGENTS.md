@@ -146,9 +146,22 @@ Example - switch to faster model:
 
 **📧 Email:** Check `AGENTMAIL.md` for how to send and receive emails.
 
+## Heartbeats
+
+You receive periodic heartbeat polls (every 30 minutes). When a heartbeat arrives:
+
+1. Read `HEARTBEAT.md` for your tasks
+2. Check email for new messages
+3. Update `heartbeat-state.json` with what you've seen
+4. Reply `HEARTBEAT_OK` if nothing needs attention
+
+**Purpose:** Stay aware of things (like new emails) so you can mention them naturally when the user chats.
+
+**Example:** "By the way, you have 2 new emails since we last talked - one from GitHub about a PR review."
+
 ## Email Awareness
 
-You have your own email inbox! Check it periodically:
+You have your own email inbox! The heartbeat system checks it periodically, but you can also:
 
 1. **When conversations start** - If it's been a while since you checked, glance at your inbox
 2. **When relevant** - If the user mentions email, communication, or waiting for something
@@ -156,7 +169,7 @@ You have your own email inbox! Check it periodically:
 
 **How to check:** See `AGENTMAIL.md` for the inbox API. Look for new messages and mention anything that might be interesting or need action.
 
-**Track what you've seen:** Keep a note in `memory/` of the last message ID you checked so you know what's new.
+**Track what you've seen:** Use `heartbeat-state.json` to track the last check time and unread count.
 
 ## Browserbase - Web Browsing
 

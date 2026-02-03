@@ -1,0 +1,15 @@
+# OpenClaw Configuration for Automna
+# This config is applied after machine provisioning
+
+# Heartbeat: periodic check-ins for email and awareness
+heartbeat:
+  enabled: true
+  intervalMs: 1800000  # 30 minutes
+  prompt: "Read HEARTBEAT.md and follow instructions. If nothing needs attention, reply HEARTBEAT_OK."
+
+# Default model for all interactions
+model: anthropic/claude-opus-4-5
+
+# Gateway settings (inherited from CLI, listed for reference)
+# bind: lan
+# auth: token

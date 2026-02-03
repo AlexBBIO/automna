@@ -89,6 +89,11 @@ if [ ! -f "$CONFIG_FILE" ]; then
     echo "[automna] Creating default config..."
     cat > "$CONFIG_FILE" << 'EOF'
 {
+  "heartbeat": {
+    "enabled": true,
+    "intervalMs": 1800000,
+    "prompt": "Read HEARTBEAT.md and follow instructions. If nothing needs attention, reply HEARTBEAT_OK."
+  },
   "agents": {
     "defaults": {
       "workspace": "/home/node/.openclaw/workspace",
