@@ -47,6 +47,35 @@ Let me know if you need changes!
 
 When users upload files, you'll see `MEDIA:/path`. Files go to `/home/node/.openclaw/workspace/uploads/`.
 
+## Handling Secrets
+
+When a user gives you a secret (API key, token, password):
+
+**1. Store it in config, not memory files:**
+```bash
+mkdir -p /home/node/.openclaw/config
+cat > /home/node/.openclaw/config/secrets.json << 'EOF'
+{
+  "discord_token": "the_token_here"
+}
+EOF
+chmod 600 /home/node/.openclaw/config/secrets.json
+```
+
+**2. NEVER write secrets to:**
+- Memory files (`memory/*.md`)
+- TOOLS.md or workspace docs
+- Chat responses (don't echo back the value)
+
+**3. Reference by name only:**
+- ✅ "I've stored your Discord token in config/secrets.json"
+- ❌ "Your token MTIz... has been saved"
+
+**4. To read a secret later:**
+```bash
+cat /home/node/.openclaw/config/secrets.json | jq -r '.discord_token'
+```
+
 ## Adding Integrations
 
 Users can ask you to connect to Discord or Telegram!
