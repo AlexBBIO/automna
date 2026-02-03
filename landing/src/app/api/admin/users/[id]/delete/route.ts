@@ -149,20 +149,21 @@ export async function DELETE(
       results.push({ step: "delete_agentmail", success: true, error: "No inbox to delete" });
     }
 
-    // 6. Log deletion event
-    await db.insert(machineEvents).values({
-      machineId: machine.id,
-      eventType: "destroyed",
-      details: JSON.stringify({ 
-        deletedBy: userId,
-        deletedAt: new Date().toISOString(),
-        results 
-      }),
-    });
+    // 6. Delete machine events first (foreign key constraint)
+    try {
+      await db.delete(machineEvents).where(eq(machineEvents.machineId, machine.id));
+      results.push({ step: "delete_events", success: true });
+    } catch (e) {
+      results.push({ step: "delete_events", success: false, error: String(e) });
+    }
 
     // 7. Delete from machines table
-    await db.delete(machines).where(eq(machines.id, machine.id));
-    results.push({ step: "delete_db_record", success: true });
+    try {
+      await db.delete(machines).where(eq(machines.id, machine.id));
+      results.push({ step: "delete_db_record", success: true });
+    } catch (e) {
+      results.push({ step: "delete_db_record", success: false, error: String(e) });
+    }
 
     const allSuccess = results.every(r => r.success);
 
