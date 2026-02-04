@@ -522,26 +522,31 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                         : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700'
                     }`}
                   >
-                    {message.content
-                      .filter((part) => {
-                        // Always show text
-                        if (part.type === 'text') return true;
-                        // Only show tool activity (toolCall) if toggle is on
-                        if (part.type === 'toolCall') return showAgentActivity;
-                        // Hide unknown types when toggle is off
-                        return showAgentActivity;
-                      })
-                      .map((part, i) => {
-                        if (part.type === 'text' && typeof part.text === 'string') {
-                          return (
-                            <MessageContent 
-                              key={i} 
-                              text={part.text}
-                              isUser={message.role === 'user'}
-                              showToolOutput={showAgentActivity}
-                            />
-                          );
-                        }
+                    {(() => {
+                      // Check if message contains any toolCall - if so, tool output is in text parts
+                      const hasToolCall = message.content.some((p) => p.type === 'toolCall');
+                      const shouldHideToolOutput = hasToolCall && !showAgentActivity;
+                      
+                      return message.content
+                        .filter((part) => {
+                          // Always show text (but may filter code blocks inside it)
+                          if (part.type === 'text') return true;
+                          // Only show tool activity (toolCall) if toggle is on
+                          if (part.type === 'toolCall') return showAgentActivity;
+                          // Hide unknown types when toggle is off
+                          return showAgentActivity;
+                        })
+                        .map((part, i) => {
+                          if (part.type === 'text' && typeof part.text === 'string') {
+                            return (
+                              <MessageContent 
+                                key={i} 
+                                text={part.text}
+                                isUser={message.role === 'user'}
+                                showToolOutput={!shouldHideToolOutput}
+                              />
+                            );
+                          }
                         // OpenClaw uses 'toolCall' type for tool calls
                         if (part.type === 'toolCall') {
                           const toolData = part as { type: string; name?: string; args?: Record<string, unknown>; result?: unknown };
@@ -577,7 +582,8 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                           );
                         }
                         return null;
-                      })}
+                      });
+                    })()}
                   </div>
                   
                   {/* Timestamp and actions */}
