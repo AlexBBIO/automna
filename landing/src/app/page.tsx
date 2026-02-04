@@ -45,7 +45,6 @@ export default function Landing() {
   const [isVisible, setIsVisible] = useState(false);
   const [visibleMessages, setVisibleMessages] = useState(0);
   const [typingIndex, setTypingIndex] = useState(-1);
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
   useEffect(() => {
@@ -84,11 +83,6 @@ export default function Landing() {
 
   const scrollToDemo = () => {
     document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const prices = {
-    monthly: { lite: 30, pro: 149, business: 299 },
-    annual: { lite: 25, pro: 124, business: 249 }
   };
 
   return (
@@ -390,39 +384,13 @@ export default function Landing() {
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-10">
               <h2 className="text-2xl md:text-3xl font-bold mb-3 text-zinc-900 dark:text-white">Simple, transparent pricing</h2>
-              <p className="text-zinc-500 dark:text-zinc-400 mb-6">Start small. Scale when ready.</p>
-              
-              {/* Billing toggle */}
-              <div className="inline-flex items-center gap-3 bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-full p-1 shadow-sm">
-                <button
-                  onClick={() => setBillingPeriod('monthly')}
-                  className={`px-4 py-1.5 rounded-full text-sm transition-all ${
-                    billingPeriod === 'monthly' 
-                      ? 'bg-purple-600 text-white' 
-                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setBillingPeriod('annual')}
-                  className={`px-4 py-1.5 rounded-full text-sm transition-all flex items-center gap-2 ${
-                    billingPeriod === 'annual' 
-                      ? 'bg-purple-600 text-white' 
-                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                  }`}
-                >
-                  Annual
-                  <span className="text-xs bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded">Save 17%</span>
-                </button>
-              </div>
+              <p className="text-zinc-500 dark:text-zinc-400">Start small. Scale when ready.</p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto">
               <PricingCard
                 tier="Lite"
-                price={prices[billingPeriod].lite}
-                period={billingPeriod}
+                price={30}
                 description="For trying it out"
                 features={[
                   '1 AI agent',
@@ -434,8 +402,7 @@ export default function Landing() {
               />
               <PricingCard
                 tier="Pro"
-                price={prices[billingPeriod].pro}
-                period={billingPeriod}
+                price={149}
                 description="For power users"
                 features={[
                   '1 AI agent',
@@ -448,8 +415,7 @@ export default function Landing() {
               />
               <PricingCard
                 tier="Business"
-                price={prices[billingPeriod].business}
-                period={billingPeriod}
+                price={299}
                 description="For teams"
                 features={[
                   '3 AI agents',
@@ -563,14 +529,12 @@ function BentoCard({
 function PricingCard({ 
   tier, 
   price, 
-  period,
   description, 
   features, 
   highlighted 
 }: { 
   tier: string; 
   price: number;
-  period: 'monthly' | 'annual';
   description: string;
   features: string[];
   highlighted?: boolean;
@@ -586,13 +550,9 @@ function PricingCard({
       )}
       <h3 className="text-xl font-semibold text-zinc-900 dark:text-white">{tier}</h3>
       <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">{description}</p>
-      <div className="text-4xl font-bold mb-1 text-zinc-900 dark:text-white">
+      <div className="text-4xl font-bold mb-4 text-zinc-900 dark:text-white">
         ${price}<span className="text-base text-zinc-400 dark:text-zinc-500 font-normal">/mo</span>
       </div>
-      {period === 'annual' && (
-        <p className="text-emerald-600 dark:text-emerald-400 text-xs mb-4">Billed annually (${price * 12}/yr)</p>
-      )}
-      {period === 'monthly' && <div className="mb-4" />}
       <ul className="space-y-2.5">
         {features.map((feature, i) => (
           <li key={i} className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
