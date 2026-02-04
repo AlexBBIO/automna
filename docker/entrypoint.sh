@@ -78,6 +78,20 @@ if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initializ
     echo "[automna] Workspace initialized"
 fi
 
+# Extract gateway token from args first (needed for config)
+# Args come in as: gateway --allow-unconfigured --bind lan --auth token --token <TOKEN>
+GATEWAY_TOKEN=""
+prev_was_token=""
+for arg in "$@"; do
+    if [ "$prev_was_token" = "1" ]; then
+        GATEWAY_TOKEN="$arg"
+        break
+    fi
+    if [ "$arg" = "--token" ]; then
+        prev_was_token=1
+    fi
+done
+
 # Create/migrate config file
 CONFIG_FILE="$OPENCLAW_DIR/clawdbot.json"
 
@@ -93,18 +107,25 @@ if [ -f "$CONFIG_FILE" ] && grep -q '"heartbeat"' "$CONFIG_FILE" 2>/dev/null; th
     " 2>/dev/null || echo "[automna] Warning: Config migration failed"
 fi
 
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "[automna] Creating default config..."
-    cat > "$CONFIG_FILE" << 'EOF'
+# Write config with custom 'automna' provider that routes through our proxy
+# The built-in 'anthropic' provider ignores ANTHROPIC_BASE_URL, so we must
+# configure a custom provider with explicit baseUrl
+echo "[automna] Writing config with automna proxy provider..."
+cat > "$CONFIG_FILE" << EOFCONFIG
 {
   "gateway": {
     "trustedProxies": ["127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fd00::/8"]
   },
   "models": {
     "providers": {
-      "anthropic": {
+      "automna": {
         "baseUrl": "https://automna.ai/api/llm",
-        "models": []
+        "apiKey": "$GATEWAY_TOKEN",
+        "api": "anthropic-messages",
+        "models": [
+          {"id": "claude-opus-4-5", "name": "Claude Opus 4.5"},
+          {"id": "claude-sonnet-4", "name": "Claude Sonnet 4"}
+        ]
       }
     }
   },
@@ -112,7 +133,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "defaults": {
       "workspace": "/home/node/.openclaw/workspace",
       "model": {
-        "primary": "anthropic/claude-opus-4-5"
+        "primary": "automna/claude-opus-4-5"
       },
       "userTimezone": "America/Los_Angeles",
       "contextPruning": {
@@ -125,9 +146,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
     }
   }
 }
-EOF
-    echo "[automna] Config created"
-fi
+EOFCONFIG
+echo "[automna] Config created with automna provider (baseUrl: https://automna.ai/api/llm)"
 
 # Migration: Add trustedProxies if missing
 if [ -f "$CONFIG_FILE" ] && ! grep -q '"trustedProxies"' "$CONFIG_FILE" 2>/dev/null; then
@@ -144,31 +164,11 @@ if [ -f "$CONFIG_FILE" ] && ! grep -q '"trustedProxies"' "$CONFIG_FILE" 2>/dev/n
     " 2>/dev/null || echo "[automna] Warning: trustedProxies migration failed"
 fi
 
-# Migration: Fix model name to Opus 4.5
-if [ -f "$CONFIG_FILE" ] && grep -qE 'claude-sonnet-4|claude-3-5-sonnet' "$CONFIG_FILE" 2>/dev/null; then
-    echo "[automna] Migrating config: setting model to Opus 4.5..."
-    sed -i 's/claude-sonnet-4/claude-opus-4-5/g; s/claude-3-5-sonnet-[0-9]*/claude-opus-4-5/g' "$CONFIG_FILE"
-    echo "[automna] Model set to Opus 4.5"
-fi
-
-# Migration: Add models.providers.anthropic.baseUrl for LLM proxy routing
-# This is required because OpenClaw/pi-ai does NOT read ANTHROPIC_BASE_URL env var
-if [ -f "$CONFIG_FILE" ] && ! grep -q '"providers"' "$CONFIG_FILE" 2>/dev/null; then
-    echo "[automna] Migrating config: adding anthropic proxy baseUrl..."
-    node -e "
-        const fs = require('fs');
-        const config = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf8'));
-        if (!config.models) config.models = {};
-        if (!config.models.providers) config.models.providers = {};
-        if (!config.models.providers.anthropic) {
-            config.models.providers.anthropic = {
-                baseUrl: 'https://automna.ai/api/llm',
-                models: []
-            };
-        }
-        fs.writeFileSync('$CONFIG_FILE', JSON.stringify(config, null, 2));
-        console.log('[automna] anthropic proxy baseUrl added');
-    " 2>/dev/null || echo "[automna] Warning: anthropic proxy migration failed"
+# Migration: Fix model name to use automna provider with Opus 4.5
+if [ -f "$CONFIG_FILE" ] && grep -qE 'anthropic/claude|claude-sonnet-4|claude-3-5-sonnet' "$CONFIG_FILE" 2>/dev/null; then
+    echo "[automna] Migrating config: switching to automna provider..."
+    sed -i 's|anthropic/claude-opus-4-5|automna/claude-opus-4-5|g; s|anthropic/claude-sonnet-4|automna/claude-opus-4-5|g; s/claude-sonnet-4/claude-opus-4-5/g; s/claude-3-5-sonnet-[0-9]*/claude-opus-4-5/g' "$CONFIG_FILE"
+    echo "[automna] Model set to automna/claude-opus-4-5"
 fi
 
 # Initial session key fix
@@ -197,23 +197,10 @@ echo "[automna] Caddy running (PID: $CADDY_PID)"
 # Wait for Caddy to be ready
 sleep 1
 
-# Extract gateway token from args (we need to pass it to gateway on internal port)
-# Args come in as: gateway --allow-unconfigured --bind lan --auth token --token <TOKEN>
-# We need to change the port to 18788
-GATEWAY_TOKEN=""
-for arg in "$@"; do
-    if [ "$prev_was_token" = "1" ]; then
-        GATEWAY_TOKEN="$arg"
-        break
-    fi
-    if [ "$arg" = "--token" ]; then
-        prev_was_token=1
-    fi
-done
-
 echo "[automna] Starting OpenClaw gateway on port $GATEWAY_INTERNAL_PORT (internal)..."
 
-# Route LLM calls through Automna proxy for usage tracking
+# Route LLM calls through Automna proxy
+# The config uses automna provider, but we also set this as fallback for built-in anthropic provider
 export ANTHROPIC_BASE_URL="https://automna.ai/api/llm"
 
 # Start gateway on internal port

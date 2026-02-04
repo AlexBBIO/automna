@@ -19,12 +19,12 @@ const provisioningSteps = [
 
 // Tips shown during provisioning to educate users
 const provisioningTips = [
-  { icon: '🔍', title: 'Web Research', desc: 'Ask your agent to research any topic and summarize findings' },
-  { icon: '📝', title: 'Writing Help', desc: 'Get help drafting emails, documents, or creative content' },
-  { icon: '💾', title: 'File Management', desc: 'Upload files and your agent can read, analyze, and edit them' },
-  { icon: '🧠', title: 'Memory', desc: 'Your agent remembers your conversations and preferences' },
-  { icon: '💻', title: 'Code Assistance', desc: 'Get help writing, debugging, and explaining code' },
-  { icon: '🔗', title: 'Integrations', desc: 'Connect Discord or Telegram to chat from anywhere' },
+  { icon: '☁️', title: 'Always On', desc: 'Your agent lives in the cloud 24/7. Close the tab — it keeps working.' },
+  { icon: '📁', title: 'Your Files, Your Agent', desc: 'Upload documents, code, or data. Your agent can read, edit, and create files that persist.' },
+  { icon: '🧠', title: 'It Remembers You', desc: 'Your preferences, your projects, your context. No more starting from scratch.' },
+  { icon: '💬', title: 'Chat From Anywhere', desc: 'Connect Discord or Telegram and talk to your agent from your favorite apps.' },
+  { icon: '🔌', title: 'Integrated', desc: 'Email, calendar, web search, and more. Ask your agent what it can connect to!' },
+  { icon: '🤖', title: 'Autonomous', desc: '"Research this and get back to me" — your agent can work on tasks while you\'re away.' },
 ];
 
 function formatElapsedTime(seconds: number): string {

@@ -375,13 +375,16 @@ async function createMachine(
   // Note: cleanEnvValue strips trailing newlines that may be in Vercel env vars
   // 
   // LLM Proxy Authentication:
-  // - ANTHROPIC_BASE_URL routes all LLM traffic through our proxy
-  // - ANTHROPIC_API_KEY is set to the gateway token (NOT our real key!)
-  // - SDK sends "Bearer <gateway_token>" to proxy, which validates it
-  // - Proxy then forwards to Anthropic with the real key (only on Vercel)
+  // - ANTHROPIC_BASE_URL routes all LLM traffic through our proxy (set in entrypoint)
+  // - ANTHROPIC_API_KEY is set to the gateway token (NOT our real Anthropic key!)
+  // - The built-in anthropic provider reads these env vars
+  // - Proxy validates gateway token, then forwards to Anthropic with real key (only on Vercel)
+  //
+  // Note: Using ANTHROPIC_API_KEY for gateway token is confusing but necessary because
+  // OpenClaw's custom provider config doesn't work correctly. The real Anthropic key
+  // exists ONLY in Vercel env vars.
   const env: Record<string, string> = {
-    ANTHROPIC_API_KEY: gatewayToken,  // Gateway token used as bearer auth for proxy
-    ANTHROPIC_BASE_URL: "https://automna.ai/api/llm",
+    ANTHROPIC_API_KEY: gatewayToken,  // Gateway token (NOT real Anthropic key!)
     GEMINI_API_KEY: cleanEnvValue(process.env.GEMINI_API_KEY),
     OPENCLAW_GATEWAY_TOKEN: gatewayToken,
   };

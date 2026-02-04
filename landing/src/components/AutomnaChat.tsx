@@ -206,10 +206,12 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoWakeSentRef = useRef(false);
+  const dragCounterRef = useRef(0);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -343,8 +345,67 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
     inputRef.current?.focus();
   };
 
+  // Drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      setPendingFiles(prev => [...prev, ...files]);
+      inputRef.current?.focus();
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white transition-colors">
+    <div 
+      className="flex flex-col h-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white transition-colors relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-purple-600/10 border-4 border-dashed border-purple-500 rounded-xl flex items-center justify-center pointer-events-none animate-fadeIn">
+          <div className="bg-white dark:bg-zinc-800 rounded-2xl p-8 shadow-xl border border-purple-200 dark:border-purple-700">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                <svg className="w-8 h-8 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <p className="text-lg font-medium text-zinc-800 dark:text-white">Drop files here</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Files will be attached to your message</p>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
         <ConnectionStatus phase={loadingPhase} error={error} />
