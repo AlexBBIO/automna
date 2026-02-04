@@ -39,7 +39,10 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
   const [showNewFileModal, setShowNewFileModal] = useState(false);
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newItemName, setNewItemName] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
   
   // Initial load
   useEffect(() => {
@@ -143,6 +146,52 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
     }
   };
   
+  // Drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    
+    setIsUploading(true);
+    try {
+      // Upload files sequentially to current directory
+      for (const file of files) {
+        await uploadFile(file, currentPath);
+      }
+    } catch (err) {
+      console.error('Drop upload failed:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  
   const handleDelete = async (file: FileItem) => {
     if (!confirm(`Delete "${file.name}"?`)) return;
     
@@ -221,7 +270,29 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
   const workspaceSegmentCount = WORKSPACE_ROOT.split('/').filter(Boolean).length;
   
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white transition-colors">
+    <div 
+      className="h-full flex flex-col bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white transition-colors relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-purple-500/20 border-2 border-dashed border-purple-500 rounded-lg flex items-center justify-center pointer-events-none">
+          <div className="bg-white dark:bg-zinc-800 rounded-xl p-6 shadow-xl text-center">
+            <div className="text-4xl mb-2">📂</div>
+            <div className="text-lg font-medium text-purple-600 dark:text-purple-400">Drop files here</div>
+            <div className="text-sm text-zinc-500 dark:text-zinc-400">Upload to {currentPath.split('/').pop() || 'workspace'}</div>
+          </div>
+        </div>
+      )}
+      
+      {/* Upload progress indicator */}
+      {isUploading && (
+        <div className="absolute top-0 left-0 right-0 z-40 bg-purple-500 h-1 animate-pulse" />
+      )}
+      
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
         <div className="flex items-center gap-2 text-sm">
