@@ -351,6 +351,7 @@ function parseContent(text: string): Segment[] {
 }
 
 // Detect if a code block looks like tool output (web_fetch, web_search, etc.)
+// Must match specific key combinations to avoid false positives on regular code
 function isToolOutputCodeBlock(content: string, language: string): boolean {
   // Only check JSON or unlabeled code blocks
   if (language && !['json', ''].includes(language.toLowerCase())) {
@@ -364,15 +365,18 @@ function isToolOutputCodeBlock(content: string, language: string): boolean {
     return false;
   }
   
-  // Check for common tool output keys
-  const toolOutputKeys = [
-    '"url":', '"finalUrl":', '"status":', '"fetchedAt":', '"tookMs":',
-    '"extractMode":', '"contentType":', '"truncated":', '"length":',
-    '"results":', '"citations":', '"answer":', '"query":',  // search results
-    '"tool":', '"error":', '"output":',  // generic tool output
-  ];
+  // web_fetch output: requires these specific keys (unlikely in regular code)
+  const webFetchKeys = ['"fetchedAt":', '"tookMs":', '"extractMode":', '"finalUrl":'];
+  const webFetchMatches = webFetchKeys.filter(key => trimmed.includes(key)).length;
+  if (webFetchMatches >= 2) return true;
   
-  return toolOutputKeys.some(key => trimmed.includes(key));
+  // web_search output: requires citations array
+  if (trimmed.includes('"citations":') && trimmed.includes('"answer":')) return true;
+  
+  // brave search output
+  if (trimmed.includes('"web":') && trimmed.includes('"results":') && trimmed.includes('"title":')) return true;
+  
+  return false;
 }
 
 export function MessageContent({ text, isUser, showToolOutput = true }: MessageContentProps) {

@@ -40,6 +40,20 @@ const genId = () => crypto.randomUUID();
 
 // Parse messages from API response - preserve all content types for agent activity toggle
 function parseMessages(messages: Array<{ role: string; content: unknown; timestamp?: number }>, prefix: string): ThreadMessage[] {
+  // Debug: log first message's content structure
+  if (messages.length > 0) {
+    const sample = messages[0];
+    const contentTypes = Array.isArray(sample.content) 
+      ? sample.content.map((c: { type?: string }) => c.type || 'unknown')
+      : [typeof sample.content];
+    console.log('[clawdbot] History message format:', {
+      role: sample.role,
+      contentIsArray: Array.isArray(sample.content),
+      contentTypes,
+      sampleContent: JSON.stringify(sample.content).slice(0, 300)
+    });
+  }
+  
   return messages.map((m, idx) => {
     let content: Array<{ type: string; [key: string]: unknown }> = [];
     
