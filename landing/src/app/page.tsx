@@ -509,7 +509,7 @@ export default function Landing() {
               Ready to delegate?
             </h2>
             <p className="text-zinc-500 dark:text-zinc-400 mb-8">
-              Start free. No credit card required.
+              Your AI employee is waiting.
             </p>
 
             <Link
