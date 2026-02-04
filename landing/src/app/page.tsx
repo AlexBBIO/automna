@@ -108,7 +108,7 @@ export default function Landing() {
 
       <main className="relative z-10">
         {/* Hero Section */}
-        <section className="container mx-auto px-6 pt-8 pb-12 md:pt-14 md:pb-16">
+        <section className="container mx-auto px-6 pt-6 pb-8 md:pt-10 md:pb-12">
           <div className={`max-w-3xl mx-auto text-center transform transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             
             {/* Trust badge */}
@@ -171,7 +171,7 @@ export default function Landing() {
         </section>
 
         {/* Demo Section */}
-        <section id="demo" className="container mx-auto px-6 py-12 md:py-16">
+        <section id="demo" className="container mx-auto px-6 py-8 md:py-10">
           <div className={`max-w-4xl mx-auto transform transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             
             <div className="text-center mb-8">
@@ -250,7 +250,7 @@ export default function Landing() {
         </section>
 
         {/* Bento Grid Features */}
-        <section className="container mx-auto px-6 py-12 md:py-16 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <section className="container mx-auto px-6 py-8 md:py-10 bg-zinc-50/50 dark:bg-zinc-900/30">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-8">
               <h2 className="text-2xl md:text-3xl font-bold mb-2 text-zinc-900 dark:text-white">Everything an employee can do.</h2>
@@ -313,7 +313,7 @@ export default function Landing() {
         </section>
 
         {/* Comparison Section */}
-        <section className="container mx-auto px-6 py-12 md:py-16">
+        <section className="container mx-auto px-6 py-8 md:py-10">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-8">
               <h2 className="text-2xl md:text-3xl font-bold mb-2 text-zinc-900 dark:text-white">
@@ -349,7 +349,7 @@ export default function Landing() {
         </section>
 
         {/* Testimonial */}
-        <section className="container mx-auto px-6 py-8">
+        <section className="container mx-auto px-6 py-6">
           <div className="max-w-2xl mx-auto">
             <div className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-6 text-center shadow-sm">
               <p className="text-lg text-zinc-700 dark:text-zinc-300 mb-4 leading-relaxed">
@@ -371,7 +371,7 @@ export default function Landing() {
         </section>
 
         {/* Pricing */}
-        <section className="container mx-auto px-6 py-12 md:py-16 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <section className="container mx-auto px-6 py-8 md:py-10 bg-zinc-50/50 dark:bg-zinc-900/30">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-8">
               <h2 className="text-2xl md:text-3xl font-bold mb-2 text-zinc-900 dark:text-white">Simple, transparent pricing</h2>
@@ -460,7 +460,7 @@ export default function Landing() {
         </section>
 
         {/* Final CTA */}
-        <section className="container mx-auto px-6 py-14 md:py-20">
+        <section className="container mx-auto px-6 py-10 md:py-14">
           <div className="max-w-xl mx-auto text-center">
             <h2 className="text-2xl md:text-3xl font-bold mb-3 text-zinc-900 dark:text-white">
               Ready to delegate?
