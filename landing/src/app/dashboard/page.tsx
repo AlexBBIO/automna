@@ -729,7 +729,29 @@ export default function DashboardPage() {
                 )}
                 {activeTab === 'integrations' && (
                   <IntegrationsPanel 
-                    onSelectIntegration={(prompt) => {
+                    onSelectIntegration={(integrationName, prompt) => {
+                      // Create a new conversation for this integration setup
+                      const key = `setup-${integrationName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+                      const name = `${integrationName} Setup`;
+                      
+                      // Check if conversation already exists
+                      if (!conversations.some(c => c.key === key)) {
+                        const newConversation: Conversation = {
+                          key,
+                          name,
+                          icon: '🔌',
+                        };
+                        setConversations(prev => [...prev, newConversation]);
+                        
+                        // Save to backend
+                        fetch('/api/user/sessions', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ key, label: name }),
+                        }).catch(err => console.error('[dashboard] Failed to set session label:', err));
+                      }
+                      
+                      setCurrentConversation(key);
                       setPendingMessage(prompt);
                       setActiveTab('chat');
                     }}

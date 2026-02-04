@@ -264,7 +264,7 @@ const categoryLabels: Record<string, string> = {
 const categoryOrder = ['messaging', 'productivity', 'calendar', 'developer', 'notes', 'smart-home', 'media', 'other'];
 
 interface IntegrationsPanelProps {
-  onSelectIntegration: (prompt: string) => void;
+  onSelectIntegration: (integrationName: string, prompt: string) => void;
 }
 
 export function IntegrationsPanel({ onSelectIntegration }: IntegrationsPanelProps) {
@@ -353,7 +353,7 @@ export function IntegrationsPanel({ onSelectIntegration }: IntegrationsPanelProp
                     <IntegrationCard
                       key={integration.id}
                       integration={integration}
-                      onClick={() => onSelectIntegration(integration.setupPrompt)}
+                      onClick={() => onSelectIntegration(integration.name, integration.setupPrompt)}
                     />
                   ))}
                 </div>
@@ -367,7 +367,7 @@ export function IntegrationsPanel({ onSelectIntegration }: IntegrationsPanelProp
               <IntegrationCard
                 key={integration.id}
                 integration={integration}
-                onClick={() => onSelectIntegration(integration.setupPrompt)}
+                onClick={() => onSelectIntegration(integration.name, integration.setupPrompt)}
               />
             ))}
           </div>
