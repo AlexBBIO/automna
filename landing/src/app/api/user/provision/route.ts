@@ -377,28 +377,43 @@ async function createMachine(
   // Build env vars - only include integrations if configured
   // Note: cleanEnvValue strips trailing newlines that may be in Vercel env vars
   // 
-  // LLM Proxy Authentication:
-  // - ANTHROPIC_BASE_URL routes all LLM traffic through our proxy (set in entrypoint)
-  // - ANTHROPIC_API_KEY is set to the gateway token (NOT our real Anthropic key!)
-  // - The built-in anthropic provider reads these env vars
-  // - Proxy validates gateway token, then forwards to Anthropic with real key (only on Vercel)
+  // API Proxy Authentication:
+  // All external API calls are proxied through automna.ai to:
+  // 1. Keep real API keys secure (only on Vercel, never on user machines)
+  // 2. Enable usage logging and billing
+  // 3. Apply rate limits
   //
-  // Note: Using ANTHROPIC_API_KEY for gateway token is confusing but necessary because
-  // OpenClaw's custom provider config doesn't work correctly. The real Anthropic key
-  // exists ONLY in Vercel env vars.
+  // User machines get gateway token as their "API key" for each service.
+  // Proxies authenticate via gateway token, then forward with real keys.
+  //
+  // Proxied services:
+  // - Anthropic: ANTHROPIC_BASE_URL + gateway token
+  // - Gemini: GOOGLE_API_BASE_URL + gateway token  
+  // - Browserbase: BROWSERBASE_API_URL + gateway token
   const env: Record<string, string> = {
-    ANTHROPIC_API_KEY: gatewayToken,  // Gateway token (NOT real Anthropic key!)
-    GEMINI_API_KEY: cleanEnvValue(process.env.GEMINI_API_KEY),
+    // Gateway auth
     OPENCLAW_GATEWAY_TOKEN: gatewayToken,
+    
+    // Anthropic proxy (OpenClaw's anthropic provider uses these)
+    ANTHROPIC_API_KEY: gatewayToken,
+    // ANTHROPIC_BASE_URL set in entrypoint.sh
+    
+    // Gemini proxy
+    GEMINI_API_KEY: gatewayToken,
+    GOOGLE_API_KEY: gatewayToken,  // Some SDKs use this
+    GOOGLE_API_BASE_URL: "https://automna.ai/api/gemini",
+    
+    // Browserbase proxy
+    BROWSERBASE_API_KEY: gatewayToken,
+    BROWSERBASE_API_URL: "https://automna.ai/api/browserbase",
   };
   
-  // Add Browserbase config if available
-  if (BROWSERBASE_API_KEY && BROWSERBASE_PROJECT_ID) {
-    env.BROWSERBASE_API_KEY = cleanEnvValue(BROWSERBASE_API_KEY);
+  // Add Browserbase context if available (for persistent browser sessions)
+  if (BROWSERBASE_PROJECT_ID) {
     env.BROWSERBASE_PROJECT_ID = cleanEnvValue(BROWSERBASE_PROJECT_ID);
-    if (browserbaseContextId) {
-      env.BROWSERBASE_CONTEXT_ID = browserbaseContextId;
-    }
+  }
+  if (browserbaseContextId) {
+    env.BROWSERBASE_CONTEXT_ID = browserbaseContextId;
   }
 
   // Add Agentmail inbox ID (agents use our proxy API for sending, not direct Agentmail)
