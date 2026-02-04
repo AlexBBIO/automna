@@ -385,7 +385,7 @@ export function MessageContent({ text, isUser, showToolOutput = true }: MessageC
   return (
     <div className="text-[15px] leading-relaxed">
       {segments.map((segment, i) => {
-        // Code blocks - always show (user intentional content)
+        // Code blocks - hide if it's tool output JSON and toggle is off
         if (segment.type === 'code') {
           if (isUser) {
             return (
@@ -393,6 +393,10 @@ export function MessageContent({ text, isUser, showToolOutput = true }: MessageC
                 {`\`\`\`${segment.language}\n${segment.content}\`\`\``}
               </span>
             );
+          }
+          // Hide code blocks that are tool output when toggle is off
+          if (!showToolOutput && isRawToolOutputJson(segment.content)) {
+            return null;
           }
           return <CodeBlock key={i} language={segment.language} code={segment.content} />;
         }
