@@ -13,8 +13,8 @@ export function useTheme() {
     if (stored) {
       setIsDark(stored === 'dark');
     } else {
-      // Default to system preference
-      setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      // Default to light mode for new visitors
+      setIsDark(false);
     }
   }, []);
 
