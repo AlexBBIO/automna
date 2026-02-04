@@ -168,15 +168,6 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* Logo strip - Social proof */}
-          <div className={`max-w-3xl mx-auto mt-16 transform transition-all duration-700 delay-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-            <p className="text-center text-zinc-400 dark:text-zinc-600 text-xs uppercase tracking-wider mb-6">Trusted by teams at</p>
-            <div className="flex flex-wrap justify-center items-center gap-x-10 gap-y-4 opacity-50 dark:opacity-40">
-              {['Acme Corp', 'TechFlow', 'DataSync', 'CloudNine', 'DevStack'].map((name) => (
-                <span key={name} className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">{name}</span>
-              ))}
-            </div>
-          </div>
         </section>
 
         {/* Demo Section */}
