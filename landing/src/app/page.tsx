@@ -108,11 +108,11 @@ export default function Landing() {
 
       <main className="relative z-10">
         {/* Hero Section */}
-        <section className="container mx-auto px-6 pt-12 pb-16 md:pt-20 md:pb-24">
+        <section className="container mx-auto px-6 pt-8 pb-12 md:pt-14 md:pb-16">
           <div className={`max-w-3xl mx-auto text-center transform transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             
             {/* Trust badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-medium mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-medium mb-5">
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-600 dark:bg-purple-500"></span>
@@ -130,7 +130,7 @@ export default function Landing() {
             </h1>
             
             {/* Subheadline */}
-            <p className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 mb-8 max-w-xl mx-auto leading-relaxed">
+            <p className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 mb-6 max-w-xl mx-auto leading-relaxed">
               Delegate real work to an AI that browses, emails, codes, and executes—autonomously 
               or with your approval. Running 24/7 in the cloud.
             </p>
@@ -171,11 +171,11 @@ export default function Landing() {
         </section>
 
         {/* Demo Section */}
-        <section id="demo" className="container mx-auto px-6 py-16 md:py-24">
+        <section id="demo" className="container mx-auto px-6 py-12 md:py-16">
           <div className={`max-w-4xl mx-auto transform transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             
-            <div className="text-center mb-10">
-              <h2 className="text-2xl md:text-3xl font-bold mb-3 text-zinc-900 dark:text-white">See it in action</h2>
+            <div className="text-center mb-8">
+              <h2 className="text-2xl md:text-3xl font-bold mb-2 text-zinc-900 dark:text-white">See it in action</h2>
               <p className="text-zinc-500 dark:text-zinc-400">Real task. Real autonomy. Real control.</p>
             </div>
 
@@ -250,10 +250,10 @@ export default function Landing() {
         </section>
 
         {/* Bento Grid Features */}
-        <section className="container mx-auto px-6 py-16 md:py-24 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <section className="container mx-auto px-6 py-12 md:py-16 bg-zinc-50/50 dark:bg-zinc-900/30">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-2xl md:text-3xl font-bold mb-3 text-zinc-900 dark:text-white">Everything an employee can do.</h2>
+            <div className="text-center mb-8">
+              <h2 className="text-2xl md:text-3xl font-bold mb-2 text-zinc-900 dark:text-white">Everything an employee can do.</h2>
               <p className="text-zinc-500 dark:text-zinc-400">Except take vacation.</p>
             </div>
 
@@ -313,18 +313,18 @@ export default function Landing() {
         </section>
 
         {/* Comparison Section */}
-        <section className="container mx-auto px-6 py-16 md:py-24">
+        <section className="container mx-auto px-6 py-12 md:py-16">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-2xl md:text-3xl font-bold mb-3 text-zinc-900 dark:text-white">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl md:text-3xl font-bold mb-2 text-zinc-900 dark:text-white">
                 ChatGPT answers questions.
               </h2>
               <p className="text-zinc-500 dark:text-zinc-400">Automna gets things done.</p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-6">
-                <div className="text-zinc-400 dark:text-zinc-500 text-xs font-medium uppercase tracking-wider mb-5">Typical AI Chat</div>
+              <div className="bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-5">
+                <div className="text-zinc-400 dark:text-zinc-500 text-xs font-medium uppercase tracking-wider mb-4">Typical AI Chat</div>
                 <ul className="space-y-3">
                   <ComparisonItem negative>Just a chat window</ComparisonItem>
                   <ComparisonItem negative>Forgets between sessions</ComparisonItem>
@@ -334,8 +334,8 @@ export default function Landing() {
                 </ul>
               </div>
 
-              <div className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-500/10 dark:to-violet-500/5 border border-purple-200 dark:border-purple-500/30 rounded-xl p-6">
-                <div className="text-purple-600 dark:text-purple-400 text-xs font-medium uppercase tracking-wider mb-5">Automna Agent</div>
+              <div className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-500/10 dark:to-violet-500/5 border border-purple-200 dark:border-purple-500/30 rounded-xl p-5">
+                <div className="text-purple-600 dark:text-purple-400 text-xs font-medium uppercase tracking-wider mb-4">Automna Agent</div>
                 <ul className="space-y-3">
                   <ComparisonItem>Executes real tasks</ComparisonItem>
                   <ComparisonItem>Persistent memory</ComparisonItem>
@@ -349,10 +349,10 @@ export default function Landing() {
         </section>
 
         {/* Testimonial */}
-        <section className="container mx-auto px-6 py-12">
+        <section className="container mx-auto px-6 py-8">
           <div className="max-w-2xl mx-auto">
-            <div className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-8 text-center shadow-sm">
-              <p className="text-lg text-zinc-700 dark:text-zinc-300 mb-6 leading-relaxed">
+            <div className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-6 text-center shadow-sm">
+              <p className="text-lg text-zinc-700 dark:text-zinc-300 mb-4 leading-relaxed">
                 &quot;I set it to monitor 3 subreddits for mentions of our product. 
                 Two days later it had compiled a report with sentiment analysis and 
                 sent it to my Notion. I didn&apos;t touch anything.&quot;
@@ -371,10 +371,10 @@ export default function Landing() {
         </section>
 
         {/* Pricing */}
-        <section className="container mx-auto px-6 py-16 md:py-24 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <section className="container mx-auto px-6 py-12 md:py-16 bg-zinc-50/50 dark:bg-zinc-900/30">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-10">
-              <h2 className="text-2xl md:text-3xl font-bold mb-3 text-zinc-900 dark:text-white">Simple, transparent pricing</h2>
+            <div className="text-center mb-8">
+              <h2 className="text-2xl md:text-3xl font-bold mb-2 text-zinc-900 dark:text-white">Simple, transparent pricing</h2>
               <p className="text-zinc-500 dark:text-zinc-400">Start small. Scale when ready.</p>
             </div>
 
@@ -423,8 +423,8 @@ export default function Landing() {
             </p>
 
             {/* FAQ Accordion */}
-            <div className="max-w-2xl mx-auto mt-16">
-              <h3 className="text-lg font-semibold text-center mb-6 text-zinc-900 dark:text-white">Frequently asked questions</h3>
+            <div className="max-w-2xl mx-auto mt-10">
+              <h3 className="text-lg font-semibold text-center mb-4 text-zinc-900 dark:text-white">Frequently asked questions</h3>
               <div className="space-y-2">
                 {[
                   { q: "Do I need my own API key?", a: "No. All plans include Claude AI. We handle the infrastructure so you can focus on what your agent does, not how it runs." },
@@ -460,12 +460,12 @@ export default function Landing() {
         </section>
 
         {/* Final CTA */}
-        <section className="container mx-auto px-6 py-20 md:py-28">
+        <section className="container mx-auto px-6 py-14 md:py-20">
           <div className="max-w-xl mx-auto text-center">
-            <h2 className="text-2xl md:text-3xl font-bold mb-4 text-zinc-900 dark:text-white">
+            <h2 className="text-2xl md:text-3xl font-bold mb-3 text-zinc-900 dark:text-white">
               Ready to delegate?
             </h2>
-            <p className="text-zinc-500 dark:text-zinc-400 mb-8">
+            <p className="text-zinc-500 dark:text-zinc-400 mb-6">
               Your AI employee is waiting.
             </p>
 
