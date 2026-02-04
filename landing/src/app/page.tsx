@@ -380,15 +380,15 @@ export default function Landing() {
 
             <div className="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto">
               <PricingCard
-                tier="Lite"
-                price={30}
-                description="For trying it out"
+                tier="Starter"
+                price={79}
+                description="Perfect for getting started"
                 features={[
                   '1 AI agent',
-                  'Web interface',
-                  'Persistent memory',
-                  'Bring your own API key',
-                  'Community support',
+                  'Web chat interface',
+                  '1 integration (Discord OR Telegram)',
+                  'Basic memory (30 days)',
+                  'Email support',
                 ]}
               />
               <PricingCard
@@ -398,28 +398,28 @@ export default function Landing() {
                 features={[
                   '1 AI agent',
                   'All integrations',
-                  'App deployment',
-                  'Priority support',
-                  'API access',
+                  'Cloud browser access',
+                  'Agent email inbox',
+                  'Unlimited memory',
                 ]}
                 highlighted
               />
               <PricingCard
                 tier="Business"
                 price={299}
-                description="For teams"
+                description="For teams and agencies"
                 features={[
                   '3 AI agents',
+                  'Everything in Pro',
                   'Team workspace',
-                  'Advanced analytics',
+                  'API access',
                   'Dedicated support',
-                  'Custom integrations',
                 ]}
               />
             </div>
 
             <p className="text-center text-zinc-500 dark:text-zinc-400 text-sm mt-6">
-              All plans: AI usage billed separately (typically $5-50/mo). No surprises.
+              All plans include Claude AI. No API key needed.
             </p>
 
             {/* FAQ Accordion */}
@@ -427,7 +427,7 @@ export default function Landing() {
               <h3 className="text-lg font-semibold text-center mb-6 text-zinc-900 dark:text-white">Frequently asked questions</h3>
               <div className="space-y-2">
                 {[
-                  { q: "What does 'bring your own API key' mean?", a: "You connect your own OpenAI/Anthropic API key. You pay them directly for AI usage, giving you full control over costs and models." },
+                  { q: "Do I need my own API key?", a: "No. All plans include Claude AI. We handle the infrastructure so you can focus on what your agent does, not how it runs." },
                   { q: "How is this different from ChatGPT?", a: "ChatGPT is a chat interface. Automna is an autonomous agent that executes real tasks—browsing, emailing, coding—without you copy-pasting." },
                   { q: "Is my data private?", a: "Yes. Your agent runs in an isolated container. We never train on your data. You can self-host if needed." },
                   { q: "Can I control what it does autonomously?", a: "Absolutely. Set approval requirements for sensitive actions, or let it run fully autonomous. You decide." },

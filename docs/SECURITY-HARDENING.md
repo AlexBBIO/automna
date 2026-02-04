@@ -1,7 +1,7 @@
 # Security Hardening Plan
 
 **Created:** 2026-02-04
-**Status:** Planning
+**Status:** Phases 1 & 3 complete, deployed
 **Risk Level:** Low-Medium (defensive improvements, not fixing active vulnerabilities)
 
 ---
@@ -219,12 +219,12 @@ Remove the validation check. Routes work as before (relying on file server).
 
 ## Implementation Order
 
-| Phase | Item | Risk | Time |
-|-------|------|------|------|
-| 1 | Logging cleanup | Very Low | 30min |
-| 2 | Rate limit await | Low | 15min |
-| 3 | Path validation | Medium | 1hr |
-| 4 | Zod schemas | Medium | 2hr |
+| Phase | Item | Risk | Time | Status |
+|-------|------|------|------|--------|
+| 1 | Logging cleanup | Very Low | 30min | ✅ Done |
+| 2 | Rate limit await | Low | 15min | Pending |
+| 3 | Path validation | Medium | 1hr | ✅ Done |
+| 4 | Zod schemas | Medium | 2hr | Pending |
 
 **Total estimated time:** ~4 hours
 
