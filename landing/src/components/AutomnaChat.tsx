@@ -9,7 +9,8 @@ import { MessageContent } from './MessageContent';
 import { 
   useEffect, 
   useRef, 
-  useState, 
+  useState,
+  useMemo,
   type FormEvent,
   type KeyboardEvent 
 } from 'react';
@@ -231,6 +232,18 @@ function getMessageText(content: Array<{ type: string; text?: string }>): string
     .join('\n');
 }
 
+// Check if a content part is tool-related
+function isToolContentPart(part: { type: string }): boolean {
+  const type = part.type?.toLowerCase();
+  return type === 'tool_use' || type === 'tool_result' || type === 'toolcall';
+}
+
+// Check if a message role is tool-related
+function isToolResultRole(role: string): boolean {
+  const r = role?.toLowerCase();
+  return r === 'toolresult' || r === 'tool_result';
+}
+
 export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage, onInitialMessageSent }: AutomnaChatProps) {
   const { messages, isRunning, isConnected, loadingPhase, error, append, cancel } = useClawdbotRuntime({
     gatewayUrl,
@@ -243,6 +256,24 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showToolCalls, setShowToolCalls] = useState(false);
+  
+  // Filter messages to hide tool-related content when showToolCalls is false
+  const displayMessages = useMemo(() => {
+    if (showToolCalls) return messages;
+    
+    return messages
+      // Filter out toolResult role messages entirely
+      .filter(msg => !isToolResultRole(msg.role))
+      // Filter out tool content parts from remaining messages
+      .map(msg => ({
+        ...msg,
+        content: msg.content.filter(part => !isToolContentPart(part))
+      }))
+      // Remove messages that have no content left after filtering
+      .filter(msg => msg.content.length > 0);
+  }, [messages, showToolCalls]);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -465,9 +496,23 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
         <ConnectionStatus phase={loadingPhase} error={error} />
-        <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium uppercase tracking-wide">
-          {sessionKey === 'main' ? 'General' : sessionKey}
-        </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowToolCalls(!showToolCalls)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+              showToolCalls 
+                ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30' 
+                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+            }`}
+            title={showToolCalls ? 'Hide tool calls' : 'Show tool calls'}
+          >
+            <span>{showToolCalls ? '🔧' : '💬'}</span>
+            <span>{showToolCalls ? 'Tools' : 'Chat'}</span>
+          </button>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium uppercase tracking-wide">
+            {sessionKey === 'main' ? 'General' : sessionKey}
+          </span>
+        </div>
       </div>
       
       {/* Messages */}
@@ -478,9 +523,9 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
         )}
         
         {/* Messages */}
-        {messages.length > 0 && (
+        {displayMessages.length > 0 && (
           <div className="space-y-6 max-w-4xl mx-auto">
-            {messages.map((message, index) => (
+            {displayMessages.map((message, index) => (
               <div
                 key={message.id}
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'gap-3 items-start'} group animate-fadeIn`}
