@@ -185,6 +185,115 @@ Like having your own:
 
 ---
 
+---
+
+## Killer Use Cases: What Actually Resonates
+
+Based on what's gone viral with OpenClaw/Clawdbot and what testimonials highlight as life-changing:
+
+### 🏆 Tier 1: Highest Emotional Impact
+
+**1. "I Woke Up To Completed Work"**
+The overnight agent that works while you sleep. Morning brief waiting for you with:
+- Summarized emails, flagged priorities
+- Research you requested, compiled
+- Content drafted, ready to review
+- Trends monitored, opportunities identified
+
+*Why it hits:* It's visceral. You literally wake up to a more productive day. The "magic" is undeniable.
+
+**2. "My Second Brain That Actually Does Things"**
+Not just storage — action. The agent that:
+- Remembers every conversation, every preference
+- Notices patterns in your behavior
+- Proactively surfaces relevant info
+- Takes actions based on learned context
+
+*Why it hits:* People have been promised this for years (Evernote, Notion, Roam). Nobody delivered. An agent that truly remembers YOU and acts on it is the dream.
+
+**3. "Solo Founder → Team of One"**
+The multiplier for indie hackers/entrepreneurs:
+- Handles customer support (80% of tickets)
+- Drafts investor emails (21 in one batch)
+- Monitors competitors, surfaces insights
+- Manages operations you'd otherwise hire for
+
+*Why it hits:* Solo founders feel alone. An AI that genuinely handles work (not just suggests) is transformational.
+
+### 🥈 Tier 2: High Viral Potential
+
+**4. "Find That Thing I Forgot"**
+Remote file/photo/note search via chat:
+- "Find that screenshot of the error message from last week"
+- "Where's the PDF from the accountant?"
+- "What was that idea I had in November?"
+
+*Why it hits:* Everyone has this problem. Demo is instant and relatable.
+
+**5. "Watchdog for Everything"**
+Monitoring + alerts without setup complexity:
+- Price drops on products you want
+- News about companies you care about
+- Changes to websites/competitors
+- Social mentions, trends in your niche
+
+*Why it hits:* People want to know things without checking constantly. Proactive > reactive.
+
+**6. "The Insurance Email Fighter"**
+One OpenClaw user's agent drafted assertive dispute emails to insurance companies — more aggressive than the human would write — and it worked. The company reinvestigated instead of rejecting.
+
+*Why it hits:* David vs Goliath. AI helping regular people fight bureaucracy.
+
+### 🥉 Tier 3: Impressive But Niche
+
+- **Multi-agent coding workflows** (orchestrator + builder + reviewer + deployer)
+- **Smart home/IoT integration** (camera triggers, emergency radio decoding)
+- **Trend → App builder** (monitor Twitter, build trending apps, push to GitHub)
+- **Meeting prep/follow-up automation**
+
+---
+
+## The ONE Demo To Make
+
+If I had to pick ONE demo to create virality:
+
+**"24 Hours With My AI Running"**
+
+Time-lapse style video showing:
+1. Night: Agent researching, organizing, preparing
+2. Morning: User wakes up, checks phone, sees completed brief
+3. Day: Quick commands via chat, agent handles tasks
+4. Evening: Agent summarizes day, queues tomorrow's priorities
+
+End with the metric: "I got 4 hours back and my brain doesn't hurt."
+
+**Why this specific demo:**
+- Shows persistence (it runs 24/7)
+- Shows proactivity (it acts without asking)
+- Shows real utility (not a gimmick)
+- Addresses the #1 testimonial point: mental overhead relief
+
+---
+
+## The Positioning That Wins
+
+After all this research, here's the sharpest positioning:
+
+**"Your AI, running 24/7, that actually knows you."**
+
+Not "AI assistant" (too generic)
+Not "AI agent" (too technical)
+Not "personal AI" (too vague)
+
+**"Your AI"** — ownership, privacy, yours
+**"Running 24/7"** — always on, proactive
+**"Actually knows you"** — persistence, memory, context
+
+The tagline writes itself:
+> "Stop prompting. Start delegating."
+
+---
+
 ## Final Thought
 
 You have something real. Automna isn't vaporware — it's a working product with genuine differentiation. The gap isn't the product, it's getting it in front of the right people.
