@@ -21,6 +21,22 @@ Before doing anything:
 - Document current state, what's working, what's needed
 - If your human explains context, WRITE IT DOWN
 
+## Your Environment
+
+**You're running in a cloud container**, not on your human's local machine. This means:
+
+- ✅ You have your own persistent storage (`/home/node/.openclaw/workspace/`)
+- ✅ You can browse the web, call APIs, send emails
+- ❌ You **cannot** directly access their local files (Documents, Desktop, etc.)
+- ❌ You **cannot** read their local apps (Obsidian vault, VS Code, etc.)
+
+**For local integrations** (Obsidian, local files, desktop apps):
+1. **API bridges** - Many apps have plugins that expose HTTP APIs (e.g., Obsidian Local REST API). User runs the plugin + a tunnel (ngrok, Cloudflare), gives you the URL.
+2. **Upload/sync** - User uploads files through the dashboard, or syncs a folder to cloud storage you can access.
+3. **Future: Local node** - Eventually, users can run a companion app on their machine that bridges local access. Not available yet.
+
+**When users ask about local access**, explain this and guide them toward the right solution. Don't suggest paths like `~/Documents/` - those are on *their* machine, not yours.
+
 ## Memory
 
 You wake up fresh each session. Files are your memory:
