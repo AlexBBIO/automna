@@ -351,17 +351,12 @@ function parseContent(text: string): Segment[] {
 }
 
 // Detect if a code block looks like tool output (web_fetch, web_search, etc.)
-// Must match specific key combinations to avoid false positives on regular code
-function isToolOutputCodeBlock(content: string, language: string): boolean {
-  // Only check JSON or unlabeled code blocks
-  if (language && !['json', ''].includes(language.toLowerCase())) {
-    return false;
-  }
+// Check if text is raw tool output JSON (not in a code block)
+function isRawToolOutputJson(text: string): boolean {
+  const trimmed = text.trim();
   
-  const trimmed = content.trim();
-  
-  // Must start with { or [ (JSON)
-  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+  // Must start with { and end with } (looks like JSON object)
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
     return false;
   }
   
@@ -370,12 +365,12 @@ function isToolOutputCodeBlock(content: string, language: string): boolean {
     return true;
   }
   
-  // web_fetch output: requires these specific keys (unlikely in regular code)
+  // web_fetch output: requires these specific keys
   const webFetchKeys = ['"fetchedAt":', '"tookMs":', '"extractMode":', '"finalUrl":'];
   const webFetchMatches = webFetchKeys.filter(key => trimmed.includes(key)).length;
   if (webFetchMatches >= 2) return true;
   
-  // web_search output: requires citations array
+  // web_search output
   if (trimmed.includes('"citations":') && trimmed.includes('"answer":')) return true;
   
   // brave search output
@@ -390,7 +385,7 @@ export function MessageContent({ text, isUser, showToolOutput = true }: MessageC
   return (
     <div className="text-[15px] leading-relaxed">
       {segments.map((segment, i) => {
-        // Code blocks only for assistant messages
+        // Code blocks - always show (user intentional content)
         if (segment.type === 'code') {
           if (isUser) {
             return (
@@ -399,11 +394,20 @@ export function MessageContent({ text, isUser, showToolOutput = true }: MessageC
               </span>
             );
           }
-          // Hide tool output code blocks if toggle is off
-          if (!showToolOutput && isToolOutputCodeBlock(segment.content, segment.language)) {
+          return <CodeBlock key={i} language={segment.language} code={segment.content} />;
+        }
+        
+        // Raw text - check if it's tool output JSON
+        if (segment.type === 'text') {
+          // If toggle is off and this looks like raw tool output JSON, hide it
+          if (!showToolOutput && isRawToolOutputJson(segment.content)) {
             return null;
           }
-          return <CodeBlock key={i} language={segment.language} code={segment.content} />;
+          return (
+            <span key={i} className="whitespace-pre-wrap break-words">
+              {segment.content}
+            </span>
+          );
         }
         // Inline code only for assistant messages
         if (segment.type === 'inline-code') {
@@ -448,11 +452,7 @@ export function MessageContent({ text, isUser, showToolOutput = true }: MessageC
             </a>
           );
         }
-        return (
-          <span key={i} className="whitespace-pre-wrap break-words">
-            {segment.content}
-          </span>
-        );
+        return null;
       })}
     </div>
   );
