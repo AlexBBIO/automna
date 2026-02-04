@@ -362,6 +362,18 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             httpHistoryAbortRef.current?.abort(); // Cancel HTTP fetch
             
             if (wsMessages.length > 0) {
+              // Debug: log first message's content structure
+              const sample = wsMessages[0];
+              const sampleContentTypes = Array.isArray(sample.content) 
+                ? sample.content.map((c: { type?: string }) => c.type || 'unknown')
+                : [typeof sample.content];
+              console.log('[clawdbot] WS History message format:', {
+                role: sample.role,
+                contentIsArray: Array.isArray(sample.content),
+                contentTypes: sampleContentTypes,
+                sampleContent: JSON.stringify(sample.content).slice(0, 500)
+              });
+              
               const history = wsMessages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
                 let content: Array<{ type: string; [key: string]: unknown }> = [];
                 
