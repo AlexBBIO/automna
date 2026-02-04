@@ -141,7 +141,12 @@ cat > "$CONFIG_FILE" << EOFCONFIG
         "ttl": "1h"
       },
       "compaction": {
-        "mode": "safeguard"
+        "mode": "safeguard",
+        "memoryFlush": {
+          "enabled": true,
+          "softThresholdTokens": 80000,
+          "prompt": "Summarize this conversation for continuity: current project state, key decisions made, user preferences, and any pending tasks or next steps."
+        }
       }
     }
   }
