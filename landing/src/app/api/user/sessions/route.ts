@@ -259,8 +259,19 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
+    // Support both query params and body
+    let key: string | null = null;
     const { searchParams } = new URL(request.url);
-    const key = searchParams.get('key');
+    key = searchParams.get('key');
+    
+    if (!key) {
+      try {
+        const body = await request.json();
+        key = body.key;
+      } catch {
+        // No body
+      }
+    }
     
     if (!key) {
       return NextResponse.json({ error: "key required" }, { status: 400 });

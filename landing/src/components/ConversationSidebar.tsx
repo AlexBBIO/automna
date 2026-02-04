@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface Conversation {
   key: string;
   name: string;
   icon: string;
   lastActive?: number;
+  starred?: boolean;
 }
 
 interface ConversationSidebarProps {
@@ -14,6 +15,9 @@ interface ConversationSidebarProps {
   onConversationChange: (key: string) => void;
   conversations: Conversation[];
   onCreateConversation: (name: string) => void;
+  onDeleteConversation?: (key: string) => void;
+  onRenameConversation?: (key: string, newName: string) => void;
+  onToggleStar?: (key: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   isLoading?: boolean;
@@ -25,6 +29,9 @@ export function ConversationSidebar({
   onConversationChange, 
   conversations,
   onCreateConversation,
+  onDeleteConversation,
+  onRenameConversation,
+  onToggleStar,
   isCollapsed,
   onToggleCollapse,
   isLoading = false,
@@ -32,6 +39,31 @@ export function ConversationSidebar({
 }: ConversationSidebarProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newConversationName, setNewConversationName] = useState('');
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [menuOpenKey, setMenuOpenKey] = useState<string | null>(null);
+  const [deleteConfirmKey, setDeleteConfirmKey] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenKey(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Focus edit input when editing starts
+  useEffect(() => {
+    if (editingKey && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingKey]);
 
   const handleCreate = () => {
     if (!newConversationName.trim()) return;
@@ -48,6 +80,51 @@ export function ConversationSidebar({
       setNewConversationName('');
     }
   };
+
+  const handleStartEdit = (conv: Conversation) => {
+    setEditingKey(conv.key);
+    setEditingName(conv.name);
+    setMenuOpenKey(null);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingKey && editingName.trim() && onRenameConversation) {
+      onRenameConversation(editingKey, editingName.trim());
+    }
+    setEditingKey(null);
+    setEditingName('');
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      setEditingKey(null);
+      setEditingName('');
+    }
+  };
+
+  const handleDelete = (key: string) => {
+    if (onDeleteConversation) {
+      onDeleteConversation(key);
+    }
+    setDeleteConfirmKey(null);
+    setMenuOpenKey(null);
+  };
+
+  const handleToggleStar = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggleStar) {
+      onToggleStar(key);
+    }
+  };
+
+  // Sort conversations: starred first, then by lastActive
+  const sortedConversations = [...conversations].sort((a, b) => {
+    if (a.starred && !b.starred) return -1;
+    if (!a.starred && b.starred) return 1;
+    return (b.lastActive || 0) - (a.lastActive || 0);
+  });
 
   // Collapsed view - just show icons
   if (isCollapsed) {
@@ -66,11 +143,11 @@ export function ConversationSidebar({
 
         {/* Conversation icons */}
         <div className="flex-1 overflow-y-auto py-2">
-          {conversations.map((conv) => (
+          {sortedConversations.map((conv) => (
             <button
               key={conv.key}
               onClick={() => onConversationChange(conv.key)}
-              className={`w-full p-3 flex items-center justify-center transition-colors ${
+              className={`w-full p-3 flex items-center justify-center transition-colors relative ${
                 currentConversation === conv.key
                   ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
                   : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
@@ -78,6 +155,9 @@ export function ConversationSidebar({
               title={conv.name}
             >
               <span className="text-lg">{conv.icon}</span>
+              {conv.starred && (
+                <span className="absolute top-1 right-1 text-yellow-500 text-[10px]">★</span>
+              )}
             </button>
           ))}
         </div>
@@ -140,19 +220,130 @@ export function ConversationSidebar({
 
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto py-2">
-        {conversations.map((conv) => (
-          <button
-            key={conv.key}
-            onClick={() => onConversationChange(conv.key)}
-            className={`w-full px-3 py-2 text-left flex items-center gap-2 transition-colors ${
-              currentConversation === conv.key
-                ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
-                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
-            }`}
-          >
-            <span className="text-base">{conv.icon}</span>
-            <span className="text-sm truncate">{conv.name}</span>
-          </button>
+        {sortedConversations.map((conv) => (
+          <div key={conv.key} className="relative group">
+            {editingKey === conv.key ? (
+              // Editing mode
+              <div className="px-3 py-2">
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
+                  onBlur={handleSaveEdit}
+                  className="w-full px-2 py-1 bg-white dark:bg-zinc-800 border border-purple-400 dark:border-purple-500 rounded text-sm text-zinc-900 dark:text-white focus:outline-none"
+                />
+              </div>
+            ) : deleteConfirmKey === conv.key ? (
+              // Delete confirmation
+              <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20">
+                <p className="text-xs text-red-600 dark:text-red-400 mb-2">Delete "{conv.name}"?</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDelete(conv.key)}
+                    className="flex-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirmKey(null)}
+                    className="flex-1 px-2 py-1 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-300 text-xs rounded transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Normal view
+              <button
+                onClick={() => onConversationChange(conv.key)}
+                className={`w-full px-3 py-2 text-left flex items-center gap-2 transition-colors ${
+                  currentConversation === conv.key
+                    ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
+                }`}
+              >
+                <span className="text-base flex-shrink-0">{conv.icon}</span>
+                <span className="text-sm truncate flex-1">{conv.name}</span>
+                
+                {/* Star button - always visible for starred, hover for others */}
+                {onToggleStar && (
+                  <button
+                    onClick={(e) => handleToggleStar(conv.key, e)}
+                    className={`flex-shrink-0 transition-opacity ${
+                      conv.starred 
+                        ? 'text-yellow-500 opacity-100' 
+                        : 'text-zinc-300 dark:text-zinc-600 opacity-0 group-hover:opacity-100 hover:text-yellow-500'
+                    }`}
+                    title={conv.starred ? 'Unstar' : 'Star'}
+                  >
+                    {conv.starred ? '★' : '☆'}
+                  </button>
+                )}
+                
+                {/* Menu button - visible on hover */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpenKey(menuOpenKey === conv.key ? null : conv.key);
+                  }}
+                  className="flex-shrink-0 text-zinc-400 opacity-0 group-hover:opacity-100 hover:text-zinc-700 dark:hover:text-white transition-opacity p-0.5"
+                  title="More options"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  </svg>
+                </button>
+              </button>
+            )}
+            
+            {/* Context menu */}
+            {menuOpenKey === conv.key && (
+              <div 
+                ref={menuRef}
+                className="absolute right-2 top-full mt-1 z-50 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 min-w-[120px]"
+              >
+                {onRenameConversation && (
+                  <button
+                    onClick={() => handleStartEdit(conv)}
+                    className="w-full px-3 py-1.5 text-left text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Rename
+                  </button>
+                )}
+                {onToggleStar && (
+                  <button
+                    onClick={(e) => {
+                      handleToggleStar(conv.key, e);
+                      setMenuOpenKey(null);
+                    }}
+                    className="w-full px-3 py-1.5 text-left text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
+                  >
+                    <span className="w-4 text-center">{conv.starred ? '★' : '☆'}</span>
+                    {conv.starred ? 'Unstar' : 'Star'}
+                  </button>
+                )}
+                {onDeleteConversation && (
+                  <button
+                    onClick={() => {
+                      setDeleteConfirmKey(conv.key);
+                      setMenuOpenKey(null);
+                    }}
+                    className="w-full px-3 py-1.5 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         ))}
       </div>
 

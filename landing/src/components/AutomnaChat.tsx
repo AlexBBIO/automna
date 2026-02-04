@@ -18,6 +18,8 @@ interface AutomnaChatProps {
   gatewayUrl: string;
   authToken?: string;
   sessionKey?: string;
+  initialMessage?: string | null;
+  onInitialMessageSent?: () => void;
 }
 
 // Assistant avatar component
@@ -195,7 +197,7 @@ function getMessageText(content: Array<{ type: string; text?: string }>): string
     .join('\n');
 }
 
-export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatProps) {
+export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage, onInitialMessageSent }: AutomnaChatProps) {
   const { messages, isRunning, isConnected, loadingPhase, error, append, cancel } = useClawdbotRuntime({
     gatewayUrl,
     authToken,
@@ -212,6 +214,26 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey }: AutomnaChatPr
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoWakeSentRef = useRef(false);
   const dragCounterRef = useRef(0);
+  const initialMessageSentRef = useRef(false);
+
+  // Handle initial message from integrations
+  useEffect(() => {
+    if (initialMessage && isConnected && !isRunning && !initialMessageSentRef.current) {
+      initialMessageSentRef.current = true;
+      append({
+        role: 'user',
+        content: [{ type: 'text', text: initialMessage }]
+      });
+      onInitialMessageSent?.();
+    }
+  }, [initialMessage, isConnected, isRunning, append, onInitialMessageSent]);
+
+  // Reset initial message ref when initialMessage changes
+  useEffect(() => {
+    if (!initialMessage) {
+      initialMessageSentRef.current = false;
+    }
+  }, [initialMessage]);
 
   // Auto-scroll to bottom
   useEffect(() => {

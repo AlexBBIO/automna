@@ -10,14 +10,17 @@ import { FileProvider } from "@/lib/file-context";
 import { FileBrowser } from "@/components/FileBrowser";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AnnouncementModal } from "@/components/AnnouncementModal";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { IntegrationsPanel } from "@/components/IntegrationsPanel";
 
-type TabView = 'chat' | 'files';
+type TabView = 'chat' | 'files' | 'settings' | 'integrations';
 
 interface Conversation {
   key: string;
   name: string;
   icon: string;
   lastActive?: number;
+  starred?: boolean;
 }
 
 const CreditCardIcon = () => (
@@ -31,13 +34,6 @@ const ResetIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
     <path d="M3 3v5h5"/>
-  </svg>
-);
-
-const SettingsIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-    <circle cx="12" cy="12" r="3"/>
   </svg>
 );
 
@@ -79,6 +75,7 @@ export default function DashboardPage() {
   
   // Tab state
   const [activeTab, setActiveTab] = useState<TabView>('chat');
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   
   // Set initial sidebar state based on screen size (runs once on mount)
   useEffect(() => {
@@ -111,6 +108,21 @@ export default function DashboardPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Load starred conversations from localStorage
+  const getStarredConversations = useCallback((): Set<string> => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const stored = localStorage.getItem('automna-starred-conversations');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  }, []);
+
+  const saveStarredConversations = useCallback((starred: Set<string>) => {
+    localStorage.setItem('automna-starred-conversations', JSON.stringify([...starred]));
+  }, []);
+
   // Fetch conversations from OpenClaw when gateway is ready
   const fetchConversations = useCallback(async () => {
     try {
@@ -118,11 +130,13 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         const sessions = data.sessions || [];
+        const starred = getStarredConversations();
         const convos: Conversation[] = sessions.map((s: { key: string; name: string; lastActive?: number }) => ({
           key: s.key,
           name: s.name,
           icon: s.key === 'main' ? '💬' : '📝',
           lastActive: s.lastActive,
+          starred: starred.has(s.key),
         }));
         setConversations(convos);
       }
@@ -131,7 +145,7 @@ export default function DashboardPage() {
     } finally {
       setConversationsLoading(false);
     }
-  }, []);
+  }, [getStarredConversations]);
 
   // Fetch conversations when gateway becomes ready
   useEffect(() => {
@@ -169,6 +183,77 @@ export default function DashboardPage() {
       console.error('[dashboard] Failed to set session label:', err);
     }
   }, [conversations]);
+
+  // Delete a conversation
+  const handleDeleteConversation = useCallback(async (key: string) => {
+    // Don't allow deleting the main conversation
+    if (key === 'main') return;
+    
+    // Optimistic update
+    setConversations(prev => prev.filter(c => c.key !== key));
+    
+    // If we're deleting the current conversation, switch to main
+    if (currentConversation === key) {
+      setCurrentConversation('main');
+    }
+    
+    // Remove from starred
+    const starred = getStarredConversations();
+    if (starred.has(key)) {
+      starred.delete(key);
+      saveStarredConversations(starred);
+    }
+    
+    try {
+      await fetch('/api/user/sessions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+    } catch (err) {
+      console.error('[dashboard] Failed to delete session:', err);
+      // Refetch on error
+      fetchConversations();
+    }
+  }, [currentConversation, fetchConversations, getStarredConversations, saveStarredConversations]);
+
+  // Rename a conversation
+  const handleRenameConversation = useCallback(async (key: string, newName: string) => {
+    // Optimistic update
+    setConversations(prev => prev.map(c => 
+      c.key === key ? { ...c, name: newName } : c
+    ));
+    
+    try {
+      await fetch('/api/user/sessions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, label: newName }),
+      });
+    } catch (err) {
+      console.error('[dashboard] Failed to rename session:', err);
+      // Refetch on error
+      fetchConversations();
+    }
+  }, [fetchConversations]);
+
+  // Toggle star on a conversation
+  const handleToggleStar = useCallback((key: string) => {
+    const starred = getStarredConversations();
+    
+    if (starred.has(key)) {
+      starred.delete(key);
+    } else {
+      starred.add(key);
+    }
+    
+    saveStarredConversations(starred);
+    
+    // Update state
+    setConversations(prev => prev.map(c => 
+      c.key === key ? { ...c, starred: starred.has(key) } : c
+    ));
+  }, [getStarredConversations, saveStarredConversations]);
 
   const handleManageBilling = async () => {
     setLoadingPortal(true);
@@ -463,11 +548,6 @@ export default function DashboardPage() {
             <ThemeToggle />
             <UserButton>
               <UserButton.MenuItems>
-                <UserButton.Link
-                  label="Settings"
-                  labelIcon={<SettingsIcon />}
-                  href="/dashboard/settings"
-                />
                 <UserButton.Action
                   label="Manage Subscription"
                   labelIcon={<CreditCardIcon />}
@@ -566,6 +646,9 @@ export default function DashboardPage() {
               }}
               conversations={conversations.length > 0 ? conversations : [{ key: 'main', name: 'General', icon: '💬' }]}
               onCreateConversation={handleCreateConversation}
+              onDeleteConversation={handleDeleteConversation}
+              onRenameConversation={handleRenameConversation}
+              onToggleStar={handleToggleStar}
               isCollapsed={sidebarCollapsed}
               onToggleCollapse={() => {
                 if (window.innerWidth < 768) {
@@ -604,6 +687,26 @@ export default function DashboardPage() {
                 >
                   📁 Files
                 </button>
+                <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`px-4 py-3 text-sm font-medium transition-colors ${
+                    activeTab === 'settings'
+                      ? 'text-zinc-900 dark:text-white border-b-2 border-purple-600 dark:border-purple-400'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                  }`}
+                >
+                  ⚙️ Settings
+                </button>
+                <button
+                  onClick={() => setActiveTab('integrations')}
+                  className={`px-4 py-3 text-sm font-medium transition-colors ${
+                    activeTab === 'integrations'
+                      ? 'text-zinc-900 dark:text-white border-b-2 border-purple-600 dark:border-purple-400'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                  }`}
+                >
+                  🔌 Integrations
+                </button>
               </div>
               
               {/* Tab content */}
@@ -613,11 +716,24 @@ export default function DashboardPage() {
                     <AutomnaChat
                       gatewayUrl={gatewayInfo.gatewayUrl}
                       sessionKey={currentConversation}
+                      initialMessage={pendingMessage}
+                      onInitialMessageSent={() => setPendingMessage(null)}
                     />
                   </div>
                 )}
                 {activeTab === 'files' && (
                   <FileBrowser isVisible={activeTab === 'files'} />
+                )}
+                {activeTab === 'settings' && (
+                  <SettingsPanel />
+                )}
+                {activeTab === 'integrations' && (
+                  <IntegrationsPanel 
+                    onSelectIntegration={(prompt) => {
+                      setPendingMessage(prompt);
+                      setActiveTab('chat');
+                    }}
+                  />
                 )}
               </div>
             </div>
@@ -644,11 +760,6 @@ export default function DashboardPage() {
             </span>
             <UserButton>
               <UserButton.MenuItems>
-                <UserButton.Link
-                  label="Settings"
-                  labelIcon={<SettingsIcon />}
-                  href="/dashboard/settings"
-                />
                 <UserButton.Action
                   label="Manage Subscription"
                   labelIcon={<CreditCardIcon />}
