@@ -406,6 +406,10 @@ async function createMachine(
     // Browserbase proxy
     BROWSERBASE_API_KEY: gatewayToken,
     BROWSERBASE_API_URL: "https://automna.ai/api/browserbase",
+    
+    // Brave Search proxy
+    BRAVE_API_KEY: gatewayToken,
+    BRAVE_API_URL: "https://automna.ai/api/brave",
   };
   
   // Add Browserbase context if available (for persistent browser sessions)

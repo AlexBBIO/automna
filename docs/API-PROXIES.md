@@ -15,6 +15,7 @@ All external API calls from user machines route through Automna proxies.
 | Anthropic | `/api/llm/v1/messages` | `x-api-key` | ✅ Production |
 | Gemini | `/api/gemini/[path]` | `x-goog-api-key` or `?key=` | ✅ Production |
 | Browserbase | `/api/browserbase/v1/[path]` | `X-BB-API-Key` | ✅ Production |
+| Brave Search | `/api/brave/[path]` | `X-Subscription-Token` | ✅ Production |
 | Agentmail | `/api/user/email/*` | Bearer token | ✅ Production |
 
 ## Architecture
@@ -60,6 +61,10 @@ BROWSERBASE_API_KEY=<gateway-token>    # Gateway token
 BROWSERBASE_API_URL=https://automna.ai/api/browserbase
 BROWSERBASE_PROJECT_ID=<project-id>    # Shared project ID
 
+# Brave Search (via proxy)
+BRAVE_API_KEY=<gateway-token>          # Gateway token
+BRAVE_API_URL=https://automna.ai/api/brave
+
 # Email (via proxy, no direct API key)
 AGENTMAIL_INBOX_ID=<inbox-id>          # User's inbox
 ```
@@ -76,6 +81,7 @@ Real API keys exist **only** in Vercel:
 | `GEMINI_API_KEY` | Real Google AI API key |
 | `BROWSERBASE_API_KEY` | Real Browserbase API key |
 | `BROWSERBASE_PROJECT_ID` | Browserbase project |
+| `BRAVE_API_KEY` | Real Brave Search API key |
 | `AGENTMAIL_API_KEY` | Real Agentmail API key |
 
 ---
@@ -140,6 +146,30 @@ Proxies all Browserbase API calls for browser automation.
 
 **Files:**
 - `src/app/api/browserbase/v1/[...path]/route.ts`
+
+---
+
+## Brave Search Proxy
+
+**Endpoint:** `/api/brave/[...path]`
+
+Proxies all Brave Search API calls.
+
+**Example paths:**
+- `/api/brave/res/v1/web/search?q=query` - Web search
+- `/api/brave/res/v1/news/search?q=query` - News search
+- `/api/brave/res/v1/images/search?q=query` - Image search
+- `/api/brave/res/v1/videos/search?q=query` - Video search
+
+**Auth:** `X-Subscription-Token` header (gateway token)
+
+**Features:**
+- All query parameters passed through
+- Usage tracking (queries counted)
+- Rate limit headers preserved
+
+**Files:**
+- `src/app/api/brave/[...path]/route.ts`
 
 ---
 
