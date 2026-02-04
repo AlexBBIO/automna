@@ -393,6 +393,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           const role = message?.role;
           const textContent = message?.content?.find((c: { type: string }) => c.type === 'text')?.text || '';
           
+          // Debug: log message content types
+          if (message?.content && Array.isArray(message.content)) {
+            const types = message.content.map((c: { type: string }) => c.type);
+            if (types.some((t: string) => t !== 'text')) {
+              console.log('[clawdbot] Message content types:', types);
+            }
+          }
+          
           if (role === 'assistant') {
             if (state === 'delta' && textContent) {
               streamingTextRef.current = textContent;
@@ -406,12 +414,35 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             }
             
             if (state === 'final') {
-              const finalText = textContent || streamingTextRef.current;
+              // Preserve full content array (including tool_use, tool_result, etc.)
+              let finalContent: Array<{ type: string; [key: string]: unknown }> = [];
+              
+              if (Array.isArray(message?.content)) {
+                finalContent = message.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
+                  // Clean text parts
+                  if (part.type === 'text' && typeof part.text === 'string') {
+                    return {
+                      ...part,
+                      text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim()
+                    };
+                  }
+                  return part;
+                });
+              }
+              
+              // Fallback to streaming text if no content
+              if (finalContent.length === 0 || !finalContent.some(p => p.type === 'text' && p.text)) {
+                const fallbackText = textContent || streamingTextRef.current;
+                if (fallbackText) {
+                  finalContent = [{ type: 'text', text: fallbackText }];
+                }
+              }
+              
               streamingTextRef.current = '';
               setMessages(prev => {
                 const last = prev[prev.length - 1];
                 if (last?.role === 'assistant') {
-                  return [...prev.slice(0, -1), { ...last, id: genId(), content: [{ type: 'text', text: finalText }] }];
+                  return [...prev.slice(0, -1), { ...last, id: genId(), content: finalContent }];
                 }
                 return prev;
               });
