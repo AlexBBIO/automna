@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { validateFilePath } from "./_lib/validation";
 
 async function getUserGateway(clerkId: string) {
   const userMachine = await db.query.machines.findFirst({
@@ -35,7 +36,18 @@ function getFileServerUrl(appName: string, endpoint: string, token: string, para
 }
 
 export async function DELETE(request: NextRequest) {
-  const filePath = request.nextUrl.searchParams.get('path');
+  const rawPath = request.nextUrl.searchParams.get('path');
+  
+  if (!rawPath) {
+    return NextResponse.json({ error: 'Path required' }, { status: 400 });
+  }
+  
+  // Validate path
+  const pathValidation = validateFilePath(rawPath);
+  if (!pathValidation.valid) {
+    return NextResponse.json({ error: pathValidation.error }, { status: 400 });
+  }
+  const filePath = pathValidation.normalized!;
   
   try {
     const { userId: clerkId } = await auth();
@@ -48,18 +60,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'No gateway configured' }, { status: 404 });
     }
     
-    if (!filePath) {
-      return NextResponse.json({ error: 'Path required' }, { status: 400 });
-    }
-    
     const fileServerUrl = getFileServerUrl(
       gateway.appName,
       '/delete',
       gateway.token,
       { path: filePath }
     );
-    
-    console.log(`[files] DELETE ${filePath}`);
     
     const response = await fetch(fileServerUrl, {
       method: 'DELETE',

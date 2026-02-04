@@ -72,8 +72,6 @@ export async function POST(request: Request) {
   }
   
   // 5. Forward to Gemini
-  console.log(`[llm/embed] Proxying request for user ${user.userId}, model ${model}`);
-  
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${GEMINI_API_KEY}`;
   
   let geminiResponse: Response;

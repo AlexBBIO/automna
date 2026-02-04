@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { validateFilePath, validateFilePaths } from "../_lib/validation";
 
 // ============================================
 // UTILITIES
@@ -64,7 +65,14 @@ export async function GET(
 ) {
   const { path: pathSegments } = await params;
   const operation = pathSegments[0];
-  const filePath = request.nextUrl.searchParams.get('path') || '/home/node/.openclaw/workspace';
+  const rawPath = request.nextUrl.searchParams.get('path') || '/home/node/.openclaw/workspace';
+  
+  // Validate path to prevent traversal attacks
+  const pathValidation = validateFilePath(rawPath);
+  if (!pathValidation.valid) {
+    return NextResponse.json({ error: pathValidation.error }, { status: 400 });
+  }
+  const filePath = pathValidation.normalized!;
   
   try {
     const { userId: clerkId } = await auth();
@@ -83,8 +91,6 @@ export async function GET(
       gateway.token,
       { path: filePath }
     );
-    
-    console.log(`[files] ${operation.toUpperCase()} ${filePath}`);
     
     const response = await fetch(fileServerUrl, {
       signal: AbortSignal.timeout(30000),
@@ -141,11 +147,18 @@ export async function POST(
     switch (operation) {
       case 'write': {
         const body = await request.json();
-        const { path: filePath, content } = body;
+        const { path: rawPath, content } = body;
         
-        if (!filePath) {
+        if (!rawPath) {
           return NextResponse.json({ error: 'Path required' }, { status: 400 });
         }
+        
+        // Validate path
+        const pathValidation = validateFilePath(rawPath);
+        if (!pathValidation.valid) {
+          return NextResponse.json({ error: pathValidation.error }, { status: 400 });
+        }
+        const filePath = pathValidation.normalized!;
         
         const fileServerUrl = getFileServerUrl(
           gateway.appName,
@@ -153,8 +166,6 @@ export async function POST(
           gateway.token,
           { path: filePath }
         );
-        
-        console.log(`[files] WRITE ${filePath}`);
         
         const response = await fetch(fileServerUrl, {
           method: 'POST',
@@ -169,11 +180,18 @@ export async function POST(
       
       case 'mkdir': {
         const body = await request.json();
-        const { path: dirPath } = body;
+        const { path: rawPath } = body;
         
-        if (!dirPath) {
+        if (!rawPath) {
           return NextResponse.json({ error: 'Path required' }, { status: 400 });
         }
+        
+        // Validate path
+        const pathValidation = validateFilePath(rawPath);
+        if (!pathValidation.valid) {
+          return NextResponse.json({ error: pathValidation.error }, { status: 400 });
+        }
+        const dirPath = pathValidation.normalized!;
         
         const fileServerUrl = getFileServerUrl(
           gateway.appName,
@@ -181,8 +199,6 @@ export async function POST(
           gateway.token,
           { path: dirPath }
         );
-        
-        console.log(`[files] MKDIR ${dirPath}`);
         
         const response = await fetch(fileServerUrl, {
           method: 'POST',
@@ -195,19 +211,25 @@ export async function POST(
       
       case 'move': {
         const body = await request.json();
-        const { from, to } = body;
+        const { from: rawFrom, to: rawTo } = body;
         
-        if (!from || !to) {
+        if (!rawFrom || !rawTo) {
           return NextResponse.json({ error: 'From and to paths required' }, { status: 400 });
         }
+        
+        // Validate both paths
+        const pathsValidation = validateFilePaths([rawFrom, rawTo]);
+        if (!pathsValidation.valid) {
+          return NextResponse.json({ error: pathsValidation.error }, { status: 400 });
+        }
+        const from = validateFilePath(rawFrom).normalized!;
+        const to = validateFilePath(rawTo).normalized!;
         
         const fileServerUrl = getFileServerUrl(
           gateway.appName,
           '/move',
           gateway.token
         );
-        
-        console.log(`[files] MOVE ${from} -> ${to}`);
         
         const response = await fetch(fileServerUrl, {
           method: 'POST',
@@ -224,13 +246,18 @@ export async function POST(
         // Get the file from form data
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
-        const filePath = formData.get('path') as string | null;
+        const rawPath = formData.get('path') as string | null;
         
-        if (!file || !filePath) {
+        if (!file || !rawPath) {
           return NextResponse.json({ error: 'File and path required' }, { status: 400 });
         }
         
-        console.log(`[files] UPLOAD ${filePath} (${file.size} bytes)`);
+        // Validate path
+        const pathValidation = validateFilePath(rawPath);
+        if (!pathValidation.valid) {
+          return NextResponse.json({ error: pathValidation.error }, { status: 400 });
+        }
+        const filePath = pathValidation.normalized!;
         
         const fileServerUrl = getFileServerUrl(
           gateway.appName,
@@ -255,16 +282,14 @@ export async function POST(
           
           const data = await response.json();
           
-          if (response.ok) {
-            console.log(`[files] UPLOAD success: ${filePath}`);
-          } else {
-            console.error(`[files] UPLOAD failed:`, data);
+          if (!response.ok) {
+            console.error(`[files] Upload failed: ${filePath}`, data);
           }
           
           return NextResponse.json(data, { status: response.status });
         } catch (err) {
-          console.error(`[files] UPLOAD error:`, err);
-          return NextResponse.json({ error: 'Upload failed: ' + (err instanceof Error ? err.message : 'unknown') }, { status: 500 });
+          console.error('[files] Upload error:', err);
+          return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
         }
       }
       
@@ -282,7 +307,18 @@ export async function POST(
 // ============================================
 
 export async function DELETE(request: NextRequest) {
-  const filePath = request.nextUrl.searchParams.get('path');
+  const rawPath = request.nextUrl.searchParams.get('path');
+  
+  if (!rawPath) {
+    return NextResponse.json({ error: 'Path required' }, { status: 400 });
+  }
+  
+  // Validate path
+  const pathValidation = validateFilePath(rawPath);
+  if (!pathValidation.valid) {
+    return NextResponse.json({ error: pathValidation.error }, { status: 400 });
+  }
+  const filePath = pathValidation.normalized!;
   
   try {
     const { userId: clerkId } = await auth();
@@ -295,18 +331,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'No gateway configured' }, { status: 404 });
     }
     
-    if (!filePath) {
-      return NextResponse.json({ error: 'Path required' }, { status: 400 });
-    }
-    
     const fileServerUrl = getFileServerUrl(
       gateway.appName,
       '/delete',
       gateway.token,
       { path: filePath }
     );
-    
-    console.log(`[files] DELETE ${filePath}`);
     
     const response = await fetch(fileServerUrl, {
       method: 'DELETE',

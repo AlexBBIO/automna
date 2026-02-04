@@ -90,8 +90,6 @@ export async function POST(request: Request) {
   }
   
   // 5. Forward to Anthropic
-  console.log(`[llm/chat] Proxying request for user ${user.userId}, model ${model}, stream=${stream}`);
-  
   let anthropicResponse: Response;
   try {
     anthropicResponse = await fetch(ANTHROPIC_API_URL, {

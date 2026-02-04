@@ -54,8 +54,6 @@ export async function GET() {
     const gatewayUrl = `wss://${appDomain}/ws?token=${encodeURIComponent(gatewayToken)}&clientId=webchat`;
     const httpUrl = `https://${appDomain}?token=${encodeURIComponent(gatewayToken)}`;
     
-    console.log(`[api/user/gateway] User ${clerkId} -> ${userMachine.appName}`);
-    
     return NextResponse.json({
       gatewayUrl,
       httpUrl,

@@ -62,8 +62,6 @@ export async function GET(
       }
     });
     
-    console.log(`[ws-proxy] Proxying to ${targetUrl.toString()}`);
-    
     const response = await fetch(targetUrl.toString(), {
       method: "GET",
       headers: {

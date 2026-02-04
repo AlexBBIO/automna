@@ -171,7 +171,6 @@ async function handleRequest(request: NextRequest, method: string) {
         requestId: responseData?.id as string | undefined,
         durationMs,
       });
-      console.log(`[Browserbase Proxy] Session created for user ${auth.userId}`);
     } else if (!response.ok) {
       logUsageBackground({
         userId: auth.userId,
