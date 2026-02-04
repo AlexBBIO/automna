@@ -189,6 +189,40 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+// Tool call display (compact, dimmed)
+function ToolCallDisplay({ name, input }: { name: string; input: Record<string, unknown> }) {
+  const inputPreview = Object.keys(input).length > 0 
+    ? JSON.stringify(input).slice(0, 80) + (JSON.stringify(input).length > 80 ? '...' : '')
+    : '';
+  
+  return (
+    <div className="text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/50 rounded-lg px-3 py-2 my-1.5 font-mono border border-zinc-200 dark:border-zinc-700/50">
+      <span className="text-purple-600 dark:text-purple-400">🔧 {name}</span>
+      {inputPreview && (
+        <span className="text-zinc-400 dark:text-zinc-500 ml-2 break-all">{inputPreview}</span>
+      )}
+    </div>
+  );
+}
+
+// Tool result display (compact, dimmed)
+function ToolResultDisplay({ content }: { content: unknown }) {
+  let preview = '';
+  if (typeof content === 'string') {
+    preview = content.slice(0, 150) + (content.length > 150 ? '...' : '');
+  } else if (content) {
+    const str = JSON.stringify(content);
+    preview = str.slice(0, 150) + (str.length > 150 ? '...' : '');
+  }
+  
+  return (
+    <div className="text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/30 rounded-lg px-3 py-2 my-1.5 font-mono border border-zinc-200/50 dark:border-zinc-700/30">
+      <span className="text-emerald-600 dark:text-emerald-400">← </span>
+      <span className="break-all">{preview || '(empty)'}</span>
+    </div>
+  );
+}
+
 // Get message text for copying
 function getMessageText(content: Array<{ type: string; text?: string }>): string {
   return content
@@ -209,6 +243,12 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showAgentActivity, setShowAgentActivity] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('automna-show-agent-activity') === 'true';
+    }
+    return false;
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -432,6 +472,22 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
         <ConnectionStatus phase={loadingPhase} error={error} />
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              const newVal = !showAgentActivity;
+              setShowAgentActivity(newVal);
+              localStorage.setItem('automna-show-agent-activity', String(newVal));
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              showAgentActivity
+                ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
+                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+            }`}
+            title={showAgentActivity ? 'Hide agent activity' : 'Show agent activity (tool calls, searches, etc.)'}
+          >
+            <span>{showAgentActivity ? '🔧' : '💬'}</span>
+            <span className="hidden sm:inline">{showAgentActivity ? 'Activity on' : 'Activity'}</span>
+          </button>
           <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium uppercase tracking-wide">
             {sessionKey === 'main' ? 'General' : sessionKey}
           </span>
@@ -466,18 +522,42 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                         : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700'
                     }`}
                   >
-                    {message.content.map((part, i) => {
-                      if (part.type === 'text' && typeof part.text === 'string') {
-                        return (
-                          <MessageContent 
-                            key={i} 
-                            text={part.text}
-                            isUser={message.role === 'user'}
-                          />
-                        );
-                      }
-                      return null;
-                    })}
+                    {message.content
+                      .filter((part) => {
+                        // Always show text
+                        if (part.type === 'text') return true;
+                        // Only show tool activity if toggle is on
+                        return showAgentActivity;
+                      })
+                      .map((part, i) => {
+                        if (part.type === 'text' && typeof part.text === 'string') {
+                          return (
+                            <MessageContent 
+                              key={i} 
+                              text={part.text}
+                              isUser={message.role === 'user'}
+                            />
+                          );
+                        }
+                        if (part.type === 'tool_use') {
+                          return (
+                            <ToolCallDisplay 
+                              key={i}
+                              name={String(part.name || 'unknown')}
+                              input={(part.input as Record<string, unknown>) || {}}
+                            />
+                          );
+                        }
+                        if (part.type === 'tool_result') {
+                          return (
+                            <ToolResultDisplay 
+                              key={i}
+                              content={part.content}
+                            />
+                          );
+                        }
+                        return null;
+                      })}
                   </div>
                   
                   {/* Timestamp and actions */}

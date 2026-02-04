@@ -38,22 +38,31 @@ type LoadingPhase = 'connecting' | 'loading-history' | 'ready' | 'error';
 
 const genId = () => crypto.randomUUID();
 
-// Parse messages from API response
+// Parse messages from API response - preserve all content types for agent activity toggle
 function parseMessages(messages: Array<{ role: string; content: unknown; timestamp?: number }>, prefix: string): ThreadMessage[] {
   return messages.map((m, idx) => {
-    let textContent = '';
+    let content: Array<{ type: string; [key: string]: unknown }> = [];
+    
     if (Array.isArray(m.content)) {
-      const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
-      textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
+      content = m.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
+        // Strip [message_id: ...] metadata from text parts
+        if (part.type === 'text' && typeof part.text === 'string') {
+          return {
+            ...part,
+            text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim()
+          };
+        }
+        return part;
+      });
     } else if (typeof m.content === 'string') {
-      textContent = m.content;
+      const cleanedText = m.content.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+      content = [{ type: 'text', text: cleanedText }];
     }
-    // Strip [message_id: ...] metadata from display
-    textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+    
     return {
       id: `${prefix}-${idx}`,
       role: m.role as 'user' | 'assistant',
-      content: [{ type: 'text' as const, text: textContent }],
+      content,
       createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
     };
   });
@@ -340,18 +349,28 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             
             if (wsMessages.length > 0) {
               const history = wsMessages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
-                let textContent = '';
+                let content: Array<{ type: string; [key: string]: unknown }> = [];
+                
                 if (Array.isArray(m.content)) {
-                  const textPart = m.content.find((p: { type: string; text?: string }) => p.type === 'text');
-                  textContent = (textPart && typeof textPart.text === 'string') ? textPart.text : '';
+                  content = m.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
+                    // Strip [message_id: ...] metadata from text parts
+                    if (part.type === 'text' && typeof part.text === 'string') {
+                      return {
+                        ...part,
+                        text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim()
+                      };
+                    }
+                    return part;
+                  });
                 } else if (typeof m.content === 'string') {
-                  textContent = m.content;
+                  const cleanedText = m.content.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+                  content = [{ type: 'text', text: cleanedText }];
                 }
-                textContent = textContent.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+                
                 return {
                   id: m.id,
                   role: m.role as 'user' | 'assistant',
-                  content: [{ type: 'text' as const, text: textContent }],
+                  content,
                   createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
                 };
               });
