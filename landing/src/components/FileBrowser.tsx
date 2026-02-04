@@ -23,6 +23,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
     readFile,
     writeFile,
     downloadFile,
+    getImageUrl,
     deleteFile,
     uploadFile,
     createDirectory,
@@ -30,6 +31,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
   
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState<string>('');
@@ -61,11 +63,17 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
   useEffect(() => {
     if (!selectedFile || selectedFile.type === 'directory') {
       setFileContent(null);
+      setImageUrl(null);
       return;
     }
     
-    const loadContent = async () => {
+    const ext = selectedFile.extension?.toLowerCase() || '';
+    const textExtensions = ['md', 'txt', 'json', 'yaml', 'yml', 'js', 'ts', 'jsx', 'tsx', 'py', 'css', 'html', 'xml', 'toml', 'ini', 'env', 'sh', 'bash'];
+    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
+    
+    const loadTextContent = async () => {
       setIsLoadingContent(true);
+      setImageUrl(null);
       try {
         const content = await readFile(selectedFile.path);
         setFileContent(content);
@@ -77,15 +85,39 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
       }
     };
     
-    const textExtensions = ['md', 'txt', 'json', 'yaml', 'yml', 'js', 'ts', 'jsx', 'tsx', 'py', 'css', 'html', 'xml', 'toml', 'ini', 'env', 'sh', 'bash'];
-    const ext = selectedFile.extension?.toLowerCase() || '';
+    const loadImageContent = async () => {
+      setIsLoadingContent(true);
+      setFileContent(null);
+      try {
+        const url = await getImageUrl(selectedFile.path);
+        setImageUrl(url);
+      } catch (err) {
+        console.error('Failed to load image:', err);
+        setImageUrl(null);
+      } finally {
+        setIsLoadingContent(false);
+      }
+    };
     
     if (textExtensions.includes(ext) || !ext) {
-      loadContent();
+      loadTextContent();
+    } else if (imageExtensions.includes(ext)) {
+      loadImageContent();
     } else {
       setFileContent(null);
+      setImageUrl(null);
     }
-  }, [selectedFile, readFile]);
+    
+  }, [selectedFile, readFile, getImageUrl]);
+  
+  // Cleanup: revoke image URL when component unmounts or file changes
+  useEffect(() => {
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+  }, [imageUrl]);
   
   const handleFileClick = (file: FileItem) => {
     if (file.type === 'directory') {
@@ -346,6 +378,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
             <FilePreview 
               file={selectedFile} 
               content={fileContent}
+              imageUrl={imageUrl}
               isEditing={isEditing}
               editContent={editContent}
               isSaving={isSaving}
@@ -433,6 +466,7 @@ export function FileBrowser({ isVisible = true }: FileBrowserProps) {
 interface FilePreviewProps {
   file: FileItem;
   content: string | null;
+  imageUrl: string | null;
   isEditing: boolean;
   editContent: string;
   isSaving: boolean;
@@ -446,6 +480,7 @@ interface FilePreviewProps {
 function FilePreview({ 
   file, 
   content, 
+  imageUrl,
   isEditing,
   editContent,
   isSaving,
@@ -463,20 +498,32 @@ function FilePreview({
   const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
   if (imageExtensions.includes(ext)) {
     return (
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-medium text-zinc-900">{file.name}</h3>
-          <button
-            onClick={onDownload}
-            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg"
-          >
-            ⬇️ Download
-          </button>
+      <div className="h-full flex flex-col">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+          <h3 className="font-medium text-sm text-zinc-900 dark:text-white">{file.name}</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-zinc-400">{formatFileSize(file.size)}</span>
+            <button
+              onClick={onDownload}
+              className="px-2 py-1 text-xs bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded"
+            >
+              ⬇️ Download
+            </button>
+          </div>
         </div>
-        <div className="text-center text-zinc-400">
-          <div className="text-6xl mb-4">🖼️</div>
-          <div>Image preview not yet implemented</div>
-          <div className="text-sm mt-2">Click download to view</div>
+        <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-zinc-100 dark:bg-zinc-950">
+          {imageUrl ? (
+            <img 
+              src={imageUrl} 
+              alt={file.name}
+              className="max-w-full max-h-full object-contain rounded shadow-lg"
+            />
+          ) : (
+            <div className="text-center text-zinc-400">
+              <div className="text-6xl mb-4">🖼️</div>
+              <div>Loading image...</div>
+            </div>
+          )}
         </div>
       </div>
     );

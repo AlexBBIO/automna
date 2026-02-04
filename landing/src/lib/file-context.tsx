@@ -45,6 +45,7 @@ export interface FileContextType {
   writeFile: (path: string, content: string) => Promise<void>;
   uploadFile: (file: File, targetDir?: string) => Promise<string>;
   downloadFile: (path: string) => Promise<void>;
+  getImageUrl: (path: string) => Promise<string>;
   deleteFile: (path: string) => Promise<void>;
   createDirectory: (path: string) => Promise<void>;
   moveFile: (from: string, to: string) => Promise<void>;
@@ -281,6 +282,19 @@ export function FileProvider({ gatewayUrl, children }: FileProviderProps) {
     URL.revokeObjectURL(a.href);
   }, [buildUrl]);
   
+  const getImageUrl = useCallback(async (path: string): Promise<string> => {
+    const url = buildUrl('download', { path });
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Failed to load image');
+    }
+    
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }, [buildUrl]);
+  
   const deleteFile = useCallback(async (path: string) => {
     const url = buildUrl('', { path }); // DELETE /api/files?path=...
     const response = await fetch(url, { method: 'DELETE' });
@@ -346,6 +360,7 @@ export function FileProvider({ gatewayUrl, children }: FileProviderProps) {
       writeFile,
       uploadFile,
       downloadFile,
+      getImageUrl,
       deleteFile,
       createDirectory,
       moveFile,
