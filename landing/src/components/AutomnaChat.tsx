@@ -526,7 +526,9 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                       .filter((part) => {
                         // Always show text
                         if (part.type === 'text') return true;
-                        // Only show tool activity if toggle is on
+                        // Only show tool activity (toolCall) if toggle is on
+                        if (part.type === 'toolCall') return showAgentActivity;
+                        // Hide unknown types when toggle is off
                         return showAgentActivity;
                       })
                       .map((part, i) => {
@@ -540,6 +542,23 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                             />
                           );
                         }
+                        // OpenClaw uses 'toolCall' type for tool calls
+                        if (part.type === 'toolCall') {
+                          const toolData = part as { type: string; name?: string; args?: Record<string, unknown>; result?: unknown };
+                          const hasResult = toolData.result !== undefined && toolData.result !== null;
+                          return (
+                            <div key={i} className="my-2">
+                              <ToolCallDisplay 
+                                name={String(toolData.name || 'unknown')}
+                                input={toolData.args || {}}
+                              />
+                              {hasResult && (
+                                <ToolResultDisplay content={toolData.result} />
+                              )}
+                            </div>
+                          );
+                        }
+                        // Legacy Anthropic format
                         if (part.type === 'tool_use') {
                           return (
                             <ToolCallDisplay 
