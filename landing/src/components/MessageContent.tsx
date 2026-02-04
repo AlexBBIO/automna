@@ -140,6 +140,7 @@ function InlineCode({ code }: InlineCodeProps) {
 interface MessageContentProps {
   text: string;
   isUser?: boolean;
+  showToolOutput?: boolean;
 }
 
 // File attachment component for user and agent-shared files
@@ -349,7 +350,32 @@ function parseContent(text: string): Segment[] {
   return segments;
 }
 
-export function MessageContent({ text, isUser }: MessageContentProps) {
+// Detect if a code block looks like tool output (web_fetch, web_search, etc.)
+function isToolOutputCodeBlock(content: string, language: string): boolean {
+  // Only check JSON or unlabeled code blocks
+  if (language && !['json', ''].includes(language.toLowerCase())) {
+    return false;
+  }
+  
+  const trimmed = content.trim();
+  
+  // Must start with { or [ (JSON)
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    return false;
+  }
+  
+  // Check for common tool output keys
+  const toolOutputKeys = [
+    '"url":', '"finalUrl":', '"status":', '"fetchedAt":', '"tookMs":',
+    '"extractMode":', '"contentType":', '"truncated":', '"length":',
+    '"results":', '"citations":', '"answer":', '"query":',  // search results
+    '"tool":', '"error":', '"output":',  // generic tool output
+  ];
+  
+  return toolOutputKeys.some(key => trimmed.includes(key));
+}
+
+export function MessageContent({ text, isUser, showToolOutput = true }: MessageContentProps) {
   const segments = useMemo(() => parseContent(text), [text]);
   
   return (
@@ -363,6 +389,10 @@ export function MessageContent({ text, isUser }: MessageContentProps) {
                 {`\`\`\`${segment.language}\n${segment.content}\`\`\``}
               </span>
             );
+          }
+          // Hide tool output code blocks if toggle is off
+          if (!showToolOutput && isToolOutputCodeBlock(segment.content, segment.language)) {
+            return null;
           }
           return <CodeBlock key={i} language={segment.language} code={segment.content} />;
         }
