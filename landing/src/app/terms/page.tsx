@@ -11,7 +11,7 @@ export default function Terms() {
         </nav>
 
         <h1 className="text-4xl font-bold mb-8">Terms of Service</h1>
-        <p className="text-gray-400 mb-8">Last updated: January 28, 2026</p>
+        <p className="text-gray-400 mb-8">Last updated: February 4, 2026</p>
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8">
           <section>
@@ -26,7 +26,7 @@ export default function Terms() {
             <h2 className="text-2xl font-semibold mb-4">2. Description of Service</h2>
             <p className="text-gray-300 leading-relaxed">
               Automna provides hosted AI agent infrastructure. We provision and manage isolated computing 
-              environments where AI agents operate on your behalf. You provide your own AI provider API keys.
+              environments where AI agents operate on your behalf, with AI capabilities included in your subscription.
             </p>
           </section>
 
@@ -34,10 +34,10 @@ export default function Terms() {
             <h2 className="text-2xl font-semibold mb-4">3. Your Responsibilities</h2>
             <ul className="list-disc list-inside text-gray-300 space-y-2">
               <li>You are responsible for maintaining the security of your account credentials</li>
-              <li>You are responsible for your own API key costs with AI providers</li>
-              <li>You must comply with the terms of service of any AI providers you use</li>
+              <li>You must comply with the terms of service of any third-party services you connect</li>
               <li>You must not use the Service for illegal activities</li>
               <li>You must not attempt to access other users&apos; data or systems</li>
+              <li>You must use the Service within reasonable usage limits for your plan</li>
               <li>You are responsible for the actions your AI agent takes on your behalf</li>
             </ul>
           </section>
@@ -53,6 +53,7 @@ export default function Terms() {
               <li>Violate any applicable laws or regulations</li>
               <li>Infringe on intellectual property rights</li>
               <li>Attempt to circumvent security measures</li>
+              <li>Abuse compute resources (e.g., cryptocurrency mining, excessive automated requests)</li>
               <li>Resell or redistribute the Service without authorization</li>
             </ul>
           </section>
@@ -78,8 +79,8 @@ export default function Terms() {
             <h2 className="text-2xl font-semibold mb-4">7. Intellectual Property</h2>
             <p className="text-gray-300 leading-relaxed">
               You retain ownership of your data and any content you create using the Service. We retain 
-              ownership of the Automna platform, branding, and underlying technology. The Service uses 
-              open-source software; see our Open Source page for details.
+              ownership of the Automna platform, branding, and underlying technology. The Service incorporates 
+              open-source software components.
             </p>
           </section>
 
@@ -112,7 +113,7 @@ export default function Terms() {
             <h2 className="text-2xl font-semibold mb-4">11. Contact</h2>
             <p className="text-gray-300 leading-relaxed">
               Questions about these Terms? Contact us at:<br />
-              <a href="mailto:legal@automna.ai" className="text-purple-400 hover:text-purple-300">legal@automna.ai</a>
+              <a href="mailto:alex@automna.ai" className="text-purple-400 hover:text-purple-300">alex@automna.ai</a>
             </p>
           </section>
         </div>

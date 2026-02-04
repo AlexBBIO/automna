@@ -11,7 +11,7 @@ export default function Privacy() {
         </nav>
 
         <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
-        <p className="text-gray-400 mb-8">Last updated: January 28, 2026</p>
+        <p className="text-gray-400 mb-8">Last updated: February 4, 2026</p>
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8">
           <section>
@@ -26,7 +26,7 @@ export default function Privacy() {
             <h2 className="text-2xl font-semibold mb-4">Information We Collect</h2>
             <ul className="list-disc list-inside text-gray-300 space-y-2">
               <li><strong>Account Information:</strong> Email address and payment information when you sign up.</li>
-              <li><strong>API Keys:</strong> Your AI provider API keys, stored encrypted and used solely to operate your agent.</li>
+              <li><strong>API Keys:</strong> If you provide API keys, they are stored in your isolated instance and used solely to operate your agent.</li>
               <li><strong>Agent Data:</strong> Files, conversations, and data your agent processes, stored in your isolated instance.</li>
               <li><strong>Usage Data:</strong> Basic analytics like login times and feature usage to improve our service.</li>
             </ul>
@@ -46,9 +46,9 @@ export default function Privacy() {
           <section>
             <h2 className="text-2xl font-semibold mb-4">Data Isolation & Security</h2>
             <p className="text-gray-300 leading-relaxed">
-              Each Automna agent runs in an isolated container. Your conversations, files, and data are 
-              stored separately from other users. We use encryption at rest and in transit. Your API keys 
-              are encrypted with AES-256 and never logged or exposed.
+              Each Automna agent runs in an isolated container with its own encrypted storage. Your conversations, 
+              files, and data are stored separately from other users. All data is encrypted in transit and at rest 
+              at the infrastructure level. API keys stored in your instance are never logged or transmitted outside your agent.
             </p>
           </section>
 
@@ -83,9 +83,8 @@ export default function Privacy() {
           <section>
             <h2 className="text-2xl font-semibold mb-4">Your Rights</h2>
             <p className="text-gray-300 leading-relaxed">
-              You have the right to access, correct, or delete your personal data. You can export your 
-              agent&apos;s data at any time through your dashboard. To exercise these rights or for any 
-              privacy-related questions, contact us at privacy@automna.ai.
+              You have the right to access, correct, or delete your personal data. To exercise these rights, 
+              request a data export, or for any privacy-related questions, contact us at alex@automna.ai.
             </p>
           </section>
 
@@ -101,7 +100,7 @@ export default function Privacy() {
             <h2 className="text-2xl font-semibold mb-4">Contact Us</h2>
             <p className="text-gray-300 leading-relaxed">
               If you have questions about this Privacy Policy, please contact us at:<br />
-              <a href="mailto:privacy@automna.ai" className="text-purple-400 hover:text-purple-300">privacy@automna.ai</a>
+              <a href="mailto:alex@automna.ai" className="text-purple-400 hover:text-purple-300">alex@automna.ai</a>
             </p>
           </section>
         </div>
