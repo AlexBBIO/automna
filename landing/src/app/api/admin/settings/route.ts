@@ -8,8 +8,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
-
-const ADMIN_USER_IDS = ["user_38uauJcurhCOJznltOKvU12RCdK"];
+import { isAdmin } from "@/lib/admin";
 
 // Settings are stored in a simple key-value table
 // For MVP, we'll use in-memory defaults with DB overrides
@@ -51,7 +50,7 @@ export async function GET() {
   try {
     const { userId } = await auth();
     
-    if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+    if (!userId || !isAdmin(userId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -81,7 +80,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const { userId } = await auth();
     
-    if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+    if (!userId || !isAdmin(userId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

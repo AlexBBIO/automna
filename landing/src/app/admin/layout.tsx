@@ -14,11 +14,7 @@ import {
   ArrowLeft,
   Megaphone
 } from "lucide-react";
-
-// Admin user IDs - add your Clerk user ID here
-const ADMIN_USER_IDS = [
-  "user_38uauJcurhCOJznltOKvU12RCdK", // Alex
-];
+import { ADMIN_USER_IDS } from "@/lib/admin";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },

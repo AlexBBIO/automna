@@ -17,15 +17,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines, machineEvents } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isAdmin } from "@/lib/admin";
 
 const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
 const BROWSERBASE_API_KEY = process.env.BROWSERBASE_API_KEY?.replace(/[\r\n]+$/, "");
 const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY?.replace(/[\r\n]+$/, "");
-
-// Admin user IDs (Clerk IDs)
-const ADMIN_IDS = [
-  "user_38uauJcurhCOJznltOKvU12RCdK", // Alex (Automna)
-];
 
 interface DeleteResult {
   step: string;
@@ -38,7 +34,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { userId } = await auth();
-  if (!userId || !ADMIN_IDS.includes(userId)) {
+  if (!userId || !isAdmin(userId)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

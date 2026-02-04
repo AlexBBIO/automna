@@ -38,15 +38,17 @@ export async function GET() {
     const gatewayBase = `https://${userMachine.appName}.fly.dev`;
     
     try {
-      // Simple health check - any response means the server is up
-      const response = await fetch(gatewayBase, {
-        method: "HEAD", // Just check if reachable
+      // Check the actual OpenClaw gateway API endpoint (not just Caddy)
+      // The /ws/api/sessions endpoint requires OpenClaw to be running
+      const response = await fetch(`${gatewayBase}/ws/api/sessions?token=${userMachine.gatewayToken}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(5000),
       });
       
-      // Any response means the gateway is up (even redirects, 404s, etc.)
-      // Only network errors mean it's not ready
-      const ready = response.status > 0;
+      // OpenClaw returns 200 with session list when ready
+      // 502 means Caddy is up but OpenClaw isn't responding yet
+      const ready = response.status === 200;
       
       return NextResponse.json({
         ready,

@@ -9,8 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { announcements, announcementDismissals } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-const ADMIN_USER_IDS = ["user_38uauJcurhCOJznltOKvU12RCdK"]; // Alex
+import { isAdmin } from "@/lib/admin";
 
 // GET - Get single announcement
 export async function GET(
@@ -20,7 +19,7 @@ export async function GET(
   try {
     const { userId } = await auth();
     
-    if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+    if (!userId || !isAdmin(userId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -50,7 +49,7 @@ export async function PUT(
   try {
     const { userId } = await auth();
     
-    if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+    if (!userId || !isAdmin(userId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -106,7 +105,7 @@ export async function DELETE(
   try {
     const { userId } = await auth();
     
-    if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+    if (!userId || !isAdmin(userId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

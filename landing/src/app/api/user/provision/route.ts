@@ -11,10 +11,13 @@
  * fly.dev URL with no shared state.
  */
 
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines, machineEvents } from "@/lib/db/schema";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 import { eq } from "drizzle-orm";
 
 const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
@@ -538,6 +541,36 @@ export async function POST() {
       return NextResponse.json(
         { error: "Fly API token not configured" },
         { status: 500 }
+      );
+    }
+
+    // Check subscription status - require active subscription before provisioning
+    const user = await currentUser();
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const stripeCustomerId = user.publicMetadata?.stripeCustomerId as string | undefined;
+    const subscriptionStatus = user.publicMetadata?.subscriptionStatus as string | undefined;
+    
+    // Allow if user has active/trialing subscription status cached in Clerk
+    // OR verify directly with Stripe if they have a customer ID
+    let hasActiveSubscription = subscriptionStatus === "active" || subscriptionStatus === "trialing";
+    
+    if (!hasActiveSubscription && stripeCustomerId) {
+      // Double-check with Stripe in case webhook hasn't fired yet
+      const subscriptions = await stripe.subscriptions.list({
+        customer: stripeCustomerId,
+        status: "active",
+        limit: 1,
+      });
+      hasActiveSubscription = subscriptions.data.length > 0;
+    }
+    
+    if (!hasActiveSubscription) {
+      return NextResponse.json(
+        { error: "subscription_required", message: "Active subscription required to use Automna" },
+        { status: 402 }
       );
     }
 

@@ -9,8 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isAdmin } from "@/lib/admin";
 
-const ADMIN_USER_IDS = ["user_38uauJcurhCOJznltOKvU12RCdK"];
 const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
 
 export async function POST(
@@ -20,7 +20,7 @@ export async function POST(
   try {
     const { userId: adminId } = await auth();
     
-    if (!adminId || !ADMIN_USER_IDS.includes(adminId)) {
+    if (!adminId || !isAdmin(adminId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

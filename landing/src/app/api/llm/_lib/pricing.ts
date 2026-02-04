@@ -1,14 +1,26 @@
 /**
  * Pricing per million tokens (in dollars).
  * Updated as of February 2026.
+ * 
+ * Note: Include both full model names (with dates) and short names
+ * since OpenClaw/Clawdbot may send either format.
  */
 const PRICING: Record<string, { input: number; output: number }> = {
-  // Claude 4.5 models (2026)
+  // Claude 4.5 models - short names (what OpenClaw sends)
+  "claude-opus-4-5": { input: 15.0, output: 75.0 },
+  "claude-sonnet-4-5": { input: 3.0, output: 15.0 },
+  "claude-haiku-4-5": { input: 0.8, output: 4.0 },
+
+  // Claude 4.5 models - full names with dates
   "claude-sonnet-4-5-20250514": { input: 3.0, output: 15.0 },
   "claude-opus-4-5-20250514": { input: 15.0, output: 75.0 },
   "claude-haiku-4-5-20250514": { input: 0.8, output: 4.0 },
 
-  // Claude 4 models
+  // Claude 4 models - short names
+  "claude-opus-4": { input: 15.0, output: 75.0 },
+  "claude-sonnet-4": { input: 3.0, output: 15.0 },
+
+  // Claude 4 models - full names with dates
   "claude-sonnet-4-20250514": { input: 3.0, output: 15.0 },
   "claude-opus-4-20250514": { input: 15.0, output: 75.0 },
 

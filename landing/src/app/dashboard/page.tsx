@@ -262,9 +262,17 @@ export default function DashboardPage() {
       const data = await response.json();
       if (data.url) {
         window.location.href = data.url;
+      } else if (data.error) {
+        // No subscription found - redirect to pricing
+        if (data.error === 'No subscription found') {
+          window.location.href = '/pricing?subscribe=true';
+        } else {
+          alert(`Billing error: ${data.error}`);
+        }
       }
     } catch (error) {
       console.error('Billing portal error:', error);
+      alert('Failed to load billing portal. Please try again.');
     }
     setLoadingPortal(false);
   };
@@ -398,6 +406,11 @@ export default function DashboardPage() {
           
           if (provisionData.error) {
             console.error('[dashboard] Provisioning failed:', provisionData.error);
+            // Subscription required - redirect to pricing
+            if (provisionData.error === 'subscription_required' || provisionRes.status === 402) {
+              window.location.href = '/pricing?subscribe=true';
+              return;
+            }
             setLoadError(provisionData.error);
             setLoadPhase('error');
             return;

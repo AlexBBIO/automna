@@ -9,15 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { announcements } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-
-const ADMIN_USER_IDS = ["user_38uauJcurhCOJznltOKvU12RCdK"]; // Alex
+import { isAdmin } from "@/lib/admin";
 
 // GET - List all announcements
 export async function GET() {
   try {
     const { userId } = await auth();
     
-    if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+    if (!userId || !isAdmin(userId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -38,7 +37,7 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
     
-    if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+    if (!userId || !isAdmin(userId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

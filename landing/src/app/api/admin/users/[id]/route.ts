@@ -9,8 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, machines, llmUsage, emailSends, PLAN_LIMITS, PlanType } from "@/lib/db/schema";
 import { eq, gte, and, sql, desc } from "drizzle-orm";
-
-const ADMIN_USER_IDS = ["user_38uauJcurhCOJznltOKvU12RCdK"];
+import { isAdmin } from "@/lib/admin";
 
 export async function GET(
   request: NextRequest,
@@ -19,7 +18,7 @@ export async function GET(
   try {
     const { userId: adminId } = await auth();
     
-    if (!adminId || !ADMIN_USER_IDS.includes(adminId)) {
+    if (!adminId || !isAdmin(adminId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

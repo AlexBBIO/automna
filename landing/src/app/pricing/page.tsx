@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useUser, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 const plans = [
   {
@@ -51,9 +52,26 @@ const plans = [
       'Dedicated support',
       'Custom integrations',
     ],
-    cta: 'Contact Sales',
+    cta: 'Go Business',
   },
 ];
+
+function SubscriptionBanner() {
+  const searchParams = useSearchParams();
+  const needsSubscription = searchParams.get('subscribe') === 'true';
+  
+  if (!needsSubscription) return null;
+  
+  return (
+    <div className="container mx-auto px-6">
+      <div className="bg-purple-900/50 border border-purple-500/50 rounded-lg p-4 text-center">
+        <p className="text-purple-200">
+          <span className="font-semibold">Choose a plan to get started.</span> Subscribe to access your personal AI agent.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function PricingPage() {
   const { isSignedIn, user } = useUser();
@@ -108,6 +126,11 @@ export default function PricingPage() {
           )}
         </div>
       </nav>
+
+      {/* Subscription Required Banner */}
+      <Suspense fallback={null}>
+        <SubscriptionBanner />
+      </Suspense>
 
       {/* Header */}
       <main className="container mx-auto px-6 py-16">
@@ -188,10 +211,10 @@ export default function PricingPage() {
         {/* FAQ or additional info */}
         <div className="mt-20 text-center">
           <p className="text-gray-400">
-            All plans require your own Anthropic API key (BYOK).{' '}
-            <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">
-              Get one here →
-            </a>
+            All plans include Claude AI. No API key needed.{' '}
+            <Link href="/dashboard" className="text-purple-400 hover:underline">
+              Start chatting →
+            </Link>
           </p>
         </div>
       </main>
