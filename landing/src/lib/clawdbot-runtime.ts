@@ -362,16 +362,19 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             httpHistoryAbortRef.current?.abort(); // Cancel HTTP fetch
             
             if (wsMessages.length > 0) {
-              // Debug: log ALL unique content types across messages
-              const allContentTypes = new Set<string>();
+              // Debug: log sample of each content type
+              const samples: Record<string, unknown> = {};
               wsMessages.forEach((m: { content: unknown }) => {
                 if (Array.isArray(m.content)) {
                   m.content.forEach((c: { type?: string }) => {
-                    allContentTypes.add(c.type || 'unknown');
+                    const t = c.type || 'unknown';
+                    if (!samples[t]) {
+                      samples[t] = JSON.stringify(c).slice(0, 300);
+                    }
                   });
                 }
               });
-              console.log('[clawdbot] WS History - all content types found:', Array.from(allContentTypes));
+              console.log('[clawdbot] Content type samples:', samples);
               
               const history = wsMessages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
                 let content: Array<{ type: string; [key: string]: unknown }> = [];
