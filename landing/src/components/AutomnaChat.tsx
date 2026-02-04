@@ -243,12 +243,6 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [showAgentActivity, setShowAgentActivity] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('automna-show-agent-activity') === 'true';
-    }
-    return false;
-  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -471,27 +465,9 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
         <ConnectionStatus phase={loadingPhase} error={error} />
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              const newVal = !showAgentActivity;
-              setShowAgentActivity(newVal);
-              localStorage.setItem('automna-show-agent-activity', String(newVal));
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              showAgentActivity
-                ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
-                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-            }`}
-            title={showAgentActivity ? 'Hide agent activity' : 'Show agent activity (tool calls, searches, etc.)'}
-          >
-            <span>{showAgentActivity ? '🔧' : '💬'}</span>
-            <span className="hidden sm:inline">{showAgentActivity ? 'Activity on' : 'Activity'}</span>
-          </button>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium uppercase tracking-wide">
-            {sessionKey === 'main' ? 'General' : sessionKey}
-          </span>
-        </div>
+        <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium uppercase tracking-wide">
+          {sessionKey === 'main' ? 'General' : sessionKey}
+        </span>
       </div>
       
       {/* Messages */}
@@ -522,28 +498,13 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                         : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700'
                     }`}
                   >
-                    {(() => {
-                      // Check if message contains any toolCall - if so, tool output is in text parts
-                      const hasToolCall = message.content.some((p) => p.type === 'toolCall');
-                      const shouldHideToolOutput = hasToolCall && !showAgentActivity;
-                      
-                      return message.content
-                        .filter((part) => {
-                          // Always show text (but may filter code blocks inside it)
-                          if (part.type === 'text') return true;
-                          // Only show tool activity (toolCall) if toggle is on
-                          if (part.type === 'toolCall') return showAgentActivity;
-                          // Hide unknown types when toggle is off
-                          return showAgentActivity;
-                        })
-                        .map((part, i) => {
+                    {message.content.map((part, i) => {
                           if (part.type === 'text' && typeof part.text === 'string') {
                             return (
                               <MessageContent 
                                 key={i} 
                                 text={part.text}
                                 isUser={message.role === 'user'}
-                                showToolOutput={!shouldHideToolOutput}
                               />
                             );
                           }
@@ -582,8 +543,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                           );
                         }
                         return null;
-                      });
-                    })()}
+                      })}
                   </div>
                   
                   {/* Timestamp and actions */}
