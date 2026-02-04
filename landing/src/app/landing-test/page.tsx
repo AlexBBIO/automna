@@ -55,7 +55,7 @@ const integrations = [
   { name: 'Obsidian', icon: '/integrations/obsidian.svg' },
 ];
 
-export default function Landing() {
+export default function LandingTest() {
   const [isVisible, setIsVisible] = useState(false);
   const [visibleMessages, setVisibleMessages] = useState(0);
   const [typingIndex, setTypingIndex] = useState(-1);
