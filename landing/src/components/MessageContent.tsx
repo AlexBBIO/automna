@@ -210,12 +210,15 @@ function FileAttachment({ path, isUser }: { path: string; isUser?: boolean }) {
   );
 }
 
-// Parse text into segments (text, code blocks, inline code, file refs)
+// Parse text into segments (text, code blocks, inline code, file refs, markdown)
 type Segment = 
   | { type: 'text'; content: string }
   | { type: 'code'; language: string; content: string }
   | { type: 'inline-code'; content: string }
-  | { type: 'file'; path: string };
+  | { type: 'file'; path: string }
+  | { type: 'bold'; content: string }
+  | { type: 'italic'; content: string }
+  | { type: 'link'; text: string; url: string };
 
 function parseContent(text: string): Segment[] {
   const segments: Segment[] = [];
@@ -284,9 +287,10 @@ function parseContent(text: string): Segment[] {
   }
   
   // Third pass: extract inline code from remaining text segments
+  const withInlineCode: Segment[] = [];
   for (const segment of withFiles) {
     if (segment.type !== 'text') {
-      segments.push(segment);
+      withInlineCode.push(segment);
       continue;
     }
     
@@ -295,9 +299,46 @@ function parseContent(text: string): Segment[] {
     inlineCodeRegex.lastIndex = 0;
     while ((match = inlineCodeRegex.exec(textContent)) !== null) {
       if (match.index > textLastIndex) {
+        withInlineCode.push({ type: 'text', content: textContent.slice(textLastIndex, match.index) });
+      }
+      withInlineCode.push({ type: 'inline-code', content: match[1] });
+      textLastIndex = match.index + match[0].length;
+    }
+    if (textLastIndex < textContent.length) {
+      withInlineCode.push({ type: 'text', content: textContent.slice(textLastIndex) });
+    }
+  }
+  
+  // Fourth pass: extract markdown formatting (bold, italic, links) from remaining text
+  // Order matters: bold (**) before italic (*) to avoid conflicts
+  const markdownRegex = /\*\*([^*]+)\*\*|\*([^*]+)\*|_([^_]+)_|\[([^\]]+)\]\(([^)]+)\)/g;
+  
+  for (const segment of withInlineCode) {
+    if (segment.type !== 'text') {
+      segments.push(segment);
+      continue;
+    }
+    
+    let textLastIndex = 0;
+    const textContent = segment.content;
+    markdownRegex.lastIndex = 0;
+    while ((match = markdownRegex.exec(textContent)) !== null) {
+      if (match.index > textLastIndex) {
         segments.push({ type: 'text', content: textContent.slice(textLastIndex, match.index) });
       }
-      segments.push({ type: 'inline-code', content: match[1] });
+      if (match[1] !== undefined) {
+        // Bold: **text**
+        segments.push({ type: 'bold', content: match[1] });
+      } else if (match[2] !== undefined) {
+        // Italic: *text*
+        segments.push({ type: 'italic', content: match[2] });
+      } else if (match[3] !== undefined) {
+        // Italic: _text_
+        segments.push({ type: 'italic', content: match[3] });
+      } else if (match[4] !== undefined && match[5] !== undefined) {
+        // Link: [text](url)
+        segments.push({ type: 'link', text: match[4], url: match[5] });
+      }
       textLastIndex = match.index + match[0].length;
     }
     if (textLastIndex < textContent.length) {
@@ -335,6 +376,38 @@ export function MessageContent({ text, isUser }: MessageContentProps) {
         // File attachments work for both user and assistant
         if (segment.type === 'file') {
           return <FileAttachment key={i} path={segment.path} isUser={isUser} />;
+        }
+        // Bold text
+        if (segment.type === 'bold') {
+          return (
+            <strong key={i} className="font-semibold">
+              {segment.content}
+            </strong>
+          );
+        }
+        // Italic text
+        if (segment.type === 'italic') {
+          return (
+            <em key={i} className="italic">
+              {segment.content}
+            </em>
+          );
+        }
+        // Links
+        if (segment.type === 'link') {
+          return (
+            <a 
+              key={i} 
+              href={segment.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className={`underline hover:no-underline ${
+                isUser ? 'text-purple-100 hover:text-white' : 'text-purple-600 hover:text-purple-800'
+              }`}
+            >
+              {segment.text}
+            </a>
+          );
         }
         return (
           <span key={i} className="whitespace-pre-wrap break-words">
