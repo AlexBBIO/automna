@@ -365,6 +365,11 @@ function isToolOutputCodeBlock(content: string, language: string): boolean {
     return false;
   }
   
+  // Tool error responses: {"status": "error", "tool": "..."}
+  if (trimmed.includes('"tool":') && (trimmed.includes('"status":') || trimmed.includes('"error":'))) {
+    return true;
+  }
+  
   // web_fetch output: requires these specific keys (unlikely in regular code)
   const webFetchKeys = ['"fetchedAt":', '"tookMs":', '"extractMode":', '"finalUrl":'];
   const webFetchMatches = webFetchKeys.filter(key => trimmed.includes(key)).length;
