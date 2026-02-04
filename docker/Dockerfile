@@ -36,6 +36,11 @@ RUN chmod +x /usr/local/bin/automna-entrypoint.sh
 # Copy file server
 COPY file-server.cjs /app/file-server.cjs
 
+# Patch OpenClaw to support BRAVE_API_URL environment variable
+# The original code hardcodes: const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
+# We change it to: const BRAVE_SEARCH_ENDPOINT = process.env.BRAVE_API_URL ? `${process.env.BRAVE_API_URL}/res/v1/web/search` : "https://api.search.brave.com/res/v1/web/search";
+RUN sed -i 's|const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";|const BRAVE_SEARCH_ENDPOINT = process.env.BRAVE_API_URL ? `${process.env.BRAVE_API_URL}/res/v1/web/search` : "https://api.search.brave.com/res/v1/web/search";|g' /app/dist/agents/tools/web-search.js
+
 # Copy default workspace files
 COPY workspace/ /app/default-workspace/
 
