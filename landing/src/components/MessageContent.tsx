@@ -141,6 +141,7 @@ interface MessageContentProps {
   text: string;
   isUser?: boolean;
   showToolOutput?: boolean;
+  isStreaming?: boolean;
 }
 
 // File attachment component for user and agent-shared files
@@ -221,8 +222,13 @@ type Segment =
   | { type: 'italic'; content: string }
   | { type: 'link'; text: string; url: string };
 
-function parseContent(text: string): Segment[] {
+interface ParseOptions {
+  skipMedia?: boolean;
+}
+
+function parseContent(text: string, options: ParseOptions = {}): Segment[] {
   const segments: Segment[] = [];
+  const { skipMedia = false } = options;
   
   const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
   const inlineCodeRegex = /`([^`\n]+)`/g;
@@ -245,10 +251,16 @@ function parseContent(text: string): Segment[] {
     withCodeBlocks.push({ type: 'text', content: text.slice(lastIndex) });
   }
   
-  // Second pass: extract file references from text segments
+  // Second pass: extract file references from text segments (skip if streaming to avoid partial MEDIA paths)
   const withFiles: Segment[] = [];
   for (const segment of withCodeBlocks) {
     if (segment.type !== 'text') {
+      withFiles.push(segment);
+      continue;
+    }
+    
+    // Skip MEDIA parsing while streaming - content may be incomplete
+    if (skipMedia) {
       withFiles.push(segment);
       continue;
     }
@@ -379,8 +391,9 @@ function isRawToolOutputJson(text: string): boolean {
   return false;
 }
 
-export function MessageContent({ text, isUser, showToolOutput = true }: MessageContentProps) {
-  const segments = useMemo(() => parseContent(text), [text]);
+export function MessageContent({ text, isUser, showToolOutput = true, isStreaming = false }: MessageContentProps) {
+  // Skip MEDIA parsing while streaming to avoid rendering incomplete paths
+  const segments = useMemo(() => parseContent(text, { skipMedia: isStreaming }), [text, isStreaming]);
   
   return (
     <div className="text-[15px] leading-relaxed">
