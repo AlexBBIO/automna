@@ -461,47 +461,67 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             }
             
             if (state === 'final') {
-              // The stored message has the complete text (verified in session files)
-              // But streaming deltas may be truncated. Use message.content from final event
-              // as it should have the complete stored message.
+              // OpenClaw bug: streaming and final events have truncated text (e.g., MEDIA paths cut off)
+              // But stored messages are complete. Workaround: re-fetch last message from history.
               console.log('[clawdbot] Final event received');
-              console.log('[clawdbot] Final message.content:', JSON.stringify(message?.content)?.slice(0, 500));
-              console.log('[clawdbot] streamingTextRef had:', streamingTextRef.current?.slice(-100));
               
-              // Try to get complete text from final message content
-              let finalText = '';
-              if (Array.isArray(message?.content)) {
-                const textPart = message.content.find((p: { type: string }) => p.type === 'text');
-                if (textPart && 'text' in textPart && typeof textPart.text === 'string') {
-                  finalText = textPart.text;
-                }
-              }
-              
-              // Use final message text if it's longer/more complete, otherwise use streaming
               const streamedText = streamingTextRef.current || '';
-              const bestText = (finalText.length > streamedText.length) ? finalText : streamedText;
-              console.log('[clawdbot] Using text source:', finalText.length > streamedText.length ? 'final' : 'streaming', 
-                         'lengths:', { final: finalText.length, streaming: streamedText.length });
+              const isTruncated = streamedText.includes('MEDIA') && !streamedText.includes('MEDIA:/') && !streamedText.includes('MEDIA: /');
+              console.log('[clawdbot] Streamed text may be truncated:', isTruncated, 'length:', streamedText.length);
               
               streamingTextRef.current = '';
               
-              // ALWAYS finalize the streaming message - even if we have no text
-              // This prevents messages from hanging with the typing indicator
+              // Finalize the streaming message immediately to stop the typing indicator
+              const tempId = genId();
               setMessages(prev => {
                 const last = prev[prev.length - 1];
                 if (last?.role === 'assistant' && last.id === 'streaming') {
-                  // Use best available text, or keep existing content if we have nothing better
-                  const cleanedText = bestText ? bestText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() : '';
+                  const cleanedText = streamedText ? streamedText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() : '';
                   if (cleanedText) {
-                    return [...prev.slice(0, -1), { ...last, id: genId(), content: [{ type: 'text', text: cleanedText }] }];
+                    return [...prev.slice(0, -1), { ...last, id: tempId, content: [{ type: 'text', text: cleanedText }] }];
                   } else {
-                    // No text available - just finalize with existing content
-                    return [...prev.slice(0, -1), { ...last, id: genId() }];
+                    return [...prev.slice(0, -1), { ...last, id: tempId }];
                   }
                 }
                 return prev;
               });
               setIsRunning(false);
+              
+              // If text appears truncated (has MEDIA but no path), fetch the complete message from history
+              if (isTruncated && currentSessionRef.current) {
+                console.log('[clawdbot] Fetching complete message from history (MEDIA truncation workaround)');
+                // Small delay to ensure message is saved on server
+                setTimeout(() => {
+                  // Re-fetch history to get the complete message
+                  fetch(`${configRef.current.gatewayUrl.replace(/\/$/, '')}/ws/api/history?sessionKey=${encodeURIComponent(currentSessionRef.current)}&token=${encodeURIComponent(configRef.current.authToken || '')}`)
+                    .then(res => res.json())
+                    .then(data => {
+                      if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+                        const lastMsg = data.messages[data.messages.length - 1];
+                        if (lastMsg.role === 'assistant') {
+                          const fullText = Array.isArray(lastMsg.content)
+                            ? lastMsg.content.find((c: { type: string }) => c.type === 'text')?.text
+                            : typeof lastMsg.content === 'string' ? lastMsg.content : null;
+                          
+                          if (fullText && fullText.length > streamedText.length) {
+                            console.log('[clawdbot] Got complete message from history, length:', fullText.length);
+                            const cleanedText = fullText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+                            setMessages(prev => {
+                              const idx = prev.findIndex(m => m.id === tempId);
+                              if (idx >= 0) {
+                                const updated = [...prev];
+                                updated[idx] = { ...updated[idx], content: [{ type: 'text', text: cleanedText }] };
+                                return updated;
+                              }
+                              return prev;
+                            });
+                          }
+                        }
+                      }
+                    })
+                    .catch(err => console.error('[clawdbot] History re-fetch failed:', err));
+                }, 500);
+              }
             }
           }
         }
