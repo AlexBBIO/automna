@@ -431,6 +431,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           
           if (role === 'assistant') {
             if (state === 'delta' && textContent) {
+              // Log if this delta contains MEDIA to debug truncation
+              if (textContent.includes('MEDIA')) {
+                console.log('[clawdbot] Delta with MEDIA:', {
+                  textContentLength: textContent.length,
+                  lastChars: textContent.slice(-100),
+                  hasFullPath: textContent.includes('MEDIA:/') || textContent.includes('MEDIA: /'),
+                });
+              }
               streamingTextRef.current = textContent;
               setMessages(prev => {
                 const last = prev[prev.length - 1];
@@ -442,24 +450,40 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             }
             
             if (state === 'final') {
-              // Simple approach: streaming already has complete text (including full MEDIA paths)
-              // Just assign a real ID and stop running - don't touch the content
-              console.log('[clawdbot] Final event received, finalizing streaming message');
-              streamingTextRef.current = '';
-              setMessages(prev => {
-                const last = prev[prev.length - 1];
-                if (last?.role === 'assistant' && last.id === 'streaming') {
-                  // Strip message_id tags from the content before finalizing
-                  const cleanedContent = last.content.map(part => {
-                    if (part.type === 'text' && 'text' in part && typeof part.text === 'string') {
-                      return { ...part, text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() };
-                    }
-                    return part;
-                  });
-                  return [...prev.slice(0, -1), { ...last, id: genId(), content: cleanedContent }];
+              // The stored message has the complete text (verified in session files)
+              // But streaming deltas may be truncated. Use message.content from final event
+              // as it should have the complete stored message.
+              console.log('[clawdbot] Final event received');
+              console.log('[clawdbot] Final message.content:', JSON.stringify(message?.content)?.slice(0, 500));
+              console.log('[clawdbot] streamingTextRef had:', streamingTextRef.current?.slice(-100));
+              
+              // Try to get complete text from final message content
+              let finalText = '';
+              if (Array.isArray(message?.content)) {
+                const textPart = message.content.find((p: { type: string }) => p.type === 'text');
+                if (textPart && 'text' in textPart && typeof textPart.text === 'string') {
+                  finalText = textPart.text;
                 }
-                return prev;
-              });
+              }
+              
+              // Use final message text if it's longer/more complete, otherwise use streaming
+              const streamedText = streamingTextRef.current || '';
+              const bestText = (finalText.length > streamedText.length) ? finalText : streamedText;
+              console.log('[clawdbot] Using text source:', finalText.length > streamedText.length ? 'final' : 'streaming', 
+                         'lengths:', { final: finalText.length, streaming: streamedText.length });
+              
+              streamingTextRef.current = '';
+              
+              if (bestText) {
+                const cleanedText = bestText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+                setMessages(prev => {
+                  const last = prev[prev.length - 1];
+                  if (last?.role === 'assistant' && last.id === 'streaming') {
+                    return [...prev.slice(0, -1), { ...last, id: genId(), content: [{ type: 'text', text: cleanedText }] }];
+                  }
+                  return prev;
+                });
+              }
               setIsRunning(false);
             }
           }
