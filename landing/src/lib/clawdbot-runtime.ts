@@ -508,7 +508,36 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           }
         }
         
-        // Handle chat events (streaming)
+        // Handle agent events (streaming text) - OpenClaw sends content here
+        if (msg.type === 'event' && msg.event === 'agent') {
+          const { stream, data } = msg.payload || {};
+          
+          // Debug: log agent event
+          if (stream || data) {
+            console.log('[clawdbot] Agent event:', { 
+              hasStream: !!stream, 
+              streamLength: typeof stream === 'string' ? stream.length : 0,
+              hasData: !!data,
+              dataType: typeof data 
+            });
+          }
+          
+          // Handle streaming text (could be in 'stream' or 'data' field)
+          const textDelta = typeof stream === 'string' ? stream : (typeof data === 'string' ? data : null);
+          if (textDelta) {
+            streamingTextRef.current += textDelta;
+            const currentText = streamingTextRef.current;
+            setMessages(prev => {
+              const last = prev[prev.length - 1];
+              if (last?.role === 'assistant' && last.id === 'streaming') {
+                return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: currentText }] }];
+              }
+              return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: currentText }], createdAt: new Date() }];
+            });
+          }
+        }
+        
+        // Handle chat events (state transitions)
         if (msg.type === 'event' && msg.event === 'chat') {
           const { state, message } = msg.payload || {};
           const role = message?.role;
@@ -525,7 +554,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             }
           }
           
-          // Handle assistant delta events
+          // Handle assistant delta events (legacy format - some OpenClaw versions send full text here)
+          // Only use this if event agent didn't already populate streaming text
           if (role === 'assistant' && state === 'delta' && textContent) {
             // Log if this delta contains MEDIA to debug truncation
             if (textContent.includes('MEDIA')) {
@@ -535,14 +565,18 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
                 hasFullPath: textContent.includes('MEDIA:/') || textContent.includes('MEDIA: /'),
               });
             }
-            streamingTextRef.current = textContent;
-            setMessages(prev => {
-              const last = prev[prev.length - 1];
-              if (last?.role === 'assistant' && last.id === 'streaming') {
-                return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
-              }
-              return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() }];
-            });
+            // Only update if this text is longer than what we've accumulated from agent events
+            // (chat deltas send full text, agent events send incremental)
+            if (textContent.length >= streamingTextRef.current.length) {
+              streamingTextRef.current = textContent;
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last?.role === 'assistant' && last.id === 'streaming') {
+                  return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
+                }
+                return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() }];
+              });
+            }
           }
           
           // Handle final event (may have role undefined in some cases)
