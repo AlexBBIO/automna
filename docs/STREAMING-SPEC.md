@@ -89,7 +89,103 @@ OpenClaw sends two types of events during a chat response:
 
 4. **MEDIA truncation:** Separate issue - MEDIA paths get truncated in WebSocket events, requiring history re-fetch
 
-## Recommended Fix
+## Phase 1: Cleanup First
+
+Before implementing the streaming fix, clean up the existing code. It's accumulated patches and debug code that makes it fragile and hard to reason about.
+
+### 1.1 Audit Current State
+
+Review `clawdbot-runtime.ts` and identify:
+- [ ] Dead code paths (handlers that never trigger)
+- [ ] Redundant logic (multiple places handling same event)
+- [ ] Debug logging that should be removed or gated
+- [ ] Unclear variable names or magic strings
+
+### 1.2 Extract Clear Responsibilities
+
+The current code mixes concerns. Refactor into clear sections:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  WebSocket Connection                                    │
+│  - connect/disconnect/reconnect logic                    │
+│  - auth handling                                         │
+└─────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────┐
+│  Message Router                                          │
+│  - parse incoming messages                               │
+│  - route to appropriate handler by type/event            │
+└─────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────┐
+│  Event Handlers (separate functions)                     │
+│  - handleConnectResponse()                               │
+│  - handleHistoryResponse()                               │
+│  - handleAgentEvent()      ← streaming content           │
+│  - handleChatEvent()       ← state transitions           │
+│  - handleError()                                         │
+└─────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────┐
+│  State Management                                        │
+│  - messages array                                        │
+│  - isRunning, isConnected                                │
+│  - streaming message buffer                              │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 1.3 Document the Image Path
+
+Images have been particularly fragile. Document the exact flow:
+
+```
+User sends image:
+1. File uploaded to /api/files/upload → returns workspace path
+2. Message sent with MEDIA:/path/to/file
+3. Agent receives, processes, responds
+
+Agent sends image:
+1. Agent generates MEDIA:/path in response text
+2. During streaming: MEDIA path may be truncated (known bug)
+3. On final: re-fetch history to get complete message
+4. History contains either:
+   a. Text with full MEDIA:/path → render via MessageContent
+   b. Content part type:"image" with base64 → render inline
+5. MessageContent parses MEDIA: syntax, fetches via /api/files/download
+```
+
+### 1.4 Add Integration Tests
+
+Before changing streaming logic, add tests that verify:
+- [ ] Basic message send/receive works
+- [ ] Images upload and display correctly
+- [ ] History loads on reconnect
+- [ ] Tool calls display properly
+- [ ] Errors are handled gracefully
+
+Use Playwright for e2e tests against a real OpenClaw instance.
+
+### 1.5 Remove Debug Logging
+
+Current code has extensive console.log statements from debugging. Either:
+- Remove them entirely, OR
+- Gate behind a DEBUG flag: `if (DEBUG) console.log(...)`
+
+### 1.6 Cleanup Checklist
+
+- [ ] Remove dead `event chat` delta handler (once streaming fix is in)
+- [ ] Remove `pendingRefetchRef` complexity if we can simplify
+- [ ] Consolidate history loading (HTTP vs WS race condition handling)
+- [ ] Clean up session key canonicalization logic
+- [ ] Remove any temporary workarounds that are no longer needed
+
+---
+
+## Phase 2: Recommended Fix
 
 ### Option A: Use `event agent` for streaming (Recommended)
 
@@ -156,13 +252,27 @@ Tool calls come through in a similar pattern but with different stream types. Ne
 
 ## Implementation Checklist
 
+### Phase 1: Cleanup
+- [ ] Audit and document current code state
+- [ ] Extract handlers into separate functions
+- [ ] Document image flow end-to-end
+- [ ] Add Playwright e2e tests for critical paths
+- [ ] Remove or gate debug logging
+- [ ] Remove dead code and simplify where possible
+
+### Phase 2: Streaming Fix
 - [ ] Switch from `event chat` delta to `event agent` assistant for streaming
 - [ ] Use `data.text` (full accumulated) not `data.delta` (incremental)
 - [ ] Keep `event chat` final for completion state
 - [ ] Keep history re-fetch workaround for MEDIA paths
+
+### Phase 3: Verification
+- [ ] Test basic chat works
 - [ ] Test with tool calls (read, exec, etc.)
 - [ ] Test with images and file uploads
 - [ ] Test error handling (aborted runs, API errors)
+- [ ] Test on multiple user accounts
+- [ ] Monitor for regressions after deploy
 
 ## Files to Modify
 
