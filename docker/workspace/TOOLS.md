@@ -27,22 +27,40 @@ web_search(query="your search query")
 web_search(query="latest AI news", count=5, freshness="pw")
 ```
 
-### Browser Automation (Browserbase)
+### Browser Automation (Browserbase + Playwright)
 
-Use the `browser` tool for web automation with a real Chrome instance:
+Use Playwright to connect to Browserbase for web automation with a real Chrome browser:
 
-```
-browser(action="open", targetUrl="https://example.com")
-browser(action="snapshot")  # Get page content
-browser(action="screenshot")  # Get visual
-browser(action="act", request={"kind": "click", "ref": "button#submit"})
+```python
+import os
+import requests
+from playwright.sync_api import sync_playwright
+
+# Create a Browserbase session
+session = requests.post(
+    f"{os.environ['BROWSERBASE_API_URL']}/v1/sessions",
+    headers={"X-BB-API-Key": os.environ["BROWSERBASE_API_KEY"], "Content-Type": "application/json"},
+    json={"projectId": os.environ["BROWSERBASE_PROJECT_ID"]}
+).json()
+
+# Connect and browse
+with sync_playwright() as p:
+    browser = p.chromium.connect_over_cdp(session["connectUrl"])
+    page = browser.contexts[0].pages[0]
+    page.goto("https://example.com")
+    content = page.content()
+    browser.close()
 ```
 
 **Your browser context persists** - logins and cookies survive between sessions.
 
+See `BROWSERBASE.md` for full documentation and examples.
+
 **Environment variables:**
+- `BROWSERBASE_API_URL` - Proxy endpoint (auto-configured)
+- `BROWSERBASE_API_KEY` - Your gateway token
 - `BROWSERBASE_PROJECT_ID` - Shared project
-- `BROWSERBASE_CONTEXT_ID` - Your persistent context
+- `BROWSERBASE_CONTEXT_ID` - Your persistent context (for login persistence)
 
 ### Email (Agentmail)
 
@@ -79,7 +97,7 @@ response = client.messages.create(
 |---------|--------|-------|
 | Web Chat | ✅ Active | Default |
 | Web Search | ✅ Active | Brave Search via `web_search` tool |
-| Browser | ✅ Active | Browserbase via `browser` tool |
+| Browser | ✅ Active | Browserbase via Playwright (see BROWSERBASE.md) |
 | Email | ✅ Active | See AGENTMAIL.md |
 | Discord | ❌ Not connected | Ask user for bot token |
 | Telegram | ❌ Not connected | Ask user for bot token |

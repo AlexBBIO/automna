@@ -44,6 +44,12 @@ RUN sed -i 's|const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1
 # Copy default workspace files
 COPY workspace/ /app/default-workspace/
 
+# Install pip and Python packages for browser automation
+# Playwright connects to Browserbase (remote Chrome), so we only need the library, not browsers
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pip \
+    && pip3 install --no-cache-dir --break-system-packages playwright requests \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Only expose the proxy port (Caddy)
 EXPOSE 18789
 

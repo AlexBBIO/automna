@@ -399,13 +399,13 @@ export default function Landing() {
               <PricingCard
                 tier="Starter"
                 price={79}
-                description="Perfect for getting started"
+                description="Get started"
                 features={[
-                  '1 AI agent',
-                  'Web chat interface',
-                  '1 integration (Discord OR Telegram)',
-                  'Basic memory (30 days)',
-                  'Email support',
+                  'Your own AI agent',
+                  'Web chat + 1 integration',
+                  'Browser access',
+                  'Personal email inbox',
+                  '2M tokens/month',
                 ]}
               />
               <PricingCard
@@ -413,22 +413,22 @@ export default function Landing() {
                 price={149}
                 description="For power users"
                 features={[
-                  '1 AI agent',
+                  'Everything in Starter',
                   'All integrations',
-                  'Cloud browser access',
-                  'Agent email inbox',
+                  '10M tokens/month',
                   'Unlimited memory',
+                  'Email support',
                 ]}
                 highlighted
               />
               <PricingCard
                 tier="Business"
                 price={299}
-                description="For teams and agencies"
+                description="For teams"
                 features={[
-                  '3 AI agents',
                   'Everything in Pro',
                   'Team workspace',
+                  '50M tokens/month',
                   'API access',
                   'Dedicated support',
                 ]}

@@ -156,9 +156,8 @@ Example - switch to faster model:
 - `web_fetch` - Fetch webpage content
 - `gateway` - Manage your own config
 - `cron` - Schedule recurring tasks
-- `browser` - Web automation (see Browserbase section below)
 
-**🌐 Web Browsing:** Check `BROWSERBASE.md` for how to browse the web with persistent cookies and bot detection bypass.
+**🌐 Web Browsing:** Use Playwright + Browserbase for browser automation. Check `BROWSERBASE.md` for examples. Browserbase gives you a real Chrome browser that bypasses bot detection, and your logins/cookies persist.
 
 **📧 Email:** Check `AGENTMAIL.md` for how to send and receive emails.
 
