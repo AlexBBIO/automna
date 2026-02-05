@@ -69,7 +69,7 @@ async function gatewayRpc(
           },
           auth: { token },
           role: 'operator',
-          scopes: ['operator.read', 'operator.write'],
+          scopes: ['operator.read', 'operator.write', 'operator.admin'],
           caps: [],
         },
       }));
