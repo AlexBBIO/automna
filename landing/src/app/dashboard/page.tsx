@@ -205,11 +205,18 @@ export default function DashboardPage() {
     }
     
     try {
-      await fetch('/api/user/sessions', {
+      const res = await fetch('/api/user/sessions', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key }),
       });
+      
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error('[dashboard] Failed to delete session:', data.error || res.statusText);
+        // Refetch on error to restore state
+        fetchConversations();
+      }
     } catch (err) {
       console.error('[dashboard] Failed to delete session:', err);
       // Refetch on error

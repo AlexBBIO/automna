@@ -110,10 +110,21 @@ async function gatewayRpc(
           clearTimeout(timeout);
           ws.close();
           if (msg.error) {
+            console.error(`[gatewayRpc] RPC error for ${method}:`, msg.error);
             reject(new Error(msg.error.message || 'RPC error'));
           } else {
-            // OpenClaw uses 'payload' not 'result' for response data
-            resolve(msg.payload);
+            // OpenClaw sends payloadJSON as a string that needs parsing
+            // But the WebSocket layer usually parses it into 'payload'
+            let result = msg.payload;
+            if (!result && msg.payloadJSON) {
+              try {
+                result = JSON.parse(msg.payloadJSON);
+              } catch {
+                result = msg.payloadJSON;
+              }
+            }
+            console.log(`[gatewayRpc] ${method} response:`, JSON.stringify(result).slice(0, 500));
+            resolve(result);
           }
         }
       } catch {
@@ -294,12 +305,24 @@ export async function DELETE(request: Request) {
     const canonicalKey = key.startsWith('agent:main:') ? key : `agent:main:${key}`;
     
     try {
-      await gatewayRpc(gatewayUrl, userMachine.gatewayToken, 'sessions.delete', {
+      const result = await gatewayRpc(gatewayUrl, userMachine.gatewayToken, 'sessions.delete', {
         key: canonicalKey,
         deleteTranscript: true,
-      });
+      }) as { ok?: boolean; deleted?: boolean; key?: string; archived?: string[] } | null;
       
-      return NextResponse.json({ ok: true });
+      console.log('[sessions] Delete result:', JSON.stringify(result));
+      
+      // OpenClaw returns ok: true even if session wasn't found
+      // Check the 'deleted' field to know if anything was actually removed
+      if (result && result.ok) {
+        return NextResponse.json({ 
+          ok: true, 
+          deleted: result.deleted ?? false,
+          archived: result.archived,
+        });
+      }
+      
+      return NextResponse.json({ ok: true, deleted: false });
       
     } catch (rpcError) {
       console.error('[sessions] Failed to delete session:', rpcError);
