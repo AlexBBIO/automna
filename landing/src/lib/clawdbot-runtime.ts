@@ -463,6 +463,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           const role = message?.role;
           const textContent = message?.content?.find((c: { type: string }) => c.type === 'text')?.text || '';
           
+          // Debug: log chat event details
+          console.log('[clawdbot] Chat event:', { state, role, textLength: textContent?.length || 0, hasMedia: textContent?.includes('MEDIA') });
+          
           // Debug: log message content types
           if (message?.content && Array.isArray(message.content)) {
             const types = message.content.map((c: { type: string }) => c.type);
@@ -497,8 +500,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
               console.log('[clawdbot] Final event received');
               
               const streamedText = streamingTextRef.current || '';
-              const isTruncated = streamedText.includes('MEDIA') && !streamedText.includes('MEDIA:/') && !streamedText.includes('MEDIA: /');
-              console.log('[clawdbot] Streamed text may be truncated:', isTruncated, 'length:', streamedText.length);
+              console.log('[clawdbot] Final text length:', streamedText.length);
               
               streamingTextRef.current = '';
               
@@ -518,9 +520,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
               });
               setIsRunning(false);
               
-              // If text appears truncated (has MEDIA but no path), fetch the complete message from history
-              if (isTruncated && currentSessionRef.current) {
-                console.log('[clawdbot] Fetching complete message from history (MEDIA truncation workaround)');
+              // Always re-fetch after final to get complete message (workaround for OpenClaw truncation bug)
+              if (currentSessionRef.current) {
+                console.log('[clawdbot] Fetching complete message from history');
                 // Small delay to ensure message is saved on server
                 setTimeout(() => {
                   // Re-fetch history to get the complete message
@@ -539,8 +541,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
                             ? lastMsg.content.find((c: { type: string }) => c.type === 'text')?.text
                             : typeof lastMsg.content === 'string' ? lastMsg.content : null;
                           
-                          if (fullText && fullText.length > streamedText.length) {
-                            console.log('[clawdbot] Got complete message from history, length:', fullText.length);
+                          // Update if history has more content OR contains MEDIA that current doesn't
+                          const hasNewMedia = fullText?.includes('MEDIA:') && !streamedText.includes('MEDIA:');
+                          const isLonger = fullText && fullText.length > streamedText.length;
+                          
+                          if (fullText && (isLonger || hasNewMedia)) {
+                            console.log('[clawdbot] Got better message from history:', { length: fullText.length, hasNewMedia, isLonger });
                             const cleanedText = fullText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
                             setMessages(prev => {
                               const idx = prev.findIndex(m => m.id === tempId);
@@ -551,6 +557,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
                               }
                               return prev;
                             });
+                          } else {
+                            console.log('[clawdbot] History message not better, keeping streamed version');
                           }
                         }
                       }

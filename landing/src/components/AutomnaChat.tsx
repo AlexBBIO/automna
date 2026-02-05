@@ -587,6 +587,25 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                             />
                           );
                         }
+                        // Handle image content parts (base64 data from OpenClaw)
+                        if (part.type === 'image') {
+                          const imageData = part as { type: string; data?: string; media_type?: string; source?: { type: string; media_type?: string; data?: string } };
+                          // Handle both direct data and Anthropic source format
+                          const base64Data = imageData.data || imageData.source?.data;
+                          const mediaType = imageData.media_type || imageData.source?.media_type || 'image/jpeg';
+                          if (base64Data) {
+                            return (
+                              <div key={i} className="my-2">
+                                <img 
+                                  src={`data:${mediaType};base64,${base64Data}`}
+                                  alt="Shared image"
+                                  className="max-w-full rounded-lg shadow-md"
+                                  style={{ maxHeight: '400px', objectFit: 'contain' }}
+                                />
+                              </div>
+                            );
+                          }
+                        }
                         return null;
                       })}
                   </div>
