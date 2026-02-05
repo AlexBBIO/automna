@@ -130,6 +130,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const streamingTextRef = useRef('');
   const historyLoadedRef = useRef(false);
   const httpHistoryAbortRef = useRef<AbortController | null>(null);
+  // Track pending re-fetch after final event (to get complete message with images)
+  const pendingRefetchRef = useRef<{ tempId: string; streamedText: string } | null>(null);
   
   // Store config in ref to avoid effect deps
   const configRef = useRef(config);
@@ -361,7 +363,56 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           
           const wsMessages = msg.payload.messages;
           
-          // Mark as loaded - empty is valid for new channels
+          // Check if this is a pending re-fetch (after final event)
+          const pendingRefetch = pendingRefetchRef.current;
+          if (pendingRefetch && wsMessages.length > 0) {
+            console.log('[clawdbot] Processing re-fetch history response');
+            pendingRefetchRef.current = null; // Clear pending
+            
+            const lastMsg = wsMessages[wsMessages.length - 1];
+            if (lastMsg.role === 'assistant' && Array.isArray(lastMsg.content)) {
+              // Get all content parts, cleaning text parts
+              const fullContent = lastMsg.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
+                if (part.type === 'text' && typeof part.text === 'string') {
+                  return { ...part, text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() };
+                }
+                return part;
+              });
+              
+              // Check if history has more/better content
+              const hasImage = fullContent.some((p: { type: string }) => p.type === 'image');
+              const fullText = fullContent.find((p: { type: string }) => p.type === 'text')?.text || '';
+              const hasMoreContent = fullContent.length > 1 || fullText.length > pendingRefetch.streamedText.length || hasImage;
+              
+              if (hasMoreContent) {
+                console.log('[clawdbot] Got better message from history:', { 
+                  parts: fullContent.length, 
+                  hasImage,
+                  textLength: fullText.length 
+                });
+                setMessages(prev => {
+                  const idx = prev.findIndex(m => m.id === pendingRefetch.tempId);
+                  if (idx >= 0) {
+                    const updated = [...prev];
+                    updated[idx] = { ...updated[idx], content: fullContent };
+                    return updated;
+                  }
+                  // If no streaming message exists, add the complete message
+                  return [...prev, { 
+                    id: pendingRefetch.tempId, 
+                    role: 'assistant' as const, 
+                    content: fullContent, 
+                    createdAt: new Date() 
+                  }];
+                });
+              } else {
+                console.log('[clawdbot] History message not better, keeping streamed version');
+              }
+            }
+            return;
+          }
+          
+          // Mark as loaded - empty is valid for new channels (initial history load)
           if (!historyLoadedRef.current) {
             console.log(`[clawdbot] WS history: ${wsMessages.length} messages`);
             historyLoadedRef.current = true;
@@ -523,62 +574,13 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
               
               // Always re-fetch after final to get complete message (workaround for OpenClaw truncation bug)
               if (currentSessionRef.current) {
-                console.log('[clawdbot] Fetching complete message from history');
+                console.log('[clawdbot] Requesting history via WS for complete message');
                 // Small delay to ensure message is saved on server
                 setTimeout(() => {
-                  // Re-fetch history to get the complete message
-                  // Convert wss:// to https:// for HTTP fetch
-                  const httpUrl = configRef.current.gatewayUrl
-                    .replace(/^wss:\/\//, 'https://')
-                    .replace(/^ws:\/\//, 'http://')
-                    .replace(/\/ws\/?$/, '');  // Remove /ws suffix
-                  fetch(`${httpUrl}/ws/api/history?sessionKey=${encodeURIComponent(currentSessionRef.current)}&token=${encodeURIComponent(configRef.current.authToken || '')}`)
-                    .then(res => res.json())
-                    .then(data => {
-                      if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-                        const lastMsg = data.messages[data.messages.length - 1];
-                        if (lastMsg.role === 'assistant' && Array.isArray(lastMsg.content)) {
-                          // Get all content parts, cleaning text parts
-                          const fullContent = lastMsg.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
-                            if (part.type === 'text' && typeof part.text === 'string') {
-                              return { ...part, text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() };
-                            }
-                            return part;
-                          });
-                          
-                          // Check if history has more/better content
-                          const hasImage = fullContent.some((p: { type: string }) => p.type === 'image');
-                          const fullText = fullContent.find((p: { type: string }) => p.type === 'text')?.text || '';
-                          const hasMoreContent = fullContent.length > 1 || fullText.length > streamedText.length || hasImage;
-                          
-                          if (hasMoreContent) {
-                            console.log('[clawdbot] Got better message from history:', { 
-                              parts: fullContent.length, 
-                              hasImage,
-                              textLength: fullText.length 
-                            });
-                            setMessages(prev => {
-                              const idx = prev.findIndex(m => m.id === tempId);
-                              if (idx >= 0) {
-                                const updated = [...prev];
-                                updated[idx] = { ...updated[idx], content: fullContent };
-                                return updated;
-                              }
-                              // If no streaming message exists, add the complete message
-                              return [...prev, { 
-                                id: tempId, 
-                                role: 'assistant' as const, 
-                                content: fullContent, 
-                                createdAt: new Date() 
-                              }];
-                            });
-                          } else {
-                            console.log('[clawdbot] History message not better, keeping streamed version');
-                          }
-                        }
-                      }
-                    })
-                    .catch(err => console.error('[clawdbot] History re-fetch failed:', err));
+                  // Store pending re-fetch info for when history response arrives
+                  pendingRefetchRef.current = { tempId, streamedText };
+                  // Request history through WebSocket (no HTTP endpoint available)
+                  wsSend('chat.history', { sessionKey: currentSessionRef.current });
                 }, 500);
               }
             }

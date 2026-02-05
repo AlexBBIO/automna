@@ -20,24 +20,37 @@ export async function GET(
   const pathStr = path.join("/");
   
   try {
-    // Get the authenticated user
-    const { userId: clerkId } = await auth();
+    // Try token-based auth first (for re-fetch calls that may not have session cookies)
+    const tokenParam = request.nextUrl.searchParams.get('token');
+    let userMachine = null;
     
-    if (!clerkId) {
-      return NextResponse.json(
-        { error: "Unauthorized", messages: [] },
-        { status: 401 }
-      );
+    if (tokenParam) {
+      // Look up machine by gateway token
+      userMachine = await db.query.machines.findFirst({
+        where: eq(machines.gatewayToken, tokenParam),
+      });
     }
     
-    // Look up user's machine/app in database
-    const userMachine = await db.query.machines.findFirst({
-      where: eq(machines.userId, clerkId),
-    });
+    // Fall back to Clerk session auth
+    if (!userMachine) {
+      const { userId: clerkId } = await auth();
+      
+      if (!clerkId) {
+        return NextResponse.json(
+          { error: "Unauthorized", messages: [] },
+          { status: 401 }
+        );
+      }
+      
+      // Look up user's machine/app in database
+      userMachine = await db.query.machines.findFirst({
+        where: eq(machines.userId, clerkId),
+      });
+    }
     
     if (!userMachine || !userMachine.appName || !userMachine.gatewayToken) {
       // No machine yet - return empty history
-      console.log(`[ws-proxy] No app found for user ${clerkId}`);
+      console.log(`[ws-proxy] No app found (token: ${tokenParam ? 'provided' : 'none'})`);
       return NextResponse.json({ messages: [] });
     }
     
