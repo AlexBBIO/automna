@@ -133,19 +133,19 @@ export const PLAN_LIMITS = {
     tokensPerMinute: 10_000,
   },
   starter: {
-    monthlyTokens: 2_000_000,      // 2M tokens
+    monthlyTokens: 500_000,        // 500K tokens
     monthlyCostCents: 2000,        // $20 cap
     requestsPerMinute: 20,
     tokensPerMinute: 50_000,
   },
   pro: {
-    monthlyTokens: 10_000_000,     // 10M tokens
+    monthlyTokens: 2_000_000,      // 2M tokens
     monthlyCostCents: 10000,       // $100 cap
     requestsPerMinute: 60,
     tokensPerMinute: 150_000,
   },
   business: {
-    monthlyTokens: 50_000_000,     // 50M tokens
+    monthlyTokens: 10_000_000,     // 10M tokens
     monthlyCostCents: 50000,       // $500 cap
     requestsPerMinute: 120,
     tokensPerMinute: 300_000,

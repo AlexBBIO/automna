@@ -405,7 +405,7 @@ export default function Landing() {
                   'Web chat + 1 integration',
                   'Browser access',
                   'Personal email inbox',
-                  '2M tokens/month',
+                  '500K tokens/month',
                 ]}
               />
               <PricingCard
@@ -415,7 +415,7 @@ export default function Landing() {
                 features={[
                   'Everything in Starter',
                   'All integrations',
-                  '10M tokens/month',
+                  '2M tokens/month',
                   'Unlimited memory',
                   'Email support',
                 ]}
@@ -428,7 +428,7 @@ export default function Landing() {
                 features={[
                   'Everything in Pro',
                   'Team workspace',
-                  '50M tokens/month',
+                  '10M tokens/month',
                   'API access',
                   'Dedicated support',
                 ]}
