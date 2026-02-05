@@ -716,6 +716,13 @@ export async function POST() {
 
     console.log(`[provision] Successfully created ${appName} with machine ${machine.id}`);
 
+    // Send machine ready email (non-blocking)
+    const userEmail = user.emailAddresses?.[0]?.emailAddress;
+    if (userEmail && agentmailInboxId) {
+      sendMachineReady(userEmail, agentmailInboxId, user.firstName || undefined)
+        .catch((err) => console.error("[provision] Failed to send machine ready email:", err));
+    }
+
     return NextResponse.json({
       appName,
       machineId: machine.id,
