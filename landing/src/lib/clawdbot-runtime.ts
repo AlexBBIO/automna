@@ -524,7 +524,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
                 // Small delay to ensure message is saved on server
                 setTimeout(() => {
                   // Re-fetch history to get the complete message
-                  fetch(`${configRef.current.gatewayUrl.replace(/\/$/, '')}/ws/api/history?sessionKey=${encodeURIComponent(currentSessionRef.current)}&token=${encodeURIComponent(configRef.current.authToken || '')}`)
+                  // Convert wss:// to https:// for HTTP fetch
+                  const httpUrl = configRef.current.gatewayUrl
+                    .replace(/^wss:\/\//, 'https://')
+                    .replace(/^ws:\/\//, 'http://')
+                    .replace(/\/ws\/?$/, '');  // Remove /ws suffix
+                  fetch(`${httpUrl}/ws/api/history?sessionKey=${encodeURIComponent(currentSessionRef.current)}&token=${encodeURIComponent(configRef.current.authToken || '')}`)
                     .then(res => res.json())
                     .then(data => {
                       if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
