@@ -474,16 +474,22 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
               
               streamingTextRef.current = '';
               
-              if (bestText) {
-                const cleanedText = bestText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
-                setMessages(prev => {
-                  const last = prev[prev.length - 1];
-                  if (last?.role === 'assistant' && last.id === 'streaming') {
+              // ALWAYS finalize the streaming message - even if we have no text
+              // This prevents messages from hanging with the typing indicator
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last?.role === 'assistant' && last.id === 'streaming') {
+                  // Use best available text, or keep existing content if we have nothing better
+                  const cleanedText = bestText ? bestText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() : '';
+                  if (cleanedText) {
                     return [...prev.slice(0, -1), { ...last, id: genId(), content: [{ type: 'text', text: cleanedText }] }];
+                  } else {
+                    // No text available - just finalize with existing content
+                    return [...prev.slice(0, -1), { ...last, id: genId() }];
                   }
-                  return prev;
-                });
-              }
+                }
+                return prev;
+              });
               setIsRunning(false);
             }
           }
