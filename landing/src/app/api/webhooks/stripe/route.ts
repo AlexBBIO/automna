@@ -2,9 +2,30 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { clerkClient } from '@clerk/nextjs/server';
+import { sendSubscriptionStarted, sendSubscriptionCanceled, sendPaymentFailed } from '@/lib/email';
+import { db } from '@/lib/db';
+import { machines } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 // Initialize Stripe lazily to avoid build-time errors
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+/**
+ * Update the user's plan in the machines table.
+ * This is critical for rate limiting - the LLM proxy reads plan from here.
+ */
+async function updateMachinePlan(userId: string, plan: string): Promise<void> {
+  try {
+    await db
+      .update(machines)
+      .set({ plan, updatedAt: new Date() })
+      .where(eq(machines.userId, userId));
+    console.log(`[stripe] Updated machines.plan for ${userId} to ${plan}`);
+  } catch (error) {
+    // Log but don't fail the webhook - Clerk update is the primary record
+    console.error(`[stripe] Failed to update machines.plan for ${userId}:`, error);
+  }
+}
 
 export async function POST(request: Request) {
   const body = await request.text();
@@ -30,6 +51,7 @@ export async function POST(request: Request) {
         const plan = session.metadata?.plan || 'starter';
 
         if (clerkUserId) {
+          // Update Clerk metadata (source of truth for user profile)
           const client = await clerkClient();
           await client.users.updateUserMetadata(clerkUserId, {
             publicMetadata: {
@@ -39,7 +61,16 @@ export async function POST(request: Request) {
               subscriptionStatus: 'active',
             },
           });
-          console.log(`Updated user ${clerkUserId} with plan ${plan}`);
+          
+          // Update machines table (used for rate limiting)
+          await updateMachinePlan(clerkUserId, plan);
+          
+          console.log(`[stripe] Upgraded user ${clerkUserId} to ${plan}`);
+
+          // Send subscription started email
+          if (session.customer_email) {
+            await sendSubscriptionStarted(session.customer_email, plan);
+          }
         }
         break;
       }
@@ -73,6 +104,7 @@ export async function POST(request: Request) {
 
         const clerkUserId = (customer as Stripe.Customer).metadata?.clerkUserId;
         if (clerkUserId) {
+          // Update Clerk metadata
           const client = await clerkClient();
           await client.users.updateUserMetadata(clerkUserId, {
             publicMetadata: {
@@ -81,7 +113,11 @@ export async function POST(request: Request) {
               stripeSubscriptionId: null,
             },
           });
-          console.log(`Canceled subscription for user ${clerkUserId}`);
+          
+          // Update machines table (rate limiting will revert to free tier)
+          await updateMachinePlan(clerkUserId, 'free');
+          
+          console.log(`[stripe] Canceled subscription for user ${clerkUserId}`);
         }
         break;
       }

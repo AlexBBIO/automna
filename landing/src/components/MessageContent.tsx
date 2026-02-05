@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
@@ -392,8 +392,9 @@ function isRawToolOutputJson(text: string): boolean {
 }
 
 export function MessageContent({ text, isUser, showToolOutput = true, isStreaming = false }: MessageContentProps) {
-  // Skip MEDIA parsing while streaming to avoid rendering incomplete paths
-  const segments = useMemo(() => parseContent(text, { skipMedia: isStreaming }), [text, isStreaming]);
+  // Parse content - skip MEDIA while streaming to avoid rendering incomplete paths
+  // No useMemo - parsing is fast and ensures fresh results when props change
+  const segments = parseContent(text, { skipMedia: isStreaming });
   
   return (
     <div className="text-[15px] leading-relaxed">
