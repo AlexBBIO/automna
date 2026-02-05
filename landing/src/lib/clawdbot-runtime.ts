@@ -442,7 +442,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             }
             
             if (state === 'final') {
-              console.log('[clawdbot] Final event received, processing...');
+              console.log('[clawdbot] Final event received');
+              console.log('[clawdbot] streamingTextRef.current:', JSON.stringify(streamingTextRef.current?.slice(-100)));
+              console.log('[clawdbot] message.content:', JSON.stringify(message?.content));
+              console.log('[clawdbot] textContent from find:', JSON.stringify(textContent?.slice(-100)));
               try {
                 // Build final content from message, but use streaming text for text parts
                 // because the final message's text can be truncated (e.g., MEDIA paths cut off)
