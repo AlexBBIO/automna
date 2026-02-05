@@ -508,36 +508,29 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           }
         }
         
-        // Handle agent events (streaming text) - OpenClaw sends content here
+        // Handle agent events - debug to understand the format
         if (msg.type === 'event' && msg.event === 'agent') {
-          const { stream, data } = msg.payload || {};
+          const payload = msg.payload || {};
+          // Log the FULL payload structure to understand it
+          console.log('[clawdbot] Agent event FULL:', JSON.stringify(payload).slice(0, 500));
           
-          // Debug: log agent event
-          if (stream || data) {
-            console.log('[clawdbot] Agent event:', { 
-              hasStream: !!stream, 
-              streamLength: typeof stream === 'string' ? stream.length : 0,
-              hasData: !!data,
-              dataType: typeof data 
-            });
-          }
+          // Check if there's actual text content somewhere in the payload
+          // Common locations: data.text, data.content, text, content, delta
+          const possibleTextLocations = [
+            payload.text,
+            payload.content,
+            payload.delta,
+            payload.data?.text,
+            payload.data?.content,
+            payload.data?.delta,
+          ].filter(Boolean);
           
-          // Handle streaming text (could be in 'stream' or 'data' field)
-          const textDelta = typeof stream === 'string' ? stream : (typeof data === 'string' ? data : null);
-          if (textDelta) {
-            streamingTextRef.current += textDelta;
-            const currentText = streamingTextRef.current;
-            setMessages(prev => {
-              const last = prev[prev.length - 1];
-              if (last?.role === 'assistant' && last.id === 'streaming') {
-                return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: currentText }] }];
-              }
-              return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: currentText }], createdAt: new Date() }];
-            });
+          if (possibleTextLocations.length > 0) {
+            console.log('[clawdbot] Agent event has text at:', possibleTextLocations.map(t => typeof t === 'string' ? t.slice(0, 50) : typeof t));
           }
         }
         
-        // Handle chat events (state transitions)
+        // Handle chat events (streaming)
         if (msg.type === 'event' && msg.event === 'chat') {
           const { state, message } = msg.payload || {};
           const role = message?.role;
@@ -554,8 +547,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             }
           }
           
-          // Handle assistant delta events (legacy format - some OpenClaw versions send full text here)
-          // Only use this if event agent didn't already populate streaming text
+          // Handle assistant delta events
           if (role === 'assistant' && state === 'delta' && textContent) {
             // Log if this delta contains MEDIA to debug truncation
             if (textContent.includes('MEDIA')) {
@@ -565,18 +557,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
                 hasFullPath: textContent.includes('MEDIA:/') || textContent.includes('MEDIA: /'),
               });
             }
-            // Only update if this text is longer than what we've accumulated from agent events
-            // (chat deltas send full text, agent events send incremental)
-            if (textContent.length >= streamingTextRef.current.length) {
-              streamingTextRef.current = textContent;
-              setMessages(prev => {
-                const last = prev[prev.length - 1];
-                if (last?.role === 'assistant' && last.id === 'streaming') {
-                  return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
-                }
-                return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() }];
-              });
-            }
+            streamingTextRef.current = textContent;
+            setMessages(prev => {
+              const last = prev[prev.length - 1];
+              if (last?.role === 'assistant' && last.id === 'streaming') {
+                return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
+              }
+              return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() }];
+            });
           }
           
           // Handle final event (may have role undefined in some cases)
