@@ -547,7 +547,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                           if (part.type === 'text' && typeof part.text === 'string') {
                             return (
                               <MessageContent 
-                                key={i} 
+                                key={`${message.id}-${i}`}
                                 text={part.text}
                                 isUser={message.role === 'user'}
                                 isStreaming={message.id === 'streaming'}
