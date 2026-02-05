@@ -444,32 +444,44 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             if (state === 'final') {
               console.log('[clawdbot] Final event received, processing...');
               try {
-                // Preserve full content array (including tool_use, tool_result, etc.)
+                // Build final content from message, but use streaming text for text parts
+                // because the final message's text can be truncated (e.g., MEDIA paths cut off)
                 let finalContent: Array<{ type: string; [key: string]: unknown }> = [];
+                const streamedText = streamingTextRef.current;
                 
                 if (Array.isArray(message?.content)) {
+                  // Keep non-text parts, replace text with streaming text
+                  let hasTextPart = false;
                   finalContent = message.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
-                    // Clean text parts
-                    if (part.type === 'text' && typeof part.text === 'string') {
+                    if (part.type === 'text') {
+                      hasTextPart = true;
+                      // Use streaming text if available (it's complete), else use final text
+                      const text = streamedText || (typeof part.text === 'string' ? part.text : '');
                       return {
                         ...part,
-                        text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim()
+                        text: text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim()
                       };
                     }
                     return part;
                   });
+                  
+                  // If no text part existed but we have streaming text, add it
+                  if (!hasTextPart && streamedText) {
+                    finalContent.unshift({ type: 'text', text: streamedText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() });
+                  }
+                } else if (streamedText) {
+                  // No content array, just use streaming text
+                  finalContent = [{ type: 'text', text: streamedText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() }];
                 }
                 
-                // Fallback to streaming text if no content
+                // Last resort fallback
                 if (finalContent.length === 0 || !finalContent.some(p => p.type === 'text' && p.text)) {
-                  const fallbackText = textContent || streamingTextRef.current;
-                  console.log('[clawdbot] Using fallback text, length:', fallbackText?.length);
-                  if (fallbackText) {
-                    finalContent = [{ type: 'text', text: fallbackText }];
+                  if (textContent) {
+                    finalContent = [{ type: 'text', text: textContent }];
                   }
                 }
                 
-                console.log('[clawdbot] Final content parts:', finalContent.length);
+                console.log('[clawdbot] Final content parts:', finalContent.length, 'streamedText length:', streamedText?.length || 0);
                 streamingTextRef.current = '';
                 setMessages(prev => {
                   const last = prev[prev.length - 1];
