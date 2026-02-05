@@ -474,27 +474,28 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             }
           }
           
-          if (role === 'assistant') {
-            if (state === 'delta' && textContent) {
-              // Log if this delta contains MEDIA to debug truncation
-              if (textContent.includes('MEDIA')) {
-                console.log('[clawdbot] Delta with MEDIA:', {
-                  textContentLength: textContent.length,
-                  lastChars: textContent.slice(-100),
-                  hasFullPath: textContent.includes('MEDIA:/') || textContent.includes('MEDIA: /'),
-                });
-              }
-              streamingTextRef.current = textContent;
-              setMessages(prev => {
-                const last = prev[prev.length - 1];
-                if (last?.role === 'assistant' && last.id === 'streaming') {
-                  return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
-                }
-                return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() }];
+          // Handle assistant delta events
+          if (role === 'assistant' && state === 'delta' && textContent) {
+            // Log if this delta contains MEDIA to debug truncation
+            if (textContent.includes('MEDIA')) {
+              console.log('[clawdbot] Delta with MEDIA:', {
+                textContentLength: textContent.length,
+                lastChars: textContent.slice(-100),
+                hasFullPath: textContent.includes('MEDIA:/') || textContent.includes('MEDIA: /'),
               });
             }
-            
-            if (state === 'final') {
+            streamingTextRef.current = textContent;
+            setMessages(prev => {
+              const last = prev[prev.length - 1];
+              if (last?.role === 'assistant' && last.id === 'streaming') {
+                return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
+              }
+              return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() }];
+            });
+          }
+          
+          // Handle final event (may have role undefined in some cases)
+          if (state === 'final') {
               // OpenClaw bug: streaming and final events have truncated text (e.g., MEDIA paths cut off)
               // But stored messages are complete. Workaround: re-fetch last message from history.
               console.log('[clawdbot] Final event received');
@@ -536,26 +537,40 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
                     .then(data => {
                       if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
                         const lastMsg = data.messages[data.messages.length - 1];
-                        if (lastMsg.role === 'assistant') {
-                          const fullText = Array.isArray(lastMsg.content)
-                            ? lastMsg.content.find((c: { type: string }) => c.type === 'text')?.text
-                            : typeof lastMsg.content === 'string' ? lastMsg.content : null;
+                        if (lastMsg.role === 'assistant' && Array.isArray(lastMsg.content)) {
+                          // Get all content parts, cleaning text parts
+                          const fullContent = lastMsg.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
+                            if (part.type === 'text' && typeof part.text === 'string') {
+                              return { ...part, text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() };
+                            }
+                            return part;
+                          });
                           
-                          // Update if history has more content OR contains MEDIA that current doesn't
-                          const hasNewMedia = fullText?.includes('MEDIA:') && !streamedText.includes('MEDIA:');
-                          const isLonger = fullText && fullText.length > streamedText.length;
+                          // Check if history has more/better content
+                          const hasImage = fullContent.some((p: { type: string }) => p.type === 'image');
+                          const fullText = fullContent.find((p: { type: string }) => p.type === 'text')?.text || '';
+                          const hasMoreContent = fullContent.length > 1 || fullText.length > streamedText.length || hasImage;
                           
-                          if (fullText && (isLonger || hasNewMedia)) {
-                            console.log('[clawdbot] Got better message from history:', { length: fullText.length, hasNewMedia, isLonger });
-                            const cleanedText = fullText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+                          if (hasMoreContent) {
+                            console.log('[clawdbot] Got better message from history:', { 
+                              parts: fullContent.length, 
+                              hasImage,
+                              textLength: fullText.length 
+                            });
                             setMessages(prev => {
                               const idx = prev.findIndex(m => m.id === tempId);
                               if (idx >= 0) {
                                 const updated = [...prev];
-                                updated[idx] = { ...updated[idx], content: [{ type: 'text', text: cleanedText }] };
+                                updated[idx] = { ...updated[idx], content: fullContent };
                                 return updated;
                               }
-                              return prev;
+                              // If no streaming message exists, add the complete message
+                              return [...prev, { 
+                                id: tempId, 
+                                role: 'assistant' as const, 
+                                content: fullContent, 
+                                createdAt: new Date() 
+                              }];
                             });
                           } else {
                             console.log('[clawdbot] History message not better, keeping streamed version');
@@ -567,7 +582,6 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
                 }, 500);
               }
             }
-          }
         }
         
         // Handle errors

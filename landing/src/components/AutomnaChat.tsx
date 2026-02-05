@@ -588,6 +588,9 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                           );
                         }
                         // Handle image content parts (base64 data from OpenClaw)
+                        if (part.type === 'image' || part.type === 'toolCall' || part.type === 'tool_use') {
+                          console.log('[AutomnaChat] Content part:', part.type, part.type === 'image' ? 'has data:' + !!(part as { data?: string }).data : '');
+                        }
                         if (part.type === 'image') {
                           const imageData = part as { type: string; data?: string; media_type?: string; source?: { type: string; media_type?: string; data?: string } };
                           // Handle both direct data and Anthropic source format
