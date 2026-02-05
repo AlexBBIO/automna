@@ -233,7 +233,8 @@ function parseContent(text: string, options: ParseOptions = {}): Segment[] {
   const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
   const inlineCodeRegex = /`([^`\n]+)`/g;
   // Support both [[file:/path]] and MEDIA:/path formats (OpenClaw uses MEDIA:)
-  const fileRefRegex = /\[\[(file|image):([^\]]+)\]\]|(?:^|\s)MEDIA:\s*`?([^\n`]+)`?/gim;
+  // Match [[file:/path]] or [[image:/path]] or MEDIA:/path (with optional leading whitespace)
+  const fileRefRegex = /\[\[(file|image):([^\]]+)\]\]|(?:^|\s)?MEDIA:\s*`?([^\n`]+)`?/gim;
   
   let lastIndex = 0;
   let match;
