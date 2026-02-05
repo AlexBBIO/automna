@@ -310,6 +310,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       try {
         const msg = JSON.parse(event.data);
         
+        // DEBUG: Log ALL incoming messages (except heartbeat/ping)
+        if (msg.type !== 'ping' && msg.event !== 'heartbeat') {
+          console.log('[clawdbot] WS msg:', msg.type, msg.event || '', msg.ok !== undefined ? (msg.ok ? 'ok' : 'err') : '', 
+                      msg.payload ? Object.keys(msg.payload).join(',') : '');
+        }
+        
         // Handle challenge
         if (msg.type === 'event' && msg.event === 'connect.challenge') {
           if (connectTimer) clearTimeout(connectTimer);
@@ -424,6 +430,31 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             messageState: msg.payload.state,
             keys: Object.keys(msg.payload)
           });
+          
+          // Handle completion via res message (some OpenClaw versions send final as res, not event)
+          if (msg.payload.status === 'done' || msg.payload.status === 'completed' || msg.payload.status === 'finished') {
+            console.log('[clawdbot] Run completed via res message');
+            setIsRunning(false);
+            
+            // If there's a message in the response, use it
+            if (msg.payload.message?.role === 'assistant') {
+              const textPart = msg.payload.message.content?.find((c: { type: string }) => c.type === 'text');
+              const text = textPart?.text || '';
+              console.log('[clawdbot] Final message from res:', text.slice(-100));
+              
+              if (text) {
+                const cleanedText = text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+                setMessages(prev => {
+                  const last = prev[prev.length - 1];
+                  if (last?.role === 'assistant' && last.id === 'streaming') {
+                    return [...prev.slice(0, -1), { ...last, id: genId(), content: [{ type: 'text', text: cleanedText }] }];
+                  }
+                  // No streaming message exists - create one
+                  return [...prev, { id: genId(), role: 'assistant', content: [{ type: 'text', text: cleanedText }], createdAt: new Date() }];
+                });
+              }
+            }
+          }
         }
         
         // Handle chat events (streaming)
