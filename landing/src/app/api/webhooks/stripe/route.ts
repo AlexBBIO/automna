@@ -118,6 +118,22 @@ export async function POST(request: Request) {
           await updateMachinePlan(clerkUserId, 'free');
           
           console.log(`[stripe] Canceled subscription for user ${clerkUserId}`);
+
+          // Send cancellation email
+          const customerEmail = (customer as Stripe.Customer).email;
+          if (customerEmail) {
+            await sendSubscriptionCanceled(customerEmail);
+          }
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerEmail = invoice.customer_email;
+        if (customerEmail) {
+          await sendPaymentFailed(customerEmail);
+          console.log(`[stripe] Sent payment failed email to ${customerEmail}`);
         }
         break;
       }

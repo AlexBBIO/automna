@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines, machineEvents } from "@/lib/db/schema";
 import Stripe from "stripe";
+import { sendMachineReady } from "@/lib/email";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 import { eq } from "drizzle-orm";
