@@ -442,63 +442,25 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             }
             
             if (state === 'final') {
-              console.log('[clawdbot] Final event received');
-              console.log('[clawdbot] streamingTextRef.current:', JSON.stringify(streamingTextRef.current?.slice(-100)));
-              console.log('[clawdbot] message.content:', JSON.stringify(message?.content));
-              console.log('[clawdbot] textContent from find:', JSON.stringify(textContent?.slice(-100)));
-              try {
-                // Build final content from message, but use streaming text for text parts
-                // because the final message's text can be truncated (e.g., MEDIA paths cut off)
-                let finalContent: Array<{ type: string; [key: string]: unknown }> = [];
-                const streamedText = streamingTextRef.current;
-                
-                if (Array.isArray(message?.content)) {
-                  // Keep non-text parts, replace text with streaming text
-                  let hasTextPart = false;
-                  finalContent = message.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
-                    if (part.type === 'text') {
-                      hasTextPart = true;
-                      // Use streaming text if available (it's complete), else use final text
-                      const text = streamedText || (typeof part.text === 'string' ? part.text : '');
-                      return {
-                        ...part,
-                        text: text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim()
-                      };
+              // Simple approach: streaming already has complete text (including full MEDIA paths)
+              // Just assign a real ID and stop running - don't touch the content
+              console.log('[clawdbot] Final event received, finalizing streaming message');
+              streamingTextRef.current = '';
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last?.role === 'assistant' && last.id === 'streaming') {
+                  // Strip message_id tags from the content before finalizing
+                  const cleanedContent = last.content.map(part => {
+                    if (part.type === 'text' && 'text' in part && typeof part.text === 'string') {
+                      return { ...part, text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() };
                     }
                     return part;
                   });
-                  
-                  // If no text part existed but we have streaming text, add it
-                  if (!hasTextPart && streamedText) {
-                    finalContent.unshift({ type: 'text', text: streamedText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() });
-                  }
-                } else if (streamedText) {
-                  // No content array, just use streaming text
-                  finalContent = [{ type: 'text', text: streamedText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() }];
+                  return [...prev.slice(0, -1), { ...last, id: genId(), content: cleanedContent }];
                 }
-                
-                // Last resort fallback
-                if (finalContent.length === 0 || !finalContent.some(p => p.type === 'text' && p.text)) {
-                  if (textContent) {
-                    finalContent = [{ type: 'text', text: textContent }];
-                  }
-                }
-                
-                console.log('[clawdbot] Final content parts:', finalContent.length, 'streamedText length:', streamedText?.length || 0);
-                streamingTextRef.current = '';
-                setMessages(prev => {
-                  const last = prev[prev.length - 1];
-                  if (last?.role === 'assistant') {
-                    return [...prev.slice(0, -1), { ...last, id: genId(), content: finalContent }];
-                  }
-                  return prev;
-                });
-              } catch (err) {
-                console.error('[clawdbot] Error processing final message:', err);
-              } finally {
-                // Always stop running, even if there's an error
-                setIsRunning(false);
-              }
+                return prev;
+              });
+              setIsRunning(false);
             }
           }
         }
