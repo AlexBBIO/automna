@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
@@ -141,7 +141,6 @@ interface MessageContentProps {
   text: string;
   isUser?: boolean;
   showToolOutput?: boolean;
-  isStreaming?: boolean;
 }
 
 // File attachment component for user and agent-shared files
@@ -222,19 +221,13 @@ type Segment =
   | { type: 'italic'; content: string }
   | { type: 'link'; text: string; url: string };
 
-interface ParseOptions {
-  skipMedia?: boolean;
-}
-
-function parseContent(text: string, options: ParseOptions = {}): Segment[] {
+function parseContent(text: string): Segment[] {
   const segments: Segment[] = [];
-  const { skipMedia = false } = options;
   
   const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
   const inlineCodeRegex = /`([^`\n]+)`/g;
   // Support both [[file:/path]] and MEDIA:/path formats (OpenClaw uses MEDIA:)
-  // Match [[file:/path]] or [[image:/path]] or MEDIA:/path (with optional leading whitespace)
-  const fileRefRegex = /\[\[(file|image):([^\]]+)\]\]|(?:^|\s)?MEDIA:\s*`?([^\n`]+)`?/gim;
+  const fileRefRegex = /\[\[(file|image):([^\]]+)\]\]|(?:^|\s)MEDIA:\s*`?([^\n`]+)`?/gim;
   
   let lastIndex = 0;
   let match;
@@ -252,16 +245,10 @@ function parseContent(text: string, options: ParseOptions = {}): Segment[] {
     withCodeBlocks.push({ type: 'text', content: text.slice(lastIndex) });
   }
   
-  // Second pass: extract file references from text segments (skip if streaming to avoid partial MEDIA paths)
+  // Second pass: extract file references from text segments
   const withFiles: Segment[] = [];
   for (const segment of withCodeBlocks) {
     if (segment.type !== 'text') {
-      withFiles.push(segment);
-      continue;
-    }
-    
-    // Skip MEDIA parsing while streaming - content may be incomplete
-    if (skipMedia) {
       withFiles.push(segment);
       continue;
     }
@@ -392,10 +379,8 @@ function isRawToolOutputJson(text: string): boolean {
   return false;
 }
 
-export function MessageContent({ text, isUser, showToolOutput = true, isStreaming = false }: MessageContentProps) {
-  // Parse content - skip MEDIA while streaming to avoid rendering incomplete paths
-  // No useMemo - parsing is fast and ensures fresh results when props change
-  const segments = parseContent(text, { skipMedia: isStreaming });
+export function MessageContent({ text, isUser, showToolOutput = true }: MessageContentProps) {
+  const segments = useMemo(() => parseContent(text), [text]);
   
   return (
     <div className="text-[15px] leading-relaxed">
