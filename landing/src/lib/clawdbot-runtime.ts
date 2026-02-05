@@ -458,20 +458,11 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
                 });
               }
               
-              // Always prefer streaming text if available - it's what the user saw
-              // The final message content might differ or be incomplete
-              const streamedText = streamingTextRef.current;
-              if (streamedText) {
-                const existingTextIdx = finalContent.findIndex(p => p.type === 'text');
-                if (existingTextIdx >= 0) {
-                  finalContent[existingTextIdx] = { type: 'text', text: streamedText };
-                } else {
-                  finalContent.unshift({ type: 'text', text: streamedText });
-                }
-              } else if (finalContent.length === 0 || !finalContent.some(p => p.type === 'text' && p.text)) {
-                // Fallback to textContent from final message if no streaming text
-                if (textContent) {
-                  finalContent = [{ type: 'text', text: textContent }];
+              // Fallback to streaming text if no content
+              if (finalContent.length === 0 || !finalContent.some(p => p.type === 'text' && p.text)) {
+                const fallbackText = textContent || streamingTextRef.current;
+                if (fallbackText) {
+                  finalContent = [{ type: 'text', text: fallbackText }];
                 }
               }
               
