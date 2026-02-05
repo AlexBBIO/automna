@@ -415,6 +415,17 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           return;
         }
         
+        // Debug: log all res messages with runId to understand the flow
+        if (msg.type === 'res' && msg.ok && msg.payload?.runId) {
+          console.log('[clawdbot] Run response:', {
+            status: msg.payload.status,
+            hasMessage: !!msg.payload.message,
+            messageRole: msg.payload.message?.role,
+            messageState: msg.payload.state,
+            keys: Object.keys(msg.payload)
+          });
+        }
+        
         // Handle chat events (streaming)
         if (msg.type === 'event' && msg.event === 'chat') {
           const { state, message } = msg.payload || {};
