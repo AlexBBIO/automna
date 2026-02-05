@@ -550,7 +550,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
                                 key={`${message.id}-${i}`}
                                 text={part.text}
                                 isUser={message.role === 'user'}
-                                isStreaming={message.id === 'streaming'}
+                                isStreaming={false}
                               />
                             );
                           }

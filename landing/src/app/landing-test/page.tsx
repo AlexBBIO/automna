@@ -34,7 +34,7 @@ const demoTabs = [
     trigger: 'Check Hacker News and selected sources every hour.',
     actions: 'Detect high-signal posts → read comments → summarize sentiment.',
     deliverable: 'Draft email + Slack message, ready for approval.',
-    buttonText: 'Use Competitor Monitor template',
+    buttonText: 'Try this example',
   },
   {
     id: 'daily-brief',
@@ -43,7 +43,7 @@ const demoTabs = [
     trigger: 'Every weekday at 7:30am.',
     actions: 'Pull updates from docs, tickets, and dashboards.',
     deliverable: 'A structured brief posted to Slack + saved to Notion.',
-    buttonText: 'Use Daily Brief template',
+    buttonText: 'Try this example',
   },
   {
     id: 'support',
@@ -52,7 +52,7 @@ const demoTabs = [
     trigger: 'New tickets arrive.',
     actions: 'Categorize → draft replies → flag urgent issues.',
     deliverable: 'Queue updated + drafts ready for review.',
-    buttonText: 'Use Support Triage template',
+    buttonText: 'Try this example',
   },
   {
     id: 'engineering',
@@ -61,23 +61,23 @@ const demoTabs = [
     trigger: 'New issue or PR opened.',
     actions: 'Summarize context → propose changes → update docs.',
     deliverable: 'PR comment + draft patch (approval before pushing).',
-    buttonText: 'Use Engineering Helper template',
+    buttonText: 'Try this example',
   },
 ];
 
-// Templates data
-const templates = [
-  { title: 'Competitor Monitor', description: 'Monitors sources and summarizes what matters.', output: 'Email + Slack brief' },
+// Examples data (starter jobs users can copy)
+const examples = [
+  { title: 'Competitor Monitor', description: 'Track mentions and summarize what matters.', output: 'Email + Slack brief' },
   { title: 'Daily Ops Brief', description: 'Daily digest across your tools.', output: 'Slack post + Notion page' },
   { title: 'Lead List Builder', description: 'Find and compile prospects with notes.', output: 'Spreadsheet + outreach draft' },
   { title: 'Support Triage', description: 'Prioritize tickets and draft responses.', output: 'Queue updates + reply drafts' },
   { title: 'Content Research Pack', description: 'Research a topic and produce a structured outline.', output: 'Doc with sources + outline' },
-  { title: 'Meeting Follow-ups', description: 'Turn notes into tasks and follow-up emails.', output: 'Trello/Notion tasks + email recap' },
+  { title: 'Meeting Follow-ups', description: 'Turn notes into tasks and follow-up emails.', output: 'Tasks + email recap' },
 ];
 
 // Features data
 const features = [
-  { title: 'Web actions that finish', description: 'Log in, navigate, fill forms, extract data, monitor pages.' },
+  { title: 'Web actions that finish', description: 'Log in, navigate, fill forms, extract data, monitor pages. With approvals when needed.' },
   { title: 'Email + messaging outputs', description: 'Draft, summarize, and send updates where your team already is.' },
   { title: 'Real deliverables', description: 'Creates docs, notes, lists, and reports—not just chat replies.' },
   { title: 'Approval gates', description: 'Require review for sends, edits, and sensitive actions.' },
@@ -96,6 +96,7 @@ const faqItems = [
   { q: 'Is my data private?', a: 'Automna only accesses what you connect. You can revoke access at any time.' },
   { q: 'What can it automate?', a: 'Monitoring, research, summaries, drafting, updates across docs/tickets/repos, and scheduled reporting—depending on connected tools.' },
   { q: 'Can my team share an agent?', a: 'On Business plans, agents can live in a team workspace.' },
+  { q: 'What can it NOT do?', a: "It can't make phone calls, access systems without your credentials, or take actions you haven't approved. It works within the tools and permissions you connect." },
 ];
 
 export default function LandingTest() {
@@ -139,8 +140,8 @@ export default function LandingTest() {
             <button onClick={() => scrollTo('how-it-works')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               How it works
             </button>
-            <button onClick={() => scrollTo('templates')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
-              Templates
+            <button onClick={() => scrollTo('examples')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+              Examples
             </button>
             <button onClick={() => scrollTo('integrations')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Integrations
@@ -160,7 +161,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg font-medium transition-all"
               >
-                Create your first agent
+                Delegate a task
               </Link>
             )}
           </div>
@@ -177,7 +178,7 @@ export default function LandingTest() {
           href="/sign-up"
           className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white text-center rounded-lg font-medium transition-all"
         >
-          Create your first agent
+          Delegate a task
         </Link>
       </div>
 
@@ -206,8 +207,16 @@ export default function LandingTest() {
                 Automna runs tasks across the web and your tools—then delivers results to the places you already work. Use approval-only mode, or let it run on autopilot.
               </p>
 
-              {/* Bullet list */}
+              {/* Bullet list - deliverables first */}
               <ul className="space-y-3 mb-8 text-zinc-700 dark:text-zinc-300">
+                <li className="flex items-start gap-3">
+                  <span className="text-purple-600 dark:text-purple-400 mt-1">✓</span>
+                  <span>Saves outputs as real artifacts (emails, docs, notes, updates)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-purple-600 dark:text-purple-400 mt-1">✓</span>
+                  <span>Approval gates for sensitive actions</span>
+                </li>
                 <li className="flex items-start gap-3">
                   <span className="text-purple-600 dark:text-purple-400 mt-1">✓</span>
                   <span>Runs 24/7 in the cloud (scheduled or triggered)</span>
@@ -218,15 +227,7 @@ export default function LandingTest() {
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-purple-600 dark:text-purple-400 mt-1">✓</span>
-                  <span>Approval gates for sensitive actions</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-purple-600 dark:text-purple-400 mt-1">✓</span>
                   <span>Persistent memory for your projects and preferences</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-purple-600 dark:text-purple-400 mt-1">✓</span>
-                  <span>Saves outputs as real artifacts (emails, docs, notes, updates)</span>
                 </li>
               </ul>
 
@@ -236,7 +237,7 @@ export default function LandingTest() {
                   href="/sign-up"
                   className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-purple-200 dark:shadow-purple-500/25 hover:shadow-purple-300 dark:hover:shadow-purple-500/40 text-base whitespace-nowrap text-center"
                 >
-                  Create your first agent
+                  Delegate a task
                 </Link>
                 <button
                   onClick={() => setDemoModalOpen(true)}
@@ -245,15 +246,13 @@ export default function LandingTest() {
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                   </svg>
-                  Watch demo
+                  Watch 90-sec demo
                 </button>
               </div>
 
               {/* Microcopy */}
               <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-500 dark:text-zinc-400">
-                <span>No API key required.</span>
-                <span className="hidden sm:block">•</span>
-                <span>Cancel anytime.</span>
+                <span>No API key required. Takes ~60 seconds to start.</span>
                 <span className="hidden sm:block">•</span>
                 <button onClick={() => scrollTo('security')} className="hover:text-zinc-700 dark:hover:text-zinc-300 underline underline-offset-2">
                   Privacy & security
@@ -283,8 +282,8 @@ export default function LandingTest() {
                 {/* Demo content - static representation */}
                 <div className="space-y-4 font-mono text-sm">
                   <div className="flex gap-3">
-                    <span className="text-purple-400 shrink-0">template:</span>
-                    <span className="text-zinc-300">Competitor Monitor</span>
+                    <span className="text-purple-400 shrink-0">task:</span>
+                    <span className="text-zinc-300">Monitor competitors on HN</span>
                   </div>
                   <div className="flex gap-3">
                     <span className="text-emerald-400 shrink-0">agent:</span>
@@ -340,7 +339,7 @@ export default function LandingTest() {
                 See an agent finish a task.
               </h2>
               <p className="text-zinc-500 dark:text-zinc-400 text-lg">
-                Not suggestions—actions, approvals, and a final deliverable.
+                Not suggestions—actions, approvals, and an email/doc/message ready to ship.
               </p>
             </div>
 
@@ -430,7 +429,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all text-center"
               >
-                Create your first agent
+                Delegate a task
               </Link>
               <button
                 onClick={() => setDemoModalOpen(true)}
@@ -439,7 +438,7 @@ export default function LandingTest() {
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                 </svg>
-                Watch demo
+                Watch 90-sec demo
               </button>
             </div>
           </div>
@@ -459,9 +458,9 @@ export default function LandingTest() {
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { num: 1, title: 'Pick a template (or describe the job)', desc: 'Start from proven workflows or write a simple instruction.' },
+                { num: 1, title: 'Describe the job (or start from an example)', desc: 'Write a simple instruction or copy a starter job.' },
                 { num: 2, title: 'Connect your tools', desc: 'Grant only the access you want the agent to have.' },
-                { num: 3, title: 'Choose autonomy', desc: 'Read-only, approval-first, or autopilot for safe tasks.' },
+                { num: 3, title: 'Choose autonomy', desc: 'Read-only, approval-first, or autopilot for safe tasks. Start approval-first. Turn on autopilot later.' },
                 { num: 4, title: 'Get deliverables', desc: 'Results arrive as emails, docs, updates, and messages—ready to use.' },
               ].map((step) => (
                 <div key={step.num} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-6">
@@ -480,7 +479,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all text-center"
               >
-                Create your first agent
+                Delegate a task
               </Link>
               <button
                 onClick={() => setDemoModalOpen(true)}
@@ -489,33 +488,33 @@ export default function LandingTest() {
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                 </svg>
-                Watch demo
+                Watch 90-sec demo
               </button>
             </div>
           </div>
         </section>
 
-        {/* Templates Gallery */}
-        <section id="templates" className="container mx-auto px-6 py-16 md:py-24">
+        {/* Examples Gallery */}
+        <section id="examples" className="container mx-auto px-6 py-16 md:py-24">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold mb-3 text-zinc-900 dark:text-white">
-                Start from templates
+                Start with proven examples
               </h2>
               <p className="text-zinc-500 dark:text-zinc-400 text-lg">
-                Launch a working agent in minutes—then customize.
+                Copy a starter job, tweak one line, and hit run.
               </p>
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templates.map((template) => (
-                <div key={template.title} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-5 hover:border-purple-300 dark:hover:border-purple-500/50 hover:shadow-md transition-all group">
-                  <h3 className="font-semibold text-zinc-900 dark:text-white mb-2">{template.title}</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">{template.description}</p>
+              {examples.map((example) => (
+                <div key={example.title} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-5 hover:border-purple-300 dark:hover:border-purple-500/50 hover:shadow-md transition-all group">
+                  <h3 className="font-semibold text-zinc-900 dark:text-white mb-2">{example.title}</h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">{example.description}</p>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500 dark:text-zinc-500">Output: {template.output}</span>
-                    <Link href={`/sign-up?template=${template.title.toLowerCase().replace(/\s+/g, '-')}`} className="text-sm text-purple-600 dark:text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Use →
+                    <span className="text-xs text-zinc-500 dark:text-zinc-500">Output: {example.output}</span>
+                    <Link href={`/sign-up?example=${example.title.toLowerCase().replace(/\s+/g, '-')}`} className="text-sm text-purple-600 dark:text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Try this example →
                     </Link>
                   </div>
                 </div>
@@ -528,7 +527,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all text-center"
               >
-                Create your first agent
+                Delegate a task
               </Link>
             </div>
           </div>
@@ -602,7 +601,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all text-center"
               >
-                Create your first agent
+                Delegate a task
               </Link>
               <button
                 onClick={() => setDemoModalOpen(true)}
@@ -611,7 +610,7 @@ export default function LandingTest() {
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                 </svg>
-                Watch demo
+                Watch 90-sec demo
               </button>
             </div>
           </div>
@@ -645,7 +644,7 @@ export default function LandingTest() {
                   </li>
                   <li className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
                     <span className="text-zinc-300 dark:text-zinc-600">✗</span>
-                    No persistent execution loop
+                    Doesn&apos;t run on a schedule by itself
                   </li>
                   <li className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
                     <span className="text-zinc-300 dark:text-zinc-600">✗</span>
@@ -741,6 +740,17 @@ export default function LandingTest() {
                     <p className="text-sm text-zinc-600 dark:text-zinc-400">Disconnect tools instantly from your dashboard.</p>
                   </div>
                 </li>
+                <li className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="font-medium text-zinc-900 dark:text-white">Action history / audit log</div>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">See what it did, step by step. Full transparency.</p>
+                  </div>
+                </li>
               </ul>
             </div>
           </div>
@@ -755,6 +765,9 @@ export default function LandingTest() {
               </h2>
               <p className="text-zinc-500 dark:text-zinc-400 text-lg">
                 Start small. Scale when ready.
+              </p>
+              <p className="text-zinc-400 dark:text-zinc-500 text-sm mt-2">
+                If Automna saves you ~2 hours/month, Pro pays for itself.
               </p>
             </div>
 
@@ -918,7 +931,7 @@ export default function LandingTest() {
               Ready to delegate?
             </h2>
             <p className="text-zinc-500 dark:text-zinc-400 text-lg mb-8">
-              Create an agent in minutes. Keep control with approvals.
+              Delegate a task in minutes. Keep control with approvals.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -926,7 +939,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-purple-200 dark:shadow-purple-500/25"
               >
-                Create your first agent
+                Delegate your first task
               </Link>
               <button
                 onClick={() => setDemoModalOpen(true)}
@@ -935,7 +948,7 @@ export default function LandingTest() {
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                 </svg>
-                Watch demo
+                Watch 90-sec demo
               </button>
             </div>
           </div>
@@ -987,7 +1000,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="inline-block px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all"
               >
-                Create your first agent
+                Delegate a task
               </Link>
             </div>
           </div>
