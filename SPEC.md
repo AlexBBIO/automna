@@ -19,13 +19,13 @@
 | **Fly.io Gateway** | ✅ Working | Per-user apps: `automna-u-{shortId}.fly.dev` |
 | **Per-user provisioning** | ✅ Working | `/api/user/provision` creates isolated apps |
 | WebSocket chat | ✅ Working | Token auth, canonical session keys |
-| Chat history | ✅ Working | Via WS + HTTP proxy with session guards |
+| Chat history | ✅ Working | Via WS only (OpenClaw has no HTTP API) |
 | **Multi-conversation** | ✅ Working | localStorage-based, history per conversation |
 | **Turso database** | ✅ Set up | `automna` - users/machines/events tables + llm_usage |
 | **Drizzle ORM** | ✅ Set up | `src/lib/db/` in landing project |
 | **LLM Proxy** | ✅ Working | Centralized API via `/api/llm/*`, usage tracking, rate limits |
 | Optimistic UI | ✅ Working | Chat skeleton, animated loading |
-| **Media rendering** | ✅ Working | Inline images, file uploads, MEDIA: syntax |
+| **Media rendering** | ✅ Working | Inline images via WS re-fetch (see Known Issues) |
 | **Heartbeat system** | ✅ Working | 30-min periodic checks, email awareness |
 | **Files API** | ✅ Working | Caddy reverse proxy → internal file server |
 | **Agent Config** | ✅ Working | Workspace injection, memory enabled |
@@ -864,6 +864,36 @@ This is NOT a chatbot. Users will have their agents:
 | Enterprise tier | P2 | Dedicated infra, SSO, audit logs |
 | Mobile app | P3 | iOS/Android for push notifications |
 | API access | P2 | Programmatic agent control |
+
+---
+
+## Known Issues & Workarounds
+
+### OpenClaw Streaming Truncates MEDIA Paths (2026-02-05)
+
+**Issue:** OpenClaw truncates `MEDIA:/path/to/file` strings during streaming. The streaming `chat` events arrive with truncated text, but the stored message in history is complete.
+
+**Impact:** Images don't render in chat UI after agent responds, because the MEDIA path is incomplete.
+
+**Workaround:** After receiving a `final` chat event, request history via WebSocket (`chat.history` command) and update the displayed message with the complete content from history.
+
+**Implementation:**
+```typescript
+// In clawdbot-runtime.ts
+// After final event:
+pendingRefetchRef.current = { tempId, streamedText };
+wsSend('chat.history', { sessionKey: currentSessionRef.current });
+
+// In history response handler:
+if (pendingRefetchRef.current) {
+  // Update message with complete content from history
+}
+```
+
+**Notes:**
+- OpenClaw has **no HTTP API** for history - only WebSocket
+- The `/ws/api/history` path returns the OpenClaw control panel HTML, not JSON
+- Must use the existing WebSocket connection with `chat.history` command
 
 ---
 
