@@ -6,8 +6,8 @@
  *
  * Architecture:
  * - Parallel HTTP + WS history fetch (first to respond wins)
- * - Streaming via event chat delta events (throttled at 150ms by gateway)
- * - Post-final history re-fetch for complete content (images, MEDIA paths)
+ * - Streaming via event agent (per-token, uses data.text for full state)
+ * - Images via data.mediaUrls re-injection (MEDIA: lines for MessageContent)
  *
  * See: /projects/automna/docs/STREAMING-SPEC.md for protocol details.
  */
@@ -58,12 +58,6 @@ interface RawMessage {
   content: unknown;
   timestamp?: number;
   createdAt?: string;
-}
-
-/** Pending re-fetch tracking after final event */
-interface PendingRefetch {
-  messageId: string;
-  streamedText: string;
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
@@ -147,7 +141,6 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const streamingTextRef = useRef('');
   const historyLoadedRef = useRef(false);
   const httpHistoryAbortRef = useRef<AbortController | null>(null);
-  const pendingRefetchRef = useRef<PendingRefetch | null>(null);
   const isRunningRef = useRef(false); // Mirror of isRunning for use in timeouts
   const activeRunIdRef = useRef<string | null>(null); // Current run ID for deduplication
   const turnCountRef = useRef(0); // Counts assistant turns within a run (increments on tool calls)
@@ -313,14 +306,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       return;
     }
 
-    // Check if this is a post-final re-fetch
-    const pending = pendingRefetchRef.current;
-    if (pending && wsMessages.length > 0) {
-      handleRefetchResponse(pending, wsMessages);
-      return;
-    }
-
-    // Initial history load
+    // Initial history load only (re-fetch removed in Phase 2F)
     if (historyLoadedRef.current) return;
 
     log(`WS history loaded: ${wsMessages.length} messages`);
@@ -341,49 +327,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     setLoadingPhase('ready');
   }
 
-  /** Handle re-fetched history after a final event (for complete MEDIA/image content) */
-  function handleRefetchResponse(pending: PendingRefetch, wsMessages: RawMessage[]) {
-    pendingRefetchRef.current = null;
-
-    const lastMsg = wsMessages[wsMessages.length - 1];
-    if (lastMsg?.role !== 'assistant' || !Array.isArray(lastMsg.content)) return;
-
-    const fullContent = parseContent(lastMsg.content);
-    const hasImage = fullContent.some((p) => p.type === 'image');
-    const fullText = fullContent.find((p) => p.type === 'text')?.text || '';
-    const hasRicherContent =
-      fullContent.length > 1 ||
-      fullText.length > pending.streamedText.length ||
-      hasImage;
-
-    if (hasRicherContent) {
-      log('Updating message with richer history content:', {
-        parts: fullContent.length,
-        hasImage,
-        textLength: fullText.length,
-      });
-      setMessages((prev) => {
-        const idx = prev.findIndex((m) => m.id === pending.messageId);
-        if (idx >= 0) {
-          const updated = [...prev];
-          updated[idx] = { ...updated[idx], content: fullContent };
-          return updated;
-        }
-        // Message not found - don't add a duplicate, just log
-        log('⚠️ Re-fetch: could not find message to update:', pending.messageId);
-        return prev;
-      });
-    } else {
-      log('History content not richer, keeping streamed version');
-    }
-  }
-
   /** Handle chat.send acknowledgment */
   function handleSendAck(payload: Record<string, unknown>) {
     const runId = payload.runId as string | undefined;
     log('📤 Run started:', { runId, status: payload.status });
-    // Cancel any pending re-fetch from previous run (prevents cross-run content swap)
-    pendingRefetchRef.current = null;
     activeRunIdRef.current = runId || null;
     turnCountRef.current = 0;
     deltaCountRef.current = 0;
@@ -471,17 +418,6 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       });
       setIsRunning(false);
       isRunningRef.current = false;
-
-      // Re-fetch history to get complete content (images, full MEDIA paths)
-      // NOTE: Store raw streamedText (not cleanedText) for comparison.
-      // When streamedText is empty (fast response, no deltas), any history content
-      // will be "richer" and trigger the update - which is how images get swapped in.
-      if (currentSessionRef.current) {
-        setTimeout(() => {
-          pendingRefetchRef.current = { messageId: finalId, streamedText: streamedText };
-          wsSend('chat.history', { sessionKey: currentSessionRef.current });
-        }, 500);
-      }
       return;
     }
 
@@ -518,31 +454,32 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     if (runId && !activeRunIdRef.current) activeRunIdRef.current = runId;
 
     // ── Assistant text streaming ──
+    // Uses data.text (full accumulated text per turn) instead of data.delta (incremental).
+    // Every event gives us the complete state — no accumulation bugs, no missed-event issues.
     if (stream === 'assistant' && data) {
-      const delta = data.delta as string | undefined;
+      const fullText = data.text as string | undefined;
       const mediaUrls = data.mediaUrls as string[] | undefined;
 
-      if (typeof delta === 'string' && delta) {
-        deltaCountRef.current++;
-        startRecoveryTimer();
+      startRecoveryTimer();
+      deltaCountRef.current++;
 
-        // Append delta to our accumulator
-        streamingTextRef.current += delta;
-      }
+      // Build display text: server's accumulated text + re-injected MEDIA URLs
+      let displayText = fullText || '';
 
-      // Collect MEDIA URLs stripped from text by the server
-      // Re-inject them as MEDIA: lines so MessageContent can render them
       if (mediaUrls?.length) {
         for (const url of mediaUrls) {
           if (!streamingMediaRef.current.includes(url)) {
             streamingMediaRef.current.push(url);
-            streamingTextRef.current += `\n\nMEDIA:${url}`;
           }
         }
       }
+      // Append all known media URLs for this turn
+      for (const url of streamingMediaRef.current) {
+        displayText += `\n\nMEDIA:${url}`;
+      }
 
-      // Update the streaming message bubble
-      const displayText = streamingTextRef.current;
+      streamingTextRef.current = displayText; // Replace, not append
+
       if (displayText) {
         const turn = turnCountRef.current;
         const sid = runId
@@ -645,7 +582,6 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     streamingTextRef.current = '';
     streamingMediaRef.current = [];
     historyLoadedRef.current = false;
-    pendingRefetchRef.current = null;
     isRunningRef.current = false;
     activeRunIdRef.current = null;
     clearRecoveryTimer();
