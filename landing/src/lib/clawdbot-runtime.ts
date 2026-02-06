@@ -355,9 +355,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       setIsRunning(false);
 
       // Re-fetch history to get complete content (images, full MEDIA paths)
+      // NOTE: Store raw streamedText (not cleanedText) for comparison.
+      // When streamedText is empty (fast response, no deltas), any history content
+      // will be "richer" and trigger the update - which is how images get swapped in.
       if (currentSessionRef.current) {
         setTimeout(() => {
-          pendingRefetchRef.current = { messageId: finalId, streamedText: cleanedText };
+          pendingRefetchRef.current = { messageId: finalId, streamedText: streamedText };
           wsSend('chat.history', { sessionKey: currentSessionRef.current });
         }, 500);
       }
