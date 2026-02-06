@@ -74,10 +74,16 @@ function TypingIndicator() {
 // Connection status
 function ConnectionStatus({ phase, error }: { phase: string; error: string | null }) {
   if (phase === 'error') {
+    const isRateLimit = error?.includes('plan limit') || error?.includes('rate limit');
     return (
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-red-500" />
         <span className="text-sm text-red-600">{error || 'Connection error'}</span>
+        {isRateLimit && (
+          <a href="/pricing" className="text-sm text-purple-600 hover:text-purple-700 font-medium underline">
+            Upgrade
+          </a>
+        )}
       </div>
     );
   }

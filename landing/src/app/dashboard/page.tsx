@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AutomnaChat } from "@/components/AutomnaChat";
 import { ChatSkeleton } from "@/components/ChatSkeleton";
+import { UsageBanner } from "@/components/UsageBanner";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { FileProvider } from "@/lib/file-context";
 import { FileBrowser } from "@/components/FileBrowser";
@@ -728,13 +729,16 @@ export default function DashboardPage() {
               {/* Tab content */}
               <div className="flex-1 overflow-hidden">
                 {activeTab === 'chat' && (
-                  <div className="h-full animate-fadeIn" key={currentConversation}>
-                    <AutomnaChat
-                      gatewayUrl={gatewayInfo.gatewayUrl}
-                      sessionKey={currentConversation}
-                      initialMessage={pendingMessage}
-                      onInitialMessageSent={() => setPendingMessage(null)}
-                    />
+                  <div className="h-full animate-fadeIn flex flex-col" key={currentConversation}>
+                    <UsageBanner gatewayUrl={gatewayInfo.gatewayUrl} />
+                    <div className="flex-1 overflow-hidden">
+                      <AutomnaChat
+                        gatewayUrl={gatewayInfo.gatewayUrl}
+                        sessionKey={currentConversation}
+                        initialMessage={pendingMessage}
+                        onInitialMessageSent={() => setPendingMessage(null)}
+                      />
+                    </div>
                   </div>
                 )}
                 {activeTab === 'files' && (

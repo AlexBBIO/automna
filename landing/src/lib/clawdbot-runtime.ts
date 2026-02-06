@@ -642,11 +642,17 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   }
 
   /** Handle error responses */
-  function handleErrorResponse(msg: { error?: { message?: string } }) {
+  function handleErrorResponse(msg: { error?: { message?: string; type?: string }; limits?: unknown }) {
     const errorMsg = msg.error?.message;
+    const errorType = msg.error?.type;
     if (errorMsg) {
       log('Error response:', errorMsg);
-      setError(errorMsg);
+      // Make rate limit errors user-friendly
+      if (errorType === 'rate_limit_error' || errorMsg.toLowerCase().includes('rate limit') || errorMsg.toLowerCase().includes('cost limit') || errorMsg.toLowerCase().includes('token limit')) {
+        setError('You\'ve reached your plan limit for this month. Upgrade your plan to keep chatting.');
+      } else {
+        setError(errorMsg);
+      }
     }
     clearRecoveryTimer();
     setIsRunning(false);
