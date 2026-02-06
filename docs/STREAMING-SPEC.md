@@ -561,59 +561,100 @@ if (pendingRefetch.current && msg.id === pendingRefetch.current.requestId) {
 
 ## Part 4: Implementation Plan
 
-### Phase 1: Cleanup (Day 1)
+### Phase 1: Cleanup ✅ DONE
 
-**Goal:** Clean code without changing behavior.
+Deployed 2026-02-06. Zero behavior changes (except unintentional image regression, fixed in Phase 2).
 
-1. **Extract handler functions** from the monolithic `ws.onmessage`
-   - `handleConnectChallenge(msg)`
-   - `handleConnectResponse(msg)`  
-   - `handleHistoryResponse(msg, wsMessages)`
-   - `handleSendAck(msg)`
-   - `handleAgentEvent(payload)` - Currently debug-only, will expand in Phase 2
-   - `handleChatEvent(payload)` - Current streaming logic
-   - `handleRunResponse(payload)` - Completion via res message
-   - `handleError(msg)`
+**What was done:**
+- Extracted 8 handler functions from monolithic `ws.onmessage`
+- Switch-based message router
+- Debug logging gated behind `?debug` URL param or dev mode
+- Removed 40+ inline console.log statements
+- Added proper TypeScript interfaces
+- Net reduction: 54 lines
 
-2. **Gate debug logging**
+**Known regression:** Image re-fetch comparison broken (see Part 9). Fix included in Phase 2.
+
+### Phase 2: Streaming Fix + Bug Fixes
+
+**Goal:** Fix all known bugs, then improve streaming reliability.
+
+#### 2A: Fix Image Rendering Regression (from Phase 1)
+
+**The bug:** `pendingRefetchRef` now stores `cleanedText` (with `|| finalText` fallback) instead of raw `streamedText`. This makes the `hasRicherContent` comparison fail for images because the stored text is the same length as the history text.
+
+**Fix:** Store raw `streamedText` for comparison, use `cleanedText` only for display:
+```typescript
+// In handleChatEvent final:
+const streamedText = streamingTextRef.current;
+streamingTextRef.current = '';
+const finalText = message?.content?.find(...)?.text || '';
+const displayText = streamedText || finalText;
+const cleanedText = displayText ? stripMessageMeta(displayText) : '';
+
+// Display uses cleanedText (with fallback)
+setMessages(prev => { /* ... use cleanedText ... */ });
+
+// Re-fetch comparison uses ONLY raw streaming text (empty = always re-fetch)
+pendingRefetchRef.current = { messageId: finalId, streamedText: streamedText };
+```
+
+#### 2B: Fix Double Message Bug
+
+**The bug:** Multiple independent code paths can create assistant messages for the same run, causing duplicates (see Part 8).
+
+**Fixes (in priority order):**
+
+1. **Use `runId` as message ID** instead of random `genId()`:
    ```typescript
-   const DEBUG = process.env.NODE_ENV === 'development' || 
-                 new URLSearchParams(window.location.search).has('debug');
-   const log = DEBUG ? console.log.bind(console, '[clawdbot]') : () => {};
+   // In handleChatEvent:
+   const runId = payload.runId as string;
+   // Streaming: id = `streaming-${runId}`
+   // Final: id = runId
+   ```
+   Same run can never create two different messages.
+
+2. **Track `activeRunId` ref:**
+   ```typescript
+   const activeRunIdRef = useRef<string | null>(null);
+   // Set on first delta/final, clear on final/error
+   // All handlers check: if (activeRunIdRef.current && activeRunIdRef.current !== runId) return;
    ```
 
-3. **Remove dead code**
-   - The `event agent` debug-only handler (replacing in Phase 2)
-   - Excessive debug logging
-   - The "some OpenClaw versions" `res` completion handler (test if it's actually needed first)
+3. **Remove `handleRunCompletion`** or gate it:
+   - OpenClaw sends `status: "ok"` in the dedupe cache `res`, NOT `"done"`
+   - Our handler checks for `"done"|"completed"|"finished"` which never matches
+   - So `handleRunCompletion` is dead code. Remove it entirely.
+   - If edge cases exist, gate behind: `if (!activeRunIdRef.current) { /* only if chat event didn't handle it */ }`
 
-4. **Simplify history loading**
-   - Keep WS-only history loading (remove HTTP parallel fetch if WS is reliable)
-   - OR keep HTTP, but simplify the race condition handling
-
-5. **Add TypeScript types** for OpenClaw events
+4. **Remove the "add if not found" fallback in `handleRefetchResponse`:**
    ```typescript
-   interface AgentEvent {
-     runId: string;
-     stream: 'lifecycle' | 'assistant' | 'tool';
-     data: AgentLifecycleData | AgentAssistantData | AgentToolData;
-     sessionKey: string;
-     seq: number;
-     ts: number;
-   }
+   // OLD: adds a duplicate if message ID not found
+   return [...prev, { id: pending.messageId, ... }];
+   // NEW: just log warning and return prev
+   log('Warning: could not find message to update', pending.messageId);
+   return prev;
    ```
 
-### Phase 2: Streaming Fix (Day 2)
+#### 2C: Improve Streaming (switch to agent events)
 
-**Goal:** Smooth, reliable streaming.
+1. **Add `event agent` handler** for `stream: "assistant"` events
+   - These fire per-token with no throttle delay
+   - Accumulate text client-side for smoother streaming
+   - Use `runId` from events for deduplication
 
-1. **Add `event agent` handler** for `stream: "assistant"` (per 3.5 above)
 2. **Change `event chat` delta to no-op** (just return, don't process)
-3. **Update `event chat` final handler** (per 3.5 above)
-4. **Simplify history re-fetch** (per 3.6 above)
-5. **Handle non-agent runs** via final event's message field
+   - These are throttled at 150ms and always behind agent events
 
-### Phase 3: Testing (Day 2-3)
+3. **Update `event chat` final handler**
+   - Use `runId` as permanent message ID
+   - Clear `activeRunIdRef`
+   - Trigger re-fetch only if needed (check `hasImage` flag from agent events)
+
+4. **Handle non-agent runs** (commands) via final event's `message` field
+   - No agent events fire for commands, so `event chat` final is the only path
+
+### Phase 3: Testing
 
 Test matrix:
 
@@ -632,8 +673,11 @@ Test matrix:
 | Page reload during response | History loads correctly |
 | Multiple rapid messages | No state leaks between runs |
 | File upload + response | File attached, response renders |
+| Fast response (no streaming deltas) | Image still appears via re-fetch |
+| **Double message scenario** | Only one message bubble per run |
+| **MEDIA path in text** | Renders as image, not raw path |
 
-### Phase 4: Polish (Day 3)
+### Phase 4: Polish
 
 - Remove any remaining workarounds that Phase 2 made unnecessary
 - Performance: verify no memory leaks from message array updates
