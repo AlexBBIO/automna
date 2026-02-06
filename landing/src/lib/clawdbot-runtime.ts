@@ -1,25 +1,40 @@
 /**
  * ClawdbotRuntimeAdapter
- * 
- * Connects to Clawdbot's Gateway WebSocket API.
- * Handles streaming responses and message history.
- * 
- * Optimizations:
- * - Parallel HTTP history fetch (doesn't wait for WebSocket to fail)
- * - Loading states for better UX
+ *
+ * Connects to OpenClaw's Gateway WebSocket API.
+ * Handles message streaming, history loading, and session management.
+ *
+ * Architecture:
+ * - Parallel HTTP + WS history fetch (first to respond wins)
+ * - Streaming via event chat delta events (throttled at 150ms by gateway)
+ * - Post-final history re-fetch for complete content (images, MEDIA paths)
+ *
+ * See: /projects/automna/docs/STREAMING-SPEC.md for protocol details.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-interface TextContentPart {
-  type: 'text';
-  text: string;
+// ─── Debug ───────────────────────────────────────────────────────────────────
+
+const DEBUG = typeof window !== 'undefined' &&
+  (process.env.NODE_ENV === 'development' || new URLSearchParams(window.location.search).has('debug'));
+
+const log = DEBUG
+  ? (...args: unknown[]) => console.log('[clawdbot]', ...args)
+  : () => {};
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface ContentPart {
+  type: string;
+  text?: string;
+  [key: string]: unknown;
 }
 
 interface ThreadMessage {
   id: string;
   role: 'user' | 'assistant';
-  content: Array<TextContentPart | { type: string; [key: string]: unknown }>;
+  content: ContentPart[];
   createdAt: Date;
 }
 
@@ -36,86 +51,85 @@ interface ClawdbotConfig {
 
 type LoadingPhase = 'connecting' | 'loading-history' | 'ready' | 'error';
 
+/** Shape of a raw message from OpenClaw history */
+interface RawMessage {
+  id?: string;
+  role: string;
+  content: unknown;
+  timestamp?: number;
+  createdAt?: string;
+}
+
+/** Pending re-fetch tracking after final event */
+interface PendingRefetch {
+  messageId: string;
+  streamedText: string;
+}
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
 const genId = () => crypto.randomUUID();
 
-// Parse messages from API response - preserve all content types for agent activity toggle
-function parseMessages(messages: Array<{ role: string; content: unknown; timestamp?: number }>, prefix: string): ThreadMessage[] {
-  // Debug: log first message's content structure
-  if (messages.length > 0) {
-    const sample = messages[0];
-    const contentTypes = Array.isArray(sample.content) 
-      ? sample.content.map((c: { type?: string }) => c.type || 'unknown')
-      : [typeof sample.content];
-    console.log('[clawdbot] History message format:', {
-      role: sample.role,
-      contentIsArray: Array.isArray(sample.content),
-      contentTypes,
-      sampleContent: JSON.stringify(sample.content).slice(0, 300)
-    });
-  }
-  
-  return messages.map((m, idx) => {
-    let content: Array<{ type: string; [key: string]: unknown }> = [];
-    
-    if (Array.isArray(m.content)) {
-      content = m.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
-        // Strip [message_id: ...] metadata from text parts
-        if (part.type === 'text' && typeof part.text === 'string') {
-          return {
-            ...part,
-            text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim()
-          };
-        }
-        return part;
-      });
-    } else if (typeof m.content === 'string') {
-      const cleanedText = m.content.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
-      content = [{ type: 'text', text: cleanedText }];
-    }
-    
-    return {
-      id: `${prefix}-${idx}`,
-      role: m.role as 'user' | 'assistant',
-      content,
-      createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
-    };
-  });
+/** Strip [message_id: ...] metadata injected by OpenClaw */
+const stripMessageMeta = (text: string) =>
+  text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
+
+/** Canonicalize session key to OpenClaw's internal "agent:main:{key}" format */
+function canonicalizeSessionKey(key: string): string {
+  if (key.startsWith('agent:main:')) return key;
+  return `agent:main:${key}`;
 }
 
-// Build HTTP history URL - use local proxy to avoid CORS
-function buildHistoryUrl(gatewayUrl: string, sessionKey: string): string {
-  const wsUrl = new URL(gatewayUrl);
-  // Use local proxy instead of direct Fly.io call
-  const historyUrl = new URL('/api/ws/history', window.location.origin);
-  historyUrl.searchParams.set('sessionKey', sessionKey);
-  // Pass through all auth params from original URL
-  const token = wsUrl.searchParams.get('token');
-  const userId = wsUrl.searchParams.get('userId');
-  const exp = wsUrl.searchParams.get('exp');
-  const sig = wsUrl.searchParams.get('sig');
-  if (token) historyUrl.searchParams.set('token', token);
-  if (userId) historyUrl.searchParams.set('userId', userId);
-  if (exp) historyUrl.searchParams.set('exp', exp);
-  if (sig) historyUrl.searchParams.set('sig', sig);
-  return historyUrl.toString();
-}
-
-// Extract token from URL query params
+/** Extract auth token from a gateway URL's query params */
 function extractTokenFromUrl(url: string): string | undefined {
   try {
-    const parsed = new URL(url);
-    return parsed.searchParams.get('token') || undefined;
+    return new URL(url).searchParams.get('token') || undefined;
   } catch {
     return undefined;
   }
 }
 
-// Canonicalize session key to match OpenClaw's internal format
-// Our background fixer converts all session keys to "agent:main:{key}" format
-function canonicalizeSessionKey(key: string): string {
-  if (key.startsWith('agent:main:')) return key;
-  return `agent:main:${key}`;
+/** Build the HTTP history proxy URL (avoids CORS by going through our API) */
+function buildHistoryUrl(gatewayUrl: string, sessionKey: string): string {
+  const wsUrl = new URL(gatewayUrl);
+  const historyUrl = new URL('/api/ws/history', window.location.origin);
+  historyUrl.searchParams.set('sessionKey', sessionKey);
+
+  // Forward auth params from the gateway URL
+  for (const param of ['token', 'userId', 'exp', 'sig']) {
+    const val = wsUrl.searchParams.get(param);
+    if (val) historyUrl.searchParams.set(param, val);
+  }
+  return historyUrl.toString();
 }
+
+/** Parse raw message content into our ContentPart[] format */
+function parseContent(raw: unknown): ContentPart[] {
+  if (Array.isArray(raw)) {
+    return raw.map((part: ContentPart) => {
+      if (part.type === 'text' && typeof part.text === 'string') {
+        return { ...part, text: stripMessageMeta(part.text) };
+      }
+      return part;
+    });
+  }
+  if (typeof raw === 'string') {
+    return [{ type: 'text', text: stripMessageMeta(raw) }];
+  }
+  return [];
+}
+
+/** Convert raw API messages to ThreadMessage[] */
+function parseMessages(messages: RawMessage[], prefix: string): ThreadMessage[] {
+  return messages.map((m, idx) => ({
+    id: `${prefix}-${idx}`,
+    role: m.role as 'user' | 'assistant',
+    content: parseContent(m.content),
+    createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
+  }));
+}
+
+// ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useClawdbotRuntime(config: ClawdbotConfig) {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
@@ -123,32 +137,29 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const [isConnected, setIsConnected] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('connecting');
   const [error, setError] = useState<string | null>(null);
-  
+
+  // Refs for mutable state that doesn't trigger re-renders
   const wsRef = useRef<WebSocket | null>(null);
   const mountedRef = useRef(true);
   const connectSentRef = useRef(false);
   const streamingTextRef = useRef('');
   const historyLoadedRef = useRef(false);
   const httpHistoryAbortRef = useRef<AbortController | null>(null);
-  // Track pending re-fetch after final event (to get complete message with images)
-  const pendingRefetchRef = useRef<{ tempId: string; streamedText: string } | null>(null);
-  
-  // Store config in ref to avoid effect deps
+  const pendingRefetchRef = useRef<PendingRefetch | null>(null);
   const configRef = useRef(config);
   configRef.current = config;
-  
+
   const rawSessionKey = config.sessionKey || 'main';
   const sessionKey = canonicalizeSessionKey(rawSessionKey);
-  
-  // Track current session to prevent stale responses from other sessions
   const currentSessionRef = useRef(sessionKey);
   currentSessionRef.current = sessionKey;
 
-  // Send WebSocket message
+  // ─── WebSocket Send ──────────────────────────────────────────────────────
+
   const wsSend = useCallback((method: string, params: Record<string, unknown>) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.warn('[clawdbot] WebSocket not connected');
+      log('WebSocket not connected, cannot send', method);
       return null;
     }
     const id = genId();
@@ -156,503 +167,446 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     return id;
   }, []);
 
-  // Connect to gateway
+  // ─── Event Handlers ──────────────────────────────────────────────────────
+
+  /** Handle connect.challenge - send auth */
+  function handleConnectChallenge(sendConnect: () => void, connectTimer: NodeJS.Timeout | null) {
+    if (connectTimer) clearTimeout(connectTimer);
+    sendConnect();
+  }
+
+  /** Handle successful connection response */
+  function handleConnectResponse() {
+    log('Connected to gateway');
+    setIsConnected(true);
+
+    if (!historyLoadedRef.current) {
+      setLoadingPhase('loading-history');
+      wsSend('chat.history', {
+        sessionKey: canonicalizeSessionKey(configRef.current.sessionKey || 'main'),
+      });
+    }
+  }
+
+  /** Handle chat.history response (initial load or post-final re-fetch) */
+  function handleHistoryResponse(wsMessages: RawMessage[]) {
+    // Guard: ignore responses for stale sessions
+    if (currentSessionRef.current !== sessionKey) {
+      log('History arrived for old session, ignoring');
+      return;
+    }
+
+    // Check if this is a post-final re-fetch
+    const pending = pendingRefetchRef.current;
+    if (pending && wsMessages.length > 0) {
+      handleRefetchResponse(pending, wsMessages);
+      return;
+    }
+
+    // Initial history load
+    if (historyLoadedRef.current) return;
+
+    log(`WS history loaded: ${wsMessages.length} messages`);
+    historyLoadedRef.current = true;
+    httpHistoryAbortRef.current?.abort();
+
+    if (wsMessages.length > 0) {
+      const history = wsMessages.map((m) => ({
+        id: m.id || genId(),
+        role: m.role as 'user' | 'assistant',
+        content: parseContent(m.content),
+        createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+      }));
+      setMessages(history);
+    }
+    setLoadingPhase('ready');
+  }
+
+  /** Handle re-fetched history after a final event (for complete MEDIA/image content) */
+  function handleRefetchResponse(pending: PendingRefetch, wsMessages: RawMessage[]) {
+    pendingRefetchRef.current = null;
+
+    const lastMsg = wsMessages[wsMessages.length - 1];
+    if (lastMsg?.role !== 'assistant' || !Array.isArray(lastMsg.content)) return;
+
+    const fullContent = parseContent(lastMsg.content);
+    const hasImage = fullContent.some((p) => p.type === 'image');
+    const fullText = fullContent.find((p) => p.type === 'text')?.text || '';
+    const hasRicherContent =
+      fullContent.length > 1 ||
+      fullText.length > pending.streamedText.length ||
+      hasImage;
+
+    if (hasRicherContent) {
+      log('Updating message with richer history content:', {
+        parts: fullContent.length,
+        hasImage,
+        textLength: fullText.length,
+      });
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === pending.messageId);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = { ...updated[idx], content: fullContent };
+          return updated;
+        }
+        // Streaming message was removed - add the complete message
+        return [
+          ...prev,
+          {
+            id: pending.messageId,
+            role: 'assistant' as const,
+            content: fullContent,
+            createdAt: new Date(),
+          },
+        ];
+      });
+    } else {
+      log('History content not richer, keeping streamed version');
+    }
+  }
+
+  /** Handle chat.send acknowledgment */
+  function handleSendAck() {
+    setIsRunning(true);
+  }
+
+  /** Handle run completion via res message */
+  function handleRunCompletion(payload: Record<string, unknown>) {
+    log('Run completed via res message');
+    setIsRunning(false);
+
+    const message = payload.message as { role?: string; content?: ContentPart[] } | undefined;
+    if (message?.role === 'assistant' && Array.isArray(message.content)) {
+      const textPart = message.content.find((c) => c.type === 'text');
+      const text = typeof textPart?.text === 'string' ? stripMessageMeta(textPart.text) : '';
+
+      if (text) {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'assistant' && last.id === 'streaming') {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, id: genId(), content: [{ type: 'text', text }] },
+            ];
+          }
+          return [
+            ...prev,
+            { id: genId(), role: 'assistant', content: [{ type: 'text', text }], createdAt: new Date() },
+          ];
+        });
+      }
+    }
+  }
+
+  /** Handle event chat - streaming deltas and final state */
+  function handleChatEvent(payload: Record<string, unknown>) {
+    const state = payload.state as string | undefined;
+    const message = payload.message as { role?: string; content?: ContentPart[] } | undefined;
+
+    // Delta: update streaming message with accumulated text
+    if (state === 'delta') {
+      const textContent = message?.content?.find((c) => c.type === 'text')?.text;
+      if (message?.role === 'assistant' && typeof textContent === 'string' && textContent) {
+        streamingTextRef.current = textContent;
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'assistant' && last.id === 'streaming') {
+            return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
+          }
+          return [
+            ...prev,
+            { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() },
+          ];
+        });
+      }
+      return;
+    }
+
+    // Final: message complete
+    if (state === 'final') {
+      const streamedText = streamingTextRef.current;
+      streamingTextRef.current = '';
+
+      // Get text from the final event's message (fallback for non-agent runs like commands)
+      const finalText = message?.content?.find((c) => c.type === 'text')?.text || '';
+      const bestText = streamedText || finalText;
+      const cleanedText = bestText ? stripMessageMeta(bestText) : '';
+
+      // Finalize the streaming message with a permanent ID
+      const finalId = genId();
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === 'assistant' && last.id === 'streaming') {
+          if (cleanedText) {
+            return [...prev.slice(0, -1), { ...last, id: finalId, content: [{ type: 'text', text: cleanedText }] }];
+          }
+          return [...prev.slice(0, -1), { ...last, id: finalId }];
+        }
+        // No streaming message exists (command/non-agent run)
+        if (cleanedText) {
+          return [
+            ...prev,
+            { id: finalId, role: 'assistant', content: [{ type: 'text', text: cleanedText }], createdAt: new Date() },
+          ];
+        }
+        return prev;
+      });
+      setIsRunning(false);
+
+      // Re-fetch history to get complete content (images, full MEDIA paths)
+      if (currentSessionRef.current) {
+        setTimeout(() => {
+          pendingRefetchRef.current = { messageId: finalId, streamedText: cleanedText };
+          wsSend('chat.history', { sessionKey: currentSessionRef.current });
+        }, 500);
+      }
+      return;
+    }
+
+    // Error state
+    if (state === 'error') {
+      streamingTextRef.current = '';
+      setIsRunning(false);
+      const errorMsg = (payload.errorMessage as string) || 'Something went wrong';
+      setError(errorMsg);
+
+      // Remove streaming placeholder
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === 'assistant' && last.id === 'streaming') {
+          return prev.slice(0, -1);
+        }
+        return prev;
+      });
+    }
+  }
+
+  /** Handle agent events (currently debug logging; streaming will use these in Phase 2) */
+  function handleAgentEvent(payload: Record<string, unknown>) {
+    // Agent events carry real-time streaming data but we don't use them yet.
+    // Phase 2 will switch to using stream:"assistant" events for smoother streaming.
+    // For now, just log in debug mode.
+    log('Agent event:', payload.stream, payload.data ? JSON.stringify(payload.data).slice(0, 100) : '');
+  }
+
+  /** Handle error responses */
+  function handleErrorResponse(msg: { error?: { message?: string } }) {
+    const errorMsg = msg.error?.message;
+    if (errorMsg) {
+      log('Error response:', errorMsg);
+      setError(errorMsg);
+    }
+    setIsRunning(false);
+  }
+
+  // ─── Connection Effect ───────────────────────────────────────────────────
+
   useEffect(() => {
     if (!config.gatewayUrl) {
       setError('No gateway URL configured');
       setLoadingPhase('error');
       return;
     }
-    
+
+    // Reset state for new connection
     mountedRef.current = true;
     connectSentRef.current = false;
     streamingTextRef.current = '';
     historyLoadedRef.current = false;
-    setMessages([]); // Clear messages when switching conversations
+    pendingRefetchRef.current = null;
+    setMessages([]);
     setLoadingPhase('connecting');
     setError(null);
-    
-    // Small delay to allow previous WebSocket cleanup to complete
-    // This prevents "WebSocket closed before connection established" errors
+
     let connectionDelayTimer: NodeJS.Timeout | null = null;
-    
-    // Safety timeout - if nothing loads in 10 seconds, allow chat anyway
-    // (Gateway should already be ready at this point since dashboard waits for it)
+
+    // Safety timeout: allow chat if nothing loads in 10s
     const safetyTimeout = setTimeout(() => {
       if (mountedRef.current && !historyLoadedRef.current) {
-        console.log('[clawdbot] Safety timeout - allowing chat');
+        log('Safety timeout - allowing chat without history');
         historyLoadedRef.current = true;
         setIsConnected(true);
         setLoadingPhase('ready');
       }
     }, 10000);
-    
-    // Debounce connection to prevent rapid reconnect issues when switching conversations
+
+    // Debounce connection (100ms) to prevent race conditions when switching sessions
     connectionDelayTimer = setTimeout(() => {
-    
-    // === PARALLEL HTTP HISTORY FETCH ===
-    // Start fetching history via HTTP immediately (don't wait for WebSocket)
-    const httpAbort = new AbortController();
-    httpHistoryAbortRef.current = httpAbort;
-    
-    const historyUrl = buildHistoryUrl(config.gatewayUrl, sessionKey);
-    console.log('[clawdbot] Starting HTTP history fetch:', historyUrl);
-    fetch(historyUrl, { signal: httpAbort.signal })
-      .then(res => {
-        console.log('[clawdbot] HTTP history response status:', res.status);
-        if (!res.ok) {
-          // Treat non-200 responses as empty history (new session)
-          console.log('[clawdbot] HTTP history non-200, treating as new session');
-          return { messages: [] };
-        }
-        return res.json();
-      })
-      .then(data => {
-        console.log('[clawdbot] HTTP history data:', { keys: Object.keys(data || {}), hasMessages: 'messages' in (data || {}), messageCount: data?.messages?.length, historyLoadedRef: historyLoadedRef.current });
-        if (!mountedRef.current) {
-          console.log('[clawdbot] Component unmounted, ignoring HTTP history');
-          return;
-        }
-        if (historyLoadedRef.current) {
-          console.log('[clawdbot] History already loaded (probably via WS), ignoring HTTP');
-          return;
-        }
-        
-        // Only mark as loaded if we actually got messages
-        // Empty response might mean the endpoint doesn't exist, let WS try
-        if (data?.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-          // Guard: only set messages if we're still on the same session
-          if (currentSessionRef.current !== sessionKey) {
-            console.log('[clawdbot] HTTP history arrived for old session, ignoring');
-            return;
-          }
-          console.log(`[clawdbot] HTTP history loaded: ${data.messages.length} messages`);
-          historyLoadedRef.current = true;
-          setMessages(parseMessages(data.messages, 'http'));
-          setIsConnected(true);
-          setError(null);
-          setLoadingPhase('ready');
-        } else {
-          console.log('[clawdbot] HTTP history empty - waiting for WebSocket');
-          // Don't set historyLoadedRef - let WebSocket try to load history
-        }
-      })
-      .catch(err => {
-        if (err.name === 'AbortError') {
-          console.log('[clawdbot] HTTP history fetch aborted (WS loaded first)');
-          return;
-        }
-        console.warn('[clawdbot] HTTP history fetch failed:', err.message);
-        
-        // Even on error, allow the chat to work - treat as new session
-        if (mountedRef.current && !historyLoadedRef.current) {
-          console.log('[clawdbot] HTTP failed but allowing chat anyway');
-          historyLoadedRef.current = true;
-          setIsConnected(true);
-          setLoadingPhase('ready');
-        }
-      });
-    
-    // === WEBSOCKET CONNECTION ===
-    let wsUrl = config.gatewayUrl;
-    if (!wsUrl.includes('/ws')) {
-      wsUrl = wsUrl.replace(/\/$/, '') + '/ws';
-    }
-    // Token is already in URL from gateway, no need to add again
-    
-    console.log('[clawdbot] Connecting...');
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-    
-    let connectTimer: NodeJS.Timeout | null = null;
 
-    const sendConnect = () => {
-      if (connectSentRef.current || ws.readyState !== WebSocket.OPEN) return;
-      connectSentRef.current = true;
-      
-      const cfg = configRef.current;
-      // Get token from config or URL
-      const token = cfg.authToken || extractTokenFromUrl(cfg.gatewayUrl);
-      
-      const connectParams: Record<string, unknown> = {
-        minProtocol: 3,
-        maxProtocol: 3,
-        client: {
-          id: 'webchat',
-          version: '1.0.0',
-          platform: typeof navigator !== 'undefined' ? navigator.platform : 'web',
-          mode: 'webchat',
-        },
-        role: 'operator',
-        scopes: ['operator.read', 'operator.write'],
-        caps: [],
-        locale: 'en-US',
-      };
-      
-      if (token) {
-        connectParams.auth = { token };
-      }
-      
-      ws.send(JSON.stringify({
-        type: 'req',
-        id: genId(),
-        method: 'connect',
-        params: connectParams,
-      }));
-    };
+      // ── HTTP History Fetch (parallel with WebSocket) ──
 
-    ws.onopen = () => {
-      console.log('[clawdbot] WebSocket opened');
-      connectTimer = setTimeout(sendConnect, 800);
-    };
+      const httpAbort = new AbortController();
+      httpHistoryAbortRef.current = httpAbort;
 
-    ws.onmessage = (event) => {
-      if (!mountedRef.current) return;
-      
-      try {
-        const msg = JSON.parse(event.data);
-        
-        // DEBUG: Log ALL incoming messages (except heartbeat/ping)
-        if (msg.type !== 'ping' && msg.event !== 'heartbeat') {
-          console.log('[clawdbot] WS msg:', msg.type, msg.event || '', msg.ok !== undefined ? (msg.ok ? 'ok' : 'err') : '', 
-                      msg.payload ? Object.keys(msg.payload).join(',') : '');
-        }
-        
-        // Handle challenge
-        if (msg.type === 'event' && msg.event === 'connect.challenge') {
-          if (connectTimer) clearTimeout(connectTimer);
-          sendConnect();
-          return;
-        }
-        
-        // Handle connect response
-        if (msg.type === 'res' && msg.ok && msg.payload?.type === 'hello-ok') {
-          console.log('[clawdbot] Connected');
-          setIsConnected(true);
-          
-          // Request history from WebSocket too (might be faster if already loaded)
-          if (!historyLoadedRef.current) {
-            setLoadingPhase('loading-history');
-            wsSend('chat.history', { sessionKey: canonicalizeSessionKey(configRef.current.sessionKey || 'main') });
-          }
-          return;
-        }
-        
-        // Handle history response from WebSocket
-        // Debug: log all 'res' messages to understand the format
-        if (msg.type === 'res') {
-          const keys = Object.keys(msg.payload || {});
-          console.log('[clawdbot] Response:', msg.ok ? 'ok' : 'error', 'keys:', keys.join(','));
-          if (keys.includes('sessionKey') || keys.includes('messages')) {
-            console.log('[clawdbot] HISTORY response detected:', {
-              hasMessages: 'messages' in (msg.payload || {}),
-              isArray: Array.isArray(msg.payload?.messages),
-              length: msg.payload?.messages?.length,
-              sessionKey: msg.payload?.sessionKey,
-            });
-          }
-        }
-        if (msg.type === 'res' && msg.ok && Array.isArray(msg.payload?.messages)) {
-          console.log('[clawdbot] Entering history handler, historyLoadedRef:', historyLoadedRef.current);
-          
-          // Guard: only process if we're still on the same session
-          if (currentSessionRef.current !== sessionKey) {
-            console.log('[clawdbot] WS history arrived for old session, ignoring');
-            return;
-          }
-          
-          const wsMessages = msg.payload.messages;
-          
-          // Check if this is a pending re-fetch (after final event)
-          const pendingRefetch = pendingRefetchRef.current;
-          if (pendingRefetch && wsMessages.length > 0) {
-            console.log('[clawdbot] Processing re-fetch history response');
-            pendingRefetchRef.current = null; // Clear pending
-            
-            const lastMsg = wsMessages[wsMessages.length - 1];
-            if (lastMsg.role === 'assistant' && Array.isArray(lastMsg.content)) {
-              // Get all content parts, cleaning text parts
-              const fullContent = lastMsg.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
-                if (part.type === 'text' && typeof part.text === 'string') {
-                  return { ...part, text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() };
-                }
-                return part;
-              });
-              
-              // Check if history has more/better content
-              const hasImage = fullContent.some((p: { type: string }) => p.type === 'image');
-              const fullText = fullContent.find((p: { type: string }) => p.type === 'text')?.text || '';
-              const hasMoreContent = fullContent.length > 1 || fullText.length > pendingRefetch.streamedText.length || hasImage;
-              
-              if (hasMoreContent) {
-                console.log('[clawdbot] Got better message from history:', { 
-                  parts: fullContent.length, 
-                  hasImage,
-                  textLength: fullText.length 
-                });
-                setMessages(prev => {
-                  const idx = prev.findIndex(m => m.id === pendingRefetch.tempId);
-                  if (idx >= 0) {
-                    const updated = [...prev];
-                    updated[idx] = { ...updated[idx], content: fullContent };
-                    return updated;
-                  }
-                  // If no streaming message exists, add the complete message
-                  return [...prev, { 
-                    id: pendingRefetch.tempId, 
-                    role: 'assistant' as const, 
-                    content: fullContent, 
-                    createdAt: new Date() 
-                  }];
-                });
-              } else {
-                console.log('[clawdbot] History message not better, keeping streamed version');
-              }
-            }
-            return;
-          }
-          
-          // Mark as loaded - empty is valid for new channels (initial history load)
-          if (!historyLoadedRef.current) {
-            console.log(`[clawdbot] WS history: ${wsMessages.length} messages`);
+      const historyUrl = buildHistoryUrl(config.gatewayUrl, sessionKey);
+      log('Starting HTTP history fetch');
+
+      fetch(historyUrl, { signal: httpAbort.signal })
+        .then((res) => {
+          if (!res.ok) return { messages: [] };
+          return res.json();
+        })
+        .then((data) => {
+          if (!mountedRef.current || historyLoadedRef.current) return;
+          if (currentSessionRef.current !== sessionKey) return;
+
+          if (data?.messages?.length > 0) {
+            log(`HTTP history loaded: ${data.messages.length} messages`);
             historyLoadedRef.current = true;
-            httpHistoryAbortRef.current?.abort(); // Cancel HTTP fetch
-            
-            if (wsMessages.length > 0) {
-              // Debug: log sample of each content type
-              const samples: Record<string, unknown> = {};
-              wsMessages.forEach((m: { content: unknown }) => {
-                if (Array.isArray(m.content)) {
-                  m.content.forEach((c: { type?: string }) => {
-                    const t = c.type || 'unknown';
-                    if (!samples[t]) {
-                      samples[t] = JSON.stringify(c).slice(0, 300);
-                    }
-                  });
-                }
-              });
-              console.log('[clawdbot] Content type samples:', samples);
-              
-              const history = wsMessages.map((m: { id: string; role: string; content: unknown; createdAt?: string }) => {
-                let content: Array<{ type: string; [key: string]: unknown }> = [];
-                
-                if (Array.isArray(m.content)) {
-                  content = m.content.map((part: { type: string; text?: string; [key: string]: unknown }) => {
-                    // Strip [message_id: ...] metadata from text parts
-                    if (part.type === 'text' && typeof part.text === 'string') {
-                      return {
-                        ...part,
-                        text: part.text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim()
-                      };
-                    }
-                    return part;
-                  });
-                } else if (typeof m.content === 'string') {
-                  const cleanedText = m.content.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
-                  content = [{ type: 'text', text: cleanedText }];
-                }
-                
-                return {
-                  id: m.id,
-                  role: m.role as 'user' | 'assistant',
-                  content,
-                  createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
-                };
-              });
-              setMessages(history);
-            }
+            setMessages(parseMessages(data.messages, 'http'));
+            setIsConnected(true);
+            setError(null);
             setLoadingPhase('ready');
           }
-          return;
-        }
-        
-        // Handle chat.send ack
-        if (msg.type === 'res' && msg.ok && (msg.payload?.status === 'started' || msg.payload?.status === 'in_flight')) {
-          setIsRunning(true);
-          return;
-        }
-        
-        // Debug: log all res messages with runId to understand the flow
-        if (msg.type === 'res' && msg.ok && msg.payload?.runId) {
-          console.log('[clawdbot] Run response:', {
-            status: msg.payload.status,
-            hasMessage: !!msg.payload.message,
-            messageRole: msg.payload.message?.role,
-            messageState: msg.payload.state,
-            keys: Object.keys(msg.payload)
-          });
-          
-          // Handle completion via res message (some OpenClaw versions send final as res, not event)
-          if (msg.payload.status === 'done' || msg.payload.status === 'completed' || msg.payload.status === 'finished') {
-            console.log('[clawdbot] Run completed via res message');
-            setIsRunning(false);
-            
-            // If there's a message in the response, use it
-            if (msg.payload.message?.role === 'assistant') {
-              const textPart = msg.payload.message.content?.find((c: { type: string }) => c.type === 'text');
-              const text = textPart?.text || '';
-              console.log('[clawdbot] Final message from res:', text.slice(-100));
-              
-              if (text) {
-                const cleanedText = text.replace(/\n?\[message_id: [^\]]+\]/g, '').trim();
-                setMessages(prev => {
-                  const last = prev[prev.length - 1];
-                  if (last?.role === 'assistant' && last.id === 'streaming') {
-                    return [...prev.slice(0, -1), { ...last, id: genId(), content: [{ type: 'text', text: cleanedText }] }];
-                  }
-                  // No streaming message exists - create one
-                  return [...prev, { id: genId(), role: 'assistant', content: [{ type: 'text', text: cleanedText }], createdAt: new Date() }];
-                });
-              }
-            }
-          }
-        }
-        
-        // Handle agent events - debug to understand the format
-        if (msg.type === 'event' && msg.event === 'agent') {
-          const payload = msg.payload || {};
-          // Log the FULL payload structure to understand it
-          console.log('[clawdbot] Agent event FULL:', JSON.stringify(payload).slice(0, 500));
-          
-          // Check if there's actual text content somewhere in the payload
-          // Common locations: data.text, data.content, text, content, delta
-          const possibleTextLocations = [
-            payload.text,
-            payload.content,
-            payload.delta,
-            payload.data?.text,
-            payload.data?.content,
-            payload.data?.delta,
-          ].filter(Boolean);
-          
-          if (possibleTextLocations.length > 0) {
-            console.log('[clawdbot] Agent event has text at:', possibleTextLocations.map(t => typeof t === 'string' ? t.slice(0, 50) : typeof t));
-          }
-        }
-        
-        // Handle chat events (streaming)
-        if (msg.type === 'event' && msg.event === 'chat') {
-          const { state, message } = msg.payload || {};
-          const role = message?.role;
-          const textContent = message?.content?.find((c: { type: string }) => c.type === 'text')?.text || '';
-          
-          // Debug: log chat event details
-          console.log('[clawdbot] Chat event:', { state, role, textLength: textContent?.length || 0, hasMedia: textContent?.includes('MEDIA') });
-          
-          // Debug: log message content types
-          if (message?.content && Array.isArray(message.content)) {
-            const types = message.content.map((c: { type: string }) => c.type);
-            if (types.some((t: string) => t !== 'text')) {
-              console.log('[clawdbot] Message content types:', types);
-            }
-          }
-          
-          // Handle assistant delta events
-          if (role === 'assistant' && state === 'delta' && textContent) {
-            // Log if this delta contains MEDIA to debug truncation
-            if (textContent.includes('MEDIA')) {
-              console.log('[clawdbot] Delta with MEDIA:', {
-                textContentLength: textContent.length,
-                lastChars: textContent.slice(-100),
-                hasFullPath: textContent.includes('MEDIA:/') || textContent.includes('MEDIA: /'),
-              });
-            }
-            streamingTextRef.current = textContent;
-            setMessages(prev => {
-              const last = prev[prev.length - 1];
-              if (last?.role === 'assistant' && last.id === 'streaming') {
-                return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
-              }
-              return [...prev, { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() }];
-            });
-          }
-          
-          // Handle final event (may have role undefined in some cases)
-          if (state === 'final') {
-              // OpenClaw bug: streaming and final events have truncated text (e.g., MEDIA paths cut off)
-              // But stored messages are complete. Workaround: re-fetch last message from history.
-              console.log('[clawdbot] Final event received');
-              
-              const streamedText = streamingTextRef.current || '';
-              console.log('[clawdbot] Final text length:', streamedText.length);
-              
-              streamingTextRef.current = '';
-              
-              // Finalize the streaming message immediately to stop the typing indicator
-              const tempId = genId();
-              setMessages(prev => {
-                const last = prev[prev.length - 1];
-                if (last?.role === 'assistant' && last.id === 'streaming') {
-                  const cleanedText = streamedText ? streamedText.replace(/\n?\[message_id: [^\]]+\]/g, '').trim() : '';
-                  if (cleanedText) {
-                    return [...prev.slice(0, -1), { ...last, id: tempId, content: [{ type: 'text', text: cleanedText }] }];
-                  } else {
-                    return [...prev.slice(0, -1), { ...last, id: tempId }];
-                  }
-                }
-                return prev;
-              });
-              setIsRunning(false);
-              
-              // Always re-fetch after final to get complete message (workaround for OpenClaw truncation bug)
-              if (currentSessionRef.current) {
-                console.log('[clawdbot] Requesting history via WS for complete message');
-                // Small delay to ensure message is saved on server
-                setTimeout(() => {
-                  // Store pending re-fetch info for when history response arrives
-                  pendingRefetchRef.current = { tempId, streamedText };
-                  // Request history through WebSocket (no HTTP endpoint available)
-                  wsSend('chat.history', { sessionKey: currentSessionRef.current });
-                }, 500);
-              }
-            }
-        }
-        
-        // Handle errors
-        if (msg.type === 'res' && !msg.ok) {
-          console.error('[clawdbot] Error:', msg.error);
-          setIsRunning(false);
-          if (msg.error?.message) {
-            setError(msg.error.message);
-          }
-        }
-        
-      } catch (e) {
-        console.error('[clawdbot] Parse error:', e);
-      }
-    };
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError') return;
+          log('HTTP history fetch failed:', err.message);
 
-    ws.onerror = () => {
-      console.error('[clawdbot] WebSocket error');
-      // Don't set error immediately - HTTP fallback might still work
-    };
-
-    ws.onclose = (event) => {
-      console.log('[clawdbot] WebSocket closed:', event.code);
-      setIsConnected(false);
-      
-      // Only show error if:
-      // 1. Not a clean close (1000)
-      // 2. Not already in ready state
-      // 3. Wait a bit to see if HTTP fallback succeeds
-      if (event.code !== 1000) {
-        setTimeout(() => {
+          // Allow chat to work even if HTTP fails
           if (mountedRef.current && !historyLoadedRef.current) {
-            setError('Connection failed. Retrying...');
-            setLoadingPhase('error');
+            historyLoadedRef.current = true;
+            setIsConnected(true);
+            setLoadingPhase('ready');
           }
-        }, 3000); // Give HTTP fallback 3 seconds
-      }
-    };
+        });
 
-    }, 100); // 100ms delay to allow cleanup and prevent race conditions
+      // ── WebSocket Connection ──
+
+      let wsUrl = config.gatewayUrl;
+      if (!wsUrl.includes('/ws')) {
+        wsUrl = wsUrl.replace(/\/$/, '') + '/ws';
+      }
+
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+      let connectTimer: NodeJS.Timeout | null = null;
+
+      const sendConnect = () => {
+        if (connectSentRef.current || ws.readyState !== WebSocket.OPEN) return;
+        connectSentRef.current = true;
+
+        const cfg = configRef.current;
+        const token = cfg.authToken || extractTokenFromUrl(cfg.gatewayUrl);
+
+        const connectParams: Record<string, unknown> = {
+          minProtocol: 3,
+          maxProtocol: 3,
+          client: {
+            id: 'webchat',
+            version: '1.0.0',
+            platform: typeof navigator !== 'undefined' ? navigator.platform : 'web',
+            mode: 'webchat',
+          },
+          role: 'operator',
+          scopes: ['operator.read', 'operator.write'],
+          caps: [],
+          locale: 'en-US',
+        };
+        if (token) {
+          connectParams.auth = { token };
+        }
+
+        ws.send(JSON.stringify({ type: 'req', id: genId(), method: 'connect', params: connectParams }));
+      };
+
+      ws.onopen = () => {
+        log('WebSocket opened');
+        connectTimer = setTimeout(sendConnect, 800);
+      };
+
+      // ── Message Router ──
+
+      ws.onmessage = (event) => {
+        if (!mountedRef.current) return;
+
+        try {
+          const msg = JSON.parse(event.data);
+
+          // Route by message type
+          if (msg.type === 'event') {
+            switch (msg.event) {
+              case 'connect.challenge':
+                handleConnectChallenge(sendConnect, connectTimer);
+                return;
+              case 'agent':
+                handleAgentEvent(msg.payload || {});
+                return;
+              case 'chat':
+                handleChatEvent(msg.payload || {});
+                return;
+              // Ignore: health, presence, tick
+              default:
+                return;
+            }
+          }
+
+          if (msg.type === 'res') {
+            if (!msg.ok) {
+              handleErrorResponse(msg);
+              return;
+            }
+
+            const payload = msg.payload || {};
+
+            // Connect response
+            if (payload.type === 'hello-ok') {
+              handleConnectResponse();
+              return;
+            }
+
+            // History response (has messages array)
+            if (Array.isArray(payload.messages)) {
+              handleHistoryResponse(payload.messages);
+              return;
+            }
+
+            // Send acknowledgment
+            if (payload.status === 'started' || payload.status === 'in_flight') {
+              handleSendAck();
+              return;
+            }
+
+            // Run completion via res (fallback path)
+            if (payload.runId && (payload.status === 'done' || payload.status === 'completed' || payload.status === 'finished')) {
+              handleRunCompletion(payload);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error('[clawdbot] Failed to parse WebSocket message:', e);
+        }
+      };
+
+      ws.onerror = () => {
+        log('WebSocket error');
+      };
+
+      ws.onclose = (event) => {
+        log('WebSocket closed:', event.code);
+        setIsConnected(false);
+
+        if (event.code !== 1000) {
+          setTimeout(() => {
+            if (mountedRef.current && !historyLoadedRef.current) {
+              setError('Connection failed. Retrying...');
+              setLoadingPhase('error');
+            }
+          }, 3000);
+        }
+      };
+
+    }, 100); // End of connection debounce
+
+    // ── Cleanup ──
 
     return () => {
       mountedRef.current = false;
       if (connectionDelayTimer) clearTimeout(connectionDelayTimer);
       httpHistoryAbortRef.current?.abort();
       clearTimeout(safetyTimeout);
-      // Close WebSocket using ref (ws variable is inside the delayed callback)
+
       const currentWs = wsRef.current;
       if (currentWs && (currentWs.readyState === WebSocket.OPEN || currentWs.readyState === WebSocket.CONNECTING)) {
         currentWs.close(1000, 'Component unmounted');
@@ -661,74 +615,66 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     };
   }, [config.gatewayUrl, config.authToken, sessionKey, wsSend]);
 
-  // Send message (with HTTP fallback)
+  // ─── Actions ─────────────────────────────────────────────────────────────
+
+  /** Send a user message */
   const append = useCallback(async (message: AppendMessage) => {
-    const text = message.content.find(p => p.type === 'text')?.text?.trim();
+    const text = message.content.find((p) => p.type === 'text')?.text?.trim();
     if (!text) return;
 
-    // Add user message immediately
-    setMessages(prev => [...prev, {
-      id: genId(),
-      role: 'user',
-      content: [{ type: 'text', text }],
-      createdAt: new Date(),
-    }]);
+    // Add user message to UI immediately
+    setMessages((prev) => [
+      ...prev,
+      { id: genId(), role: 'user', content: [{ type: 'text', text }], createdAt: new Date() },
+    ]);
 
     streamingTextRef.current = '';
     setIsRunning(true);
 
     const cfg = configRef.current;
     const ws = wsRef.current;
-    const sessionKey = canonicalizeSessionKey(cfg.sessionKey || 'main');
-    
-    // Try WebSocket first if connected
+    const sk = canonicalizeSessionKey(cfg.sessionKey || 'main');
+
+    // Prefer WebSocket
     if (ws && ws.readyState === WebSocket.OPEN) {
-      wsSend('chat.send', {
-        sessionKey,
-        message: text,
-        idempotencyKey: genId(),
-      });
+      wsSend('chat.send', { sessionKey: sk, message: text, idempotencyKey: genId() });
       return;
     }
-    
-    // Fall back to HTTP
-    console.log('[clawdbot] WebSocket not available, using HTTP fallback');
+
+    // HTTP fallback
+    log('WebSocket not available, using HTTP fallback');
     try {
       const wsUrl = new URL(cfg.gatewayUrl);
       const httpUrl = `${wsUrl.protocol === 'wss:' ? 'https:' : 'http:'}//${wsUrl.host}`;
       const sendUrl = new URL(`${httpUrl}/api/chat/send`);
-      
-      // Pass through auth params
-      const userId = wsUrl.searchParams.get('userId');
-      const exp = wsUrl.searchParams.get('exp');
-      const sig = wsUrl.searchParams.get('sig');
-      if (userId) sendUrl.searchParams.set('userId', userId);
-      if (exp) sendUrl.searchParams.set('exp', exp);
-      if (sig) sendUrl.searchParams.set('sig', sig);
-      
+
+      for (const param of ['userId', 'exp', 'sig']) {
+        const val = wsUrl.searchParams.get(param);
+        if (val) sendUrl.searchParams.set(param, val);
+      }
+
       const response = await fetch(sendUrl.toString(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, sessionKey }),
+        body: JSON.stringify({ message: text, sessionKey: sk }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }
-      
-      // HTTP send doesn't stream, so we need to poll for response
-      // For now, just show a placeholder and reload history after a delay
+
+      // Poll for response since HTTP doesn't stream
       setTimeout(async () => {
-        const historyUrl = buildHistoryUrl(cfg.gatewayUrl, sessionKey);
+        const historyUrl = buildHistoryUrl(cfg.gatewayUrl, sk);
         try {
           const historyRes = await fetch(historyUrl);
           const historyData = await historyRes.json();
-          if (historyData.messages && Array.isArray(historyData.messages)) {
+          if (historyData?.messages?.length > 0) {
             setMessages(parseMessages(historyData.messages, 'poll'));
           }
-        } catch (e) {
-          console.error('[clawdbot] Failed to poll history:', e);
+        } catch {
+          log('Failed to poll history after HTTP send');
         }
         setIsRunning(false);
       }, 3000);
@@ -739,13 +685,13 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     }
   }, [wsSend]);
 
-  // Cancel
+  /** Cancel the current run */
   const cancel = useCallback(() => {
     wsSend('chat.abort', { sessionKey: canonicalizeSessionKey(configRef.current.sessionKey || 'main') });
     setIsRunning(false);
   }, [wsSend]);
 
-  // Clear local history (called after API clear succeeds)
+  /** Clear local message history */
   const clearHistory = useCallback(() => {
     setMessages([]);
   }, []);
