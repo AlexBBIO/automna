@@ -1,5 +1,11 @@
 # Outreach Email Rules
 
+## Inbox Monitoring
+- When checking for replies, **skip messages with the "done" or "ignore" label**
+- Label threads "done" once a conversation is resolved or handed off
+- Label junk/test messages "ignore" to permanently filter them
+- Only flag genuinely NEW, unhandled inbound replies from outreach targets
+
 ## The Problem
 AI-written emails are instantly recognizable. They kill response rates. These rules exist to prevent that.
 

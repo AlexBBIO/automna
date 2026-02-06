@@ -14,11 +14,20 @@ export const metadata: Metadata = {
     description: "Your own, private, fully autonomous AI agent. Working in 60 seconds.",
     type: "website",
     url: "https://automna.ai",
+    images: [
+      {
+        url: "https://automna.ai/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Automna - Your Private AI Agent, Working in 60 Seconds",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Automna - Your Private AI Agent",
     description: "Your own, private, fully autonomous AI agent. Working in 60 seconds.",
+    images: ["https://automna.ai/og-image.png"],
   },
 };
 

@@ -8,8 +8,8 @@
 
 Add voice calling capabilities to Automna agents via Twilio + Bland.ai integration. Users get a dedicated US phone number and can make/receive AI-powered calls.
 
-**Default Voice:** Maya (Young American Female, soft, Bland Curated)  
-**Voice ID:** `maya` or `2f9fdbc7-4bf2-4792-8a18-21ce3c93978f`
+**Default Voice:** Alexandra (Young chirpy American female)  
+**Voice ID:** `6277266e-01eb-44c6-b965-438566ef7076`
 
 ## Architecture
 
@@ -29,8 +29,15 @@ Phone Network → Recipient
         ▼ (call ends)
 Bland webhook → automna.ai/api/webhooks/bland/status
         │
-        ▼ (update duration, status)
-Turso DB
+        ▼ (parallel)
+   ┌────┴────┐
+   ▼         ▼
+Turso DB   Direct file write to user's Fly volume
+   │         (calls/YYYY-MM-DD_HHMM_outbound_+1234.md)
+   │
+   ▼
+Inject message into user's OpenClaw session
+   (agent can act on result: calendar, follow-up, etc.)
 ```
 
 ### Inbound Call Flow
@@ -45,6 +52,15 @@ AI Conversation
              │
              ▼ (call ends)
 Bland webhook → automna.ai/api/webhooks/bland/status
+             │
+             ▼ (parallel)
+        ┌────┴────┐
+        ▼         ▼
+     Turso DB   Direct file write
+        │
+        ▼
+  Inject message into user's session
+  ("You received a call from +1234. Summary: ...")
 ```
 
 ---
@@ -69,7 +85,7 @@ export const phoneNumbers = sqliteTable("phone_numbers", {
   // Inbound call configuration
   inboundPrompt: text("inbound_prompt"), // System prompt for incoming calls
   inboundFirstSentence: text("inbound_first_sentence"), // e.g., "Hello, how can I help you?"
-  voiceId: text("voice_id").default("maya"), // Bland voice ID
+  voiceId: text("voice_id").default("alexandra"), // Bland voice ID
   
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
@@ -255,7 +271,7 @@ export async function POST(req: NextRequest) {
       from: userPhone.phoneNumber,
       task: body.task,
       first_sentence: body.first_sentence,
-      voice: body.voice_id || userPhone.voiceId || "maya",
+      voice: body.voice_id || userPhone.voiceId || "alexandra",
       model: "base",
       language: "en-US",
       max_duration: body.max_duration || 5,
@@ -463,7 +479,7 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json({
       phone_number: userPhone?.phoneNumber || null,
-      voice_id: userPhone?.voiceId || "maya",
+      voice_id: userPhone?.voiceId || "alexandra",
       plan,
       usage: {
         used_minutes: usedMinutes,
@@ -590,7 +606,7 @@ export async function configureInboundNumber(
     body: JSON.stringify({
       prompt: config.prompt,
       first_sentence: config.firstSentence || "Hello, how can I help you today?",
-      voice: config.voiceId || "maya",
+      voice: config.voiceId || "alexandra",
       model: "base",
       language: "en-US",
       webhook: "https://automna.ai/api/webhooks/bland/status",
@@ -655,7 +671,7 @@ if (plansWithCalling.includes(newPlan) && !plansWithCalling.includes(previousPla
         blandImported: true,
         inboundPrompt: "You are a helpful AI assistant...",
         inboundFirstSentence: "Hello, this is an AI assistant. How can I help you?",
-        voiceId: "maya",
+        voiceId: "alexandra",
       });
       
       console.log(`Provisioned phone number ${phoneNumber} for user ${userId}`);

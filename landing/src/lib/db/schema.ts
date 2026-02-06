@@ -133,24 +133,28 @@ export const PLAN_LIMITS = {
     monthlyCostCents: 100,         // $1 cap
     requestsPerMinute: 5,
     tokensPerMinute: 10_000,
+    monthlyCallMinutes: 0,
   },
   starter: {
     monthlyTokens: 500_000,        // 500K tokens
     monthlyCostCents: 2000,        // $20 cap
     requestsPerMinute: 20,
     tokensPerMinute: 50_000,
+    monthlyCallMinutes: 0,         // No calling on starter
   },
   pro: {
     monthlyTokens: 2_000_000,      // 2M tokens
     monthlyCostCents: 10000,       // $100 cap
     requestsPerMinute: 60,
     tokensPerMinute: 150_000,
+    monthlyCallMinutes: 60,        // 60 minutes/month
   },
   business: {
     monthlyTokens: 10_000_000,     // 10M tokens
     monthlyCostCents: 50000,       // $500 cap
     requestsPerMinute: 120,
     tokensPerMinute: 300_000,
+    monthlyCallMinutes: 300,       // 300 minutes/month
   },
 } as const;
 
@@ -186,6 +190,63 @@ export const announcementDismissals = sqliteTable("announcement_dismissals", {
 }));
 
 // ============================================
+// VOICE CALLING
+// ============================================
+
+// Phone numbers assigned to users (one per user)
+export const phoneNumbers = sqliteTable("phone_numbers", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().unique().references(() => users.id),
+  phoneNumber: text("phone_number").notNull().unique(), // E.164: +12025551234
+  twilioSid: text("twilio_sid").notNull(), // Twilio phone number SID
+  blandImported: integer("bland_imported", { mode: "boolean" }).default(false),
+
+  // Identity configuration
+  agentName: text("agent_name").default("AI Assistant"), // "Sarah", "Jake", etc.
+  agentRole: text("agent_role"), // "receptionist at Bright Smiles Dental"
+  voiceId: text("voice_id").default("6277266e-01eb-44c6-b965-438566ef7076"), // Bland voice ID (default: Alexandra)
+
+  // Inbound call configuration
+  inboundPrompt: text("inbound_prompt"), // System prompt for incoming calls
+  inboundFirstSentence: text("inbound_first_sentence"), // e.g., "Hello, how can I help you?"
+
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+}, (table) => ({
+  userIdIdx: index("idx_phone_numbers_user_id").on(table.userId),
+}));
+
+// Call usage tracking
+export const callUsage = sqliteTable("call_usage", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  blandCallId: text("bland_call_id").notNull().unique(), // Bland's call UUID
+
+  direction: text("direction").notNull(), // 'inbound' | 'outbound'
+  toNumber: text("to_number").notNull(),
+  fromNumber: text("from_number").notNull(),
+
+  status: text("status").notNull().default("initiated"), // initiated | in_progress | completed | failed | no_answer | voicemail
+  durationSeconds: integer("duration_seconds"), // Filled after call ends
+
+  // Call metadata
+  task: text("task"), // Outbound: the prompt/task given
+  transcript: text("transcript"), // Full transcript
+  summary: text("summary"), // AI-generated summary
+  recordingUrl: text("recording_url"),
+
+  // Cost tracking (in cents)
+  costCents: integer("cost_cents"),
+
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+}, (table) => ({
+  userIdIdx: index("idx_call_usage_user_id").on(table.userId),
+  blandCallIdIdx: index("idx_call_usage_bland_call_id").on(table.blandCallId),
+  createdAtIdx: index("idx_call_usage_created_at").on(table.createdAt),
+}));
+
+// ============================================
 // TYPE EXPORTS
 // ============================================
 
@@ -205,3 +266,7 @@ export type NewEmailSend = typeof emailSends.$inferInsert;
 export type Announcement = typeof announcements.$inferSelect;
 export type NewAnnouncement = typeof announcements.$inferInsert;
 export type AnnouncementDismissal = typeof announcementDismissals.$inferSelect;
+export type PhoneNumber = typeof phoneNumbers.$inferSelect;
+export type NewPhoneNumber = typeof phoneNumbers.$inferInsert;
+export type CallUsage = typeof callUsage.$inferSelect;
+export type NewCallUsage = typeof callUsage.$inferInsert;
