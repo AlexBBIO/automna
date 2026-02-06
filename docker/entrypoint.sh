@@ -19,7 +19,7 @@ SESSIONS_FILE="$SESSIONS_DIR/sessions.json"
 GATEWAY_INTERNAL_PORT=18788
 FILE_SERVER_PORT=8080
 
-# Function to fix session keys (OpenClaw bug workaround)
+# Function to fix session keys (OpenClaw bug workaround) - used for initial one-shot fix
 fix_session_keys() {
     [ ! -f "$SESSIONS_FILE" ] && return
     
@@ -55,13 +55,44 @@ fix_session_keys() {
     fi
 }
 
-# Background fixer loop
+# Background fixer loop - using a single long-running node process instead of
+# spawning a new node process every 3 seconds (saves ~30-50MB RAM)
 run_fixer() {
     echo "[automna] Starting session key fixer (background)"
-    while true; do
-        sleep 3
-        fix_session_keys
-    done
+    node -e "
+        const fs = require('fs');
+        const file = '$SESSIONS_FILE';
+        
+        function fixKeys() {
+            try {
+                if (!fs.existsSync(file)) return;
+                const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+                let changed = false;
+                const fixed = {};
+                
+                for (const [key, value] of Object.entries(data)) {
+                    if (key.startsWith('agent:main:')) {
+                        fixed[key] = value;
+                        continue;
+                    }
+                    if (!value.sessionId) continue;
+                    
+                    const canonicalKey = 'agent:main:' + key;
+                    if (!fixed[canonicalKey] || !fixed[canonicalKey].sessionId) {
+                        fixed[canonicalKey] = value;
+                        changed = true;
+                        console.log('[automna] Fixed key: ' + key + ' -> ' + canonicalKey);
+                    }
+                }
+                
+                if (changed) {
+                    fs.writeFileSync(file, JSON.stringify(fixed, null, 2));
+                }
+            } catch (e) {}
+        }
+        
+        setInterval(fixKeys, 3000);
+    " &
 }
 
 # Create directories
@@ -208,6 +239,11 @@ echo "[automna] Starting OpenClaw gateway on port $GATEWAY_INTERNAL_PORT (intern
 # Route LLM calls through Automna proxy
 # The config uses automna provider, but we also set this as fallback for built-in anthropic provider
 export ANTHROPIC_BASE_URL="https://automna.ai/api/llm"
+
+# Cap Node.js heap to 1536MB (out of 2048MB total)
+# Leaves ~512MB for Caddy, file server, fixer, and OS overhead
+# Without this, Node grows unbounded until the OOM killer strikes
+export NODE_OPTIONS="--max-old-space-size=1536"
 
 # Start gateway on internal port
 # Override the default port by setting environment variable and passing args
