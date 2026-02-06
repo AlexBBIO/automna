@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 interface AgentInfo {
   agentEmail: string | null;
   browserbaseContextId: string | null;
+  phoneNumber: string | null;
   appName: string;
   region: string;
 }
@@ -32,6 +33,7 @@ export default function SettingsPage() {
           setAgentInfo({
             agentEmail: data.agentEmail,
             browserbaseContextId: data.browserbaseContextId,
+            phoneNumber: data.phoneNumber,
             appName: data.appName,
             region: data.region,
           });
@@ -126,6 +128,34 @@ export default function SettingsPage() {
                 )}
                 <p className="text-xs text-zinc-500 mt-1">
                   Your agent can send and receive emails at this address.
+                </p>
+              </div>
+
+              {/* Phone Number */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Phone Number
+                </label>
+                {agentInfo.phoneNumber ? (
+                  <div className="flex items-center gap-2">
+                    <code className="bg-zinc-100 px-3 py-2 rounded-lg text-sm font-mono text-zinc-800">
+                      {agentInfo.phoneNumber.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3')}
+                    </code>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(agentInfo.phoneNumber!)}
+                      className="text-zinc-500 hover:text-zinc-700 p-1"
+                      title="Copy to clipboard"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-sm text-zinc-500">Available on Pro plan</span>
+                )}
+                <p className="text-xs text-zinc-500 mt-1">
+                  Your agent can make and receive phone calls at this number.
                 </p>
               </div>
 

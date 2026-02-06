@@ -1,8 +1,19 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { machines } from "@/lib/db/schema";
+import { machines, phoneNumbers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+
+async function getPhoneNumber(userId: string): Promise<string | null> {
+  try {
+    const userPhone = await db.query.phoneNumbers.findFirst({
+      where: eq(phoneNumbers.userId, userId),
+    });
+    return userPhone?.phoneNumber || null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * GET /api/user/gateway
@@ -67,6 +78,8 @@ export async function GET() {
       // Integration info
       agentEmail: userMachine.agentmailInboxId || null,
       browserbaseContextId: userMachine.browserbaseContextId || null,
+      // Phone number (voice calling)
+      phoneNumber: await getPhoneNumber(clerkId),
     });
   } catch (error) {
     console.error("[api/user/gateway] Error:", error);
