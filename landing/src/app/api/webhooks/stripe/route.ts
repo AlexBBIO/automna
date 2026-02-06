@@ -4,8 +4,10 @@ import Stripe from 'stripe';
 import { clerkClient } from '@clerk/nextjs/server';
 import { sendSubscriptionStarted, sendSubscriptionCanceled, sendPaymentFailed } from '@/lib/email';
 import { db } from '@/lib/db';
-import { machines, machineEvents } from '@/lib/db/schema';
+import { machines, machineEvents, phoneNumbers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { provisionPhoneNumber } from '@/lib/twilio';
+import { importNumberToBland, configureInboundNumber } from '@/lib/bland';
 
 // Initialize Stripe lazily to avoid build-time errors
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -164,6 +166,85 @@ async function scaleMachineForPlan(userId: string, plan: string): Promise<void> 
   }
 }
 
+/**
+ * Provision a phone number for users upgrading to calling-enabled plans.
+ * Non-fatal: logs errors but doesn't fail the webhook.
+ */
+const PLANS_WITH_CALLING = ["pro", "business"];
+
+async function provisionPhoneForPlan(userId: string, plan: string): Promise<void> {
+  if (!PLANS_WITH_CALLING.includes(plan)) return;
+
+  try {
+    // Check if user already has a number
+    const existing = await db.query.phoneNumbers.findFirst({
+      where: eq(phoneNumbers.userId, userId),
+    });
+
+    if (existing) {
+      console.log(`[stripe] User ${userId} already has phone number ${existing.phoneNumber}`);
+      return;
+    }
+
+    // 1. Provision Twilio number (prefer 725 Vegas area code)
+    console.log(`[stripe] Provisioning phone number for user ${userId} (plan: ${plan})`);
+    const { phoneNumber, sid } = await provisionPhoneNumber("725");
+
+    // 2. Import to Bland
+    const imported = await importNumberToBland(phoneNumber);
+
+    // 3. Configure inbound with default prompt
+    if (imported) {
+      await configureInboundNumber(phoneNumber, {
+        prompt: `You are a helpful AI assistant. You answer phone calls on behalf of your user.
+Be friendly, professional, and helpful. If someone is calling for the user, take a message 
+including their name, what it's regarding, and a callback number. Keep responses concise and natural.`,
+        firstSentence: "Hello, you've reached an AI assistant. How can I help you?",
+      });
+    }
+
+    // 4. Save to database
+    await db.insert(phoneNumbers).values({
+      userId,
+      phoneNumber,
+      twilioSid: sid,
+      blandImported: imported,
+      agentName: "AI Assistant",
+      voiceId: "6277266e-01eb-44c6-b965-438566ef7076", // Alexandra
+      inboundPrompt: "You are a helpful AI assistant...",
+      inboundFirstSentence: "Hello, you've reached an AI assistant. How can I help you?",
+    });
+
+    console.log(`[stripe] Provisioned phone ${phoneNumber} for user ${userId}`);
+
+  } catch (error) {
+    console.error(`[stripe] Failed to provision phone for ${userId}:`, error);
+    // Non-fatal - user can contact support
+  }
+}
+
+/**
+ * Release a user's phone number when downgrading from calling-enabled plans.
+ * Non-fatal.
+ */
+async function releasePhoneForPlan(userId: string, newPlan: string): Promise<void> {
+  if (PLANS_WITH_CALLING.includes(newPlan)) return; // Still on calling plan
+
+  try {
+    const userPhone = await db.query.phoneNumbers.findFirst({
+      where: eq(phoneNumbers.userId, userId),
+    });
+
+    if (!userPhone) return;
+
+    // Don't actually release the Twilio number yet - keep it reserved for 30 days
+    // in case they re-upgrade. Just log it.
+    console.log(`[stripe] User ${userId} downgraded from calling plan. Phone ${userPhone.phoneNumber} retained for now.`);
+  } catch (error) {
+    console.error(`[stripe] Error checking phone release for ${userId}:`, error);
+  }
+}
+
 export async function POST(request: Request) {
   const body = await request.text();
   const headersList = await headers();
@@ -204,6 +285,9 @@ export async function POST(request: Request) {
           
           // Scale machine memory to match plan tier (non-blocking, non-fatal)
           await scaleMachineForPlan(clerkUserId, plan);
+          
+          // Provision phone number for calling-enabled plans
+          await provisionPhoneForPlan(clerkUserId, plan);
           
           console.log(`[stripe] Upgraded user ${clerkUserId} to ${plan}`);
 

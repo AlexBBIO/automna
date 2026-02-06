@@ -91,6 +91,62 @@ response = client.messages.create(
 )
 ```
 
+### Voice Calling (Twilio + Bland.ai)
+
+Make and receive phone calls through your dedicated phone number.
+
+**Make an outbound call:**
+```bash
+curl -s -X POST "https://automna.ai/api/user/call" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+12025551234",
+    "task": "Call this person and ask about scheduling a meeting for next week.",
+    "first_sentence": "Hi! I am calling on behalf of my user to schedule a meeting.",
+    "max_duration": 5
+  }'
+```
+
+**Parameters:**
+- `to` (required) - Phone number (E.164 or common formats: +12025551234, (202) 555-1234, 202-555-1234)
+- `task` (required) - Instructions for what the AI should accomplish on the call
+- `first_sentence` (optional) - Specific opening line when the call connects
+- `max_duration` (optional) - Max call length in minutes (default: 5)
+- `voice_id` (optional) - Override the default voice
+- `voicemail_action` (optional) - What to do on voicemail: "hangup" (default), "leave_message", or "ignore"
+- `voicemail_message` (optional) - Message to leave on voicemail
+
+**Response:**
+```json
+{
+  "success": true,
+  "call_id": "uuid",
+  "from": "+17254339890",
+  "to": "+12025551234",
+  "status": "initiated",
+  "remaining_minutes": 55
+}
+```
+
+**After the call:**
+- Transcript is automatically saved to `calls/YYYY-MM-DD_HHMM_outbound_+1234.md`
+- You'll receive a notification with the summary and transcript location
+
+**Check usage:**
+```bash
+curl -s "https://automna.ai/api/user/call/usage" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
+```
+
+**Inbound calls:** Your phone number answers automatically using your configured voice and prompt. Transcripts are saved the same way.
+
+**Tips:**
+- Be specific in the `task` - include names, context, and what success looks like
+- The call AI is a separate model, not you. Pack context into the task prompt.
+- US numbers only for now
+- Call transcripts are in the `calls/` directory
+
 ## Integrations
 
 | Service | Status | Notes |
@@ -99,6 +155,7 @@ response = client.messages.create(
 | Web Search | ✅ Active | Brave Search via `web_search` tool |
 | Browser | ✅ Active | Browserbase via Playwright (see BROWSERBASE.md) |
 | Email | ✅ Active | See AGENTMAIL.md |
+| Voice Calling | ✅ Active | Outbound + Inbound via phone number |
 | Discord | ❌ Not connected | Ask user for bot token |
 | Telegram | ❌ Not connected | Ask user for bot token |
 
