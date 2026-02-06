@@ -148,6 +148,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const historyLoadedRef = useRef(false);
   const httpHistoryAbortRef = useRef<AbortController | null>(null);
   const pendingRefetchRef = useRef<PendingRefetch | null>(null);
+  const isRunningRef = useRef(false); // Mirror of isRunning for use in timeouts
+  const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recoveryAttemptsRef = useRef(0);
   const configRef = useRef(config);
   configRef.current = config;
 
@@ -169,6 +172,98 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     return id;
   }, []);
 
+  // ─── Run Recovery ─────────────────────────────────────────────────────────
+  // Safety net: if the final event never arrives (WS drop, gateway bug, etc.),
+  // periodically poll history to check if the run completed server-side.
+
+  const MAX_RECOVERY_ATTEMPTS = 8; // 30s + 8*15s = ~2.5 minutes max
+
+  function clearRecoveryTimer() {
+    if (recoveryTimerRef.current) {
+      clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+    recoveryAttemptsRef.current = 0;
+  }
+
+  function startRecoveryTimer() {
+    clearRecoveryTimer();
+    // First check at 30s, then every 15s
+    recoveryTimerRef.current = setTimeout(() => attemptRecovery(), 30_000);
+  }
+
+  function attemptRecovery() {
+    if (!mountedRef.current || !isRunningRef.current) return;
+
+    recoveryAttemptsRef.current++;
+    log(`Recovery attempt ${recoveryAttemptsRef.current}/${MAX_RECOVERY_ATTEMPTS}`);
+
+    // Max attempts reached - give up and reset UI
+    if (recoveryAttemptsRef.current > MAX_RECOVERY_ATTEMPTS) {
+      log('Recovery: max attempts reached, resetting');
+      finalizeStaleRun();
+      return;
+    }
+
+    const cfg = configRef.current;
+    const sk = currentSessionRef.current;
+    if (!sk || !cfg.gatewayUrl) {
+      scheduleRecoveryRetry();
+      return;
+    }
+
+    const historyUrl = buildHistoryUrl(cfg.gatewayUrl, sk);
+    fetch(historyUrl)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!mountedRef.current || !isRunningRef.current) return;
+
+        const msgs = (data?.messages || []).filter(
+          (m: RawMessage) => m.role === 'user' || m.role === 'assistant'
+        );
+        const lastMsg = msgs[msgs.length - 1];
+
+        if (lastMsg?.role === 'assistant') {
+          // Run completed on server - update UI with full history
+          log('Recovery: run completed server-side, updating messages');
+          setMessages(parseMessages(msgs, 'recovery'));
+          setIsRunning(false);
+          isRunningRef.current = false;
+          streamingTextRef.current = '';
+          clearRecoveryTimer();
+        } else {
+          // Still running on server, check again
+          log('Recovery: still running, will retry');
+          scheduleRecoveryRetry();
+        }
+      })
+      .catch((err) => {
+        log('Recovery fetch failed:', err.message);
+        scheduleRecoveryRetry();
+      });
+  }
+
+  function scheduleRecoveryRetry() {
+    recoveryTimerRef.current = setTimeout(() => attemptRecovery(), 15_000);
+  }
+
+  /** Last resort: reset the UI when all recovery attempts fail */
+  function finalizeStaleRun() {
+    clearRecoveryTimer();
+    streamingTextRef.current = '';
+    setIsRunning(false);
+    isRunningRef.current = false;
+
+    // Keep whatever streamed text we have, just give it a permanent ID
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last?.role === 'assistant' && last.id === 'streaming') {
+        return [...prev.slice(0, -1), { ...last, id: genId() }];
+      }
+      return prev;
+    });
+  }
+
   // ─── Event Handlers ──────────────────────────────────────────────────────
 
   /** Handle connect.challenge - send auth */
@@ -187,6 +282,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       wsSend('chat.history', {
         sessionKey: canonicalizeSessionKey(configRef.current.sessionKey || 'main'),
       });
+    }
+
+    // If we were waiting for a response when the WS dropped, recover immediately
+    if (isRunningRef.current) {
+      log('Reconnected while running - attempting immediate recovery');
+      attemptRecovery();
     }
   }
 
@@ -273,12 +374,16 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   /** Handle chat.send acknowledgment */
   function handleSendAck() {
     setIsRunning(true);
+    isRunningRef.current = true;
+    startRecoveryTimer();
   }
 
   /** Handle run completion via res message */
   function handleRunCompletion(payload: Record<string, unknown>) {
     log('Run completed via res message');
+    clearRecoveryTimer();
     setIsRunning(false);
+    isRunningRef.current = false;
 
     const message = payload.message as { role?: string; content?: ContentPart[] } | undefined;
     if (message?.role === 'assistant' && Array.isArray(message.content)) {
@@ -310,6 +415,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     // Delta: update streaming message with accumulated text
     if (state === 'delta') {
+      // Reset recovery timer on each delta - agent is still alive
+      startRecoveryTimer();
       const textContent = message?.content?.find((c) => c.type === 'text')?.text;
       if (message?.role === 'assistant' && typeof textContent === 'string' && textContent) {
         streamingTextRef.current = textContent;
@@ -329,6 +436,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     // Final: message complete
     if (state === 'final') {
+      clearRecoveryTimer();
       const streamedText = streamingTextRef.current;
       streamingTextRef.current = '';
 
@@ -357,6 +465,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         return prev;
       });
       setIsRunning(false);
+      isRunningRef.current = false;
 
       // Re-fetch history to get complete content (images, full MEDIA paths)
       // NOTE: Store raw streamedText (not cleanedText) for comparison.
@@ -373,8 +482,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     // Error state
     if (state === 'error') {
+      clearRecoveryTimer();
       streamingTextRef.current = '';
       setIsRunning(false);
+      isRunningRef.current = false;
       const errorMsg = (payload.errorMessage as string) || 'Something went wrong';
       setError(errorMsg);
 
@@ -404,7 +515,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       log('Error response:', errorMsg);
       setError(errorMsg);
     }
+    clearRecoveryTimer();
     setIsRunning(false);
+    isRunningRef.current = false;
   }
 
   // ─── Connection Effect ───────────────────────────────────────────────────
@@ -422,6 +535,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     streamingTextRef.current = '';
     historyLoadedRef.current = false;
     pendingRefetchRef.current = null;
+    isRunningRef.current = false;
+    clearRecoveryTimer();
     setMessages([]);
     setLoadingPhase('connecting');
     setError(null);
@@ -613,6 +728,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       if (connectionDelayTimer) clearTimeout(connectionDelayTimer);
       httpHistoryAbortRef.current?.abort();
       clearTimeout(safetyTimeout);
+      clearRecoveryTimer();
 
       const currentWs = wsRef.current;
       if (currentWs && (currentWs.readyState === WebSocket.OPEN || currentWs.readyState === WebSocket.CONNECTING)) {
@@ -637,6 +753,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     streamingTextRef.current = '';
     setIsRunning(true);
+    isRunningRef.current = true;
+    startRecoveryTimer();
 
     const cfg = configRef.current;
     const ws = wsRef.current;
@@ -684,18 +802,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           log('Failed to poll history after HTTP send');
         }
         setIsRunning(false);
+        isRunningRef.current = false;
+        clearRecoveryTimer();
       }, 3000);
     } catch (err) {
       console.error('[clawdbot] HTTP send failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to send message');
       setIsRunning(false);
+      isRunningRef.current = false;
+      clearRecoveryTimer();
     }
   }, [wsSend]);
 
   /** Cancel the current run */
   const cancel = useCallback(() => {
     wsSend('chat.abort', { sessionKey: canonicalizeSessionKey(configRef.current.sessionKey || 'main') });
+    clearRecoveryTimer();
     setIsRunning(false);
+    isRunningRef.current = false;
   }, [wsSend]);
 
   /** Clear local message history */
