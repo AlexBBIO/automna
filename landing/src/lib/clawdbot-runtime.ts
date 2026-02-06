@@ -149,6 +149,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const httpHistoryAbortRef = useRef<AbortController | null>(null);
   const pendingRefetchRef = useRef<PendingRefetch | null>(null);
   const isRunningRef = useRef(false); // Mirror of isRunning for use in timeouts
+  const activeRunIdRef = useRef<string | null>(null); // Current run ID for deduplication
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryAttemptsRef = useRef(0);
   const deltaCountRef = useRef(0); // Count deltas per run for diagnostics
@@ -254,6 +255,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   /** Last resort: reset the UI when all recovery attempts fail */
   function finalizeStaleRun() {
     clearRecoveryTimer();
+    activeRunIdRef.current = null;
     streamingTextRef.current = '';
     setIsRunning(false);
     isRunningRef.current = false;
@@ -261,7 +263,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     // Keep whatever streamed text we have, just give it a permanent ID
     setMessages((prev) => {
       const last = prev[prev.length - 1];
-      if (last?.role === 'assistant' && last.id === 'streaming') {
+      if (last?.role === 'assistant' && (last.id === 'streaming' || last.id.startsWith('streaming-'))) {
         return [...prev.slice(0, -1), { ...last, id: genId() }];
       }
       return prev;
@@ -359,16 +361,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           updated[idx] = { ...updated[idx], content: fullContent };
           return updated;
         }
-        // Streaming message was removed - add the complete message
-        return [
-          ...prev,
-          {
-            id: pending.messageId,
-            role: 'assistant' as const,
-            content: fullContent,
-            createdAt: new Date(),
-          },
-        ];
+        // Message not found - don't add a duplicate, just log
+        log('⚠️ Re-fetch: could not find message to update:', pending.messageId);
+        return prev;
       });
     } else {
       log('History content not richer, keeping streamed version');
@@ -377,41 +372,13 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
   /** Handle chat.send acknowledgment */
   function handleSendAck(payload: Record<string, unknown>) {
-    log('📤 Run started:', { runId: payload.runId, status: payload.status });
+    const runId = payload.runId as string | undefined;
+    log('📤 Run started:', { runId, status: payload.status });
+    activeRunIdRef.current = runId || null;
     deltaCountRef.current = 0;
     setIsRunning(true);
     isRunningRef.current = true;
     startRecoveryTimer();
-  }
-
-  /** Handle run completion via res message */
-  function handleRunCompletion(payload: Record<string, unknown>) {
-    log('Run completed via res message');
-    clearRecoveryTimer();
-    setIsRunning(false);
-    isRunningRef.current = false;
-
-    const message = payload.message as { role?: string; content?: ContentPart[] } | undefined;
-    if (message?.role === 'assistant' && Array.isArray(message.content)) {
-      const textPart = message.content.find((c) => c.type === 'text');
-      const text = typeof textPart?.text === 'string' ? stripMessageMeta(textPart.text) : '';
-
-      if (text) {
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last?.role === 'assistant' && last.id === 'streaming') {
-            return [
-              ...prev.slice(0, -1),
-              { ...last, id: genId(), content: [{ type: 'text', text }] },
-            ];
-          }
-          return [
-            ...prev,
-            { id: genId(), role: 'assistant', content: [{ type: 'text', text }], createdAt: new Date() },
-          ];
-        });
-      }
-    }
   }
 
   /** Handle event chat - streaming deltas and final state */
@@ -436,17 +403,20 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       deltaCountRef.current++;
       // Reset recovery timer on each delta - agent is still alive
       startRecoveryTimer();
+      // Capture runId if we missed the send ack
+      if (runId && !activeRunIdRef.current) activeRunIdRef.current = runId;
+      const streamingId = runId ? `streaming-${runId}` : 'streaming';
       const textContent = message?.content?.find((c) => c.type === 'text')?.text;
       if (message?.role === 'assistant' && typeof textContent === 'string' && textContent) {
         streamingTextRef.current = textContent;
         setMessages((prev) => {
           const last = prev[prev.length - 1];
-          if (last?.role === 'assistant' && last.id === 'streaming') {
-            return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: textContent }] }];
+          if (last?.role === 'assistant' && (last.id === streamingId || last.id === 'streaming')) {
+            return [...prev.slice(0, -1), { ...last, id: streamingId, content: [{ type: 'text', text: textContent }] }];
           }
           return [
             ...prev,
-            { id: 'streaming', role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() },
+            { id: streamingId, role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() },
           ];
         });
       }
@@ -472,15 +442,23 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         contentTypes: message?.content?.map((c) => c.type),
       });
 
-      // Finalize the streaming message with a permanent ID
-      const finalId = genId();
+      // Finalize the streaming message with a permanent ID (runId-based for dedup)
+      const finalId = runId || genId();
+      const streamingId = runId ? `streaming-${runId}` : 'streaming';
+      activeRunIdRef.current = null;
       setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === 'assistant' && last.id === 'streaming') {
+        // Find the streaming message for this run (by runId or generic 'streaming')
+        const streamIdx = prev.findIndex((m) =>
+          m.role === 'assistant' && (m.id === streamingId || m.id === 'streaming')
+        );
+        if (streamIdx >= 0) {
+          const updated = [...prev];
           if (cleanedText) {
-            return [...prev.slice(0, -1), { ...last, id: finalId, content: [{ type: 'text', text: cleanedText }] }];
+            updated[streamIdx] = { ...prev[streamIdx], id: finalId, content: [{ type: 'text', text: cleanedText }] };
+          } else {
+            updated[streamIdx] = { ...prev[streamIdx], id: finalId };
           }
-          return [...prev.slice(0, -1), { ...last, id: finalId }];
+          return updated;
         }
         // No streaming message exists (command/non-agent run)
         if (cleanedText) {
@@ -510,6 +488,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     // Error state
     if (state === 'error') {
       clearRecoveryTimer();
+      activeRunIdRef.current = null;
       streamingTextRef.current = '';
       setIsRunning(false);
       isRunningRef.current = false;
@@ -563,6 +542,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     historyLoadedRef.current = false;
     pendingRefetchRef.current = null;
     isRunningRef.current = false;
+    activeRunIdRef.current = null;
     clearRecoveryTimer();
     setMessages([]);
     setLoadingPhase('connecting');
@@ -717,13 +697,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
               return;
             }
 
-            // Run completion via res (fallback path)
-            if (payload.runId && (payload.status === 'done' || payload.status === 'completed' || payload.status === 'finished')) {
-              handleRunCompletion(payload);
-              return;
-            }
-
-            // Log any unhandled res messages
+            // Log any unhandled res messages (includes status:"ok" dedupe responses)
             log('📩 Unhandled res:', { keys: Object.keys(payload), status: payload.status, runId: payload.runId });
           }
         } catch (e) {
@@ -848,6 +822,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const cancel = useCallback(() => {
     wsSend('chat.abort', { sessionKey: canonicalizeSessionKey(configRef.current.sessionKey || 'main') });
     clearRecoveryTimer();
+    activeRunIdRef.current = null;
     setIsRunning(false);
     isRunningRef.current = false;
   }, [wsSend]);
