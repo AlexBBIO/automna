@@ -1,7 +1,7 @@
 # Automna Chat Streaming Spec
 
 > Last updated: 2026-02-06
-> Status: Phase 2E in progress (verbose mode + mediaUrls + tool splitting)
+> Status: Phase 2E complete ✅ (verbose mode + mediaUrls + tool splitting)
 
 ## Overview
 
@@ -848,12 +848,14 @@ This works because `MessageContent.tsx` already parses `MEDIA:` lines and render
 
 ##### Implementation Order
 
-1. Update OpenClaw config template + deploy to existing machines (Change 1)
-2. Replace lifecycle splitting with tool splitting (Change 2)  
-3. Add mediaUrls handling (Change 3)
-4. Remove the lifecycle:start hack
-5. Test with tool-calling queries (web search, image gen, etc.)
-6. Deploy
+1. ✅ Update OpenClaw config template + deploy to existing machines (Change 1)
+2. ✅ Replace lifecycle splitting with tool splitting (Change 2)  
+3. ✅ Add mediaUrls handling (Change 3)
+4. ✅ Remove the lifecycle:start hack
+5. ✅ Test with tool-calling queries (web search, image gen, etc.)
+6. ✅ Deploy
+
+**Deployed 2026-02-06.** Tested on grandathrawn's machine. Bubble splitting and image rendering both confirmed working.
 
 ### Phase 3: Testing
 

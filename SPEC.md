@@ -869,26 +869,20 @@ This is NOT a chatbot. Users will have their agents:
 
 ## Known Issues & Workarounds
 
-### OpenClaw Streaming Truncates MEDIA Paths (2026-02-05)
+### OpenClaw Streaming Truncates MEDIA Paths (2026-02-05) — ✅ FIXED 2026-02-06
 
 **Issue:** OpenClaw truncates `MEDIA:/path/to/file` strings during streaming. The streaming `chat` events arrive with truncated text, but the stored message in history is complete.
 
-**Impact:** Images don't render in chat UI after agent responds, because the MEDIA path is incomplete.
+**Root Cause (discovered 2026-02-06):** Server-side `parseReplyDirectives()` strips `MEDIA:` lines from assistant text and puts URLs in a `data.mediaUrls` field on agent events. The runtime never read `mediaUrls`, so images were lost during streaming.
 
-**Workaround:** After receiving a `final` chat event, request history via WebSocket (`chat.history` command) and update the displayed message with the complete content from history.
+**Fix (Phase 2E):** Three changes:
+1. **Enabled `verboseDefault: "on"`** in Docker entrypoint config — unlocks `stream: "tool"` events through gateway WebSocket (were silently filtered by default)
+2. **Tool boundary bubble splitting** — replaced broken `lifecycle:start` hack with `stream: "tool"` phase `"start"` events for splitting assistant responses into separate bubbles
+3. **Media URL injection** — runtime now reads `data.mediaUrls` from agent events and re-injects them as `MEDIA:` lines so `MessageContent` renders them as images
 
-**Implementation:**
-```typescript
-// In clawdbot-runtime.ts
-// After final event:
-pendingRefetchRef.current = { tempId, streamedText };
-wsSend('chat.history', { sessionKey: currentSessionRef.current });
+**History re-fetch kept** as fallback for base64 image content parts (which only appear in stored messages, never streaming).
 
-// In history response handler:
-if (pendingRefetchRef.current) {
-  // Update message with complete content from history
-}
-```
+See [`docs/STREAMING-SPEC.md`](docs/STREAMING-SPEC.md) Phase 2E for full technical details.
 
 **Notes:**
 - OpenClaw has **no HTTP API** for history - only WebSocket
