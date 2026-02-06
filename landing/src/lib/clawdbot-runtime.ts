@@ -31,7 +31,7 @@ interface ContentPart {
   [key: string]: unknown;
 }
 
-interface ThreadMessage {
+export interface ThreadMessage {
   id: string;
   role: 'user' | 'assistant';
   content: ContentPart[];
@@ -119,10 +119,33 @@ function parseContent(raw: unknown): ContentPart[] {
   return [];
 }
 
-/** Convert raw API messages to ThreadMessage[], filtering out system/tool messages */
+/** Detect heartbeat messages (both prompts and HEARTBEAT_OK responses) */
+function isHeartbeatMessage(m: RawMessage): boolean {
+  const text = typeof m.content === 'string'
+    ? m.content
+    : Array.isArray(m.content)
+      ? m.content.filter((p: ContentPart) => p.type === 'text').map((p: ContentPart) => p.text || '').join(' ')
+      : '';
+  const trimmed = text.trim();
+  // Match heartbeat prompts (contain "HEARTBEAT_OK" instruction or "Read HEARTBEAT.md")
+  if (m.role === 'user' && (
+    trimmed.includes('HEARTBEAT_OK') ||
+    trimmed.includes('HEARTBEAT.md') ||
+    trimmed.includes('heartbeat poll')
+  )) return true;
+  // Match heartbeat responses
+  if (m.role === 'assistant' && (
+    trimmed === 'HEARTBEAT_OK' ||
+    trimmed.startsWith('HEARTBEAT_OK')
+  )) return true;
+  return false;
+}
+
+/** Convert raw API messages to ThreadMessage[], filtering out system/tool/heartbeat messages */
 function parseMessages(messages: RawMessage[], prefix: string): ThreadMessage[] {
   return messages
     .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .filter((m) => !isHeartbeatMessage(m))
     .map((m, idx) => ({
       id: `${prefix}-${idx}`,
       role: m.role as 'user' | 'assistant',

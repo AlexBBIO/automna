@@ -4,9 +4,10 @@
  * AutomnaChat - Polished Chat Interface (Light Theme)
  */
 
-import { useClawdbotRuntime } from '@/lib/clawdbot-runtime';
+import { useClawdbotRuntime, type ThreadMessage } from '@/lib/clawdbot-runtime';
 import { MessageContent } from './MessageContent';
 import { 
+  useCallback,
   useEffect, 
   useRef, 
   useState,
@@ -258,11 +259,33 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
   const [isDragging, setIsDragging] = useState(false);
   const [showToolCalls, setShowToolCalls] = useState(false);
   
-  // Filter messages to hide tool-related content when showToolCalls is false
+  // Detect heartbeat messages (prompts and HEARTBEAT_OK responses)
+  const isHeartbeatMessage = useCallback((msg: ThreadMessage): boolean => {
+    const text = msg.content
+      .filter(p => p.type === 'text')
+      .map(p => p.text || '')
+      .join(' ')
+      .trim();
+    if (msg.role === 'user' && (
+      text.includes('HEARTBEAT_OK') ||
+      text.includes('HEARTBEAT.md') ||
+      text.includes('heartbeat poll')
+    )) return true;
+    if (msg.role === 'assistant' && (
+      text === 'HEARTBEAT_OK' ||
+      text.startsWith('HEARTBEAT_OK')
+    )) return true;
+    return false;
+  }, []);
+
+  // Filter messages to hide tool-related content and heartbeats when showToolCalls is false
   const displayMessages = useMemo(() => {
-    if (showToolCalls) return messages;
+    // Always filter heartbeats
+    const withoutHeartbeats = messages.filter(msg => !isHeartbeatMessage(msg));
     
-    return messages
+    if (showToolCalls) return withoutHeartbeats;
+    
+    return withoutHeartbeats
       // Filter out toolResult role messages entirely
       .filter(msg => !isToolResultRole(msg.role))
       // Filter out tool content parts from remaining messages
@@ -272,7 +295,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
       }))
       // Remove messages that have no content left after filtering
       .filter(msg => msg.content.length > 0);
-  }, [messages, showToolCalls]);
+  }, [messages, showToolCalls, isHeartbeatMessage]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
