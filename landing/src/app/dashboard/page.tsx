@@ -341,8 +341,6 @@ export default function DashboardPage() {
     const MAX_WAIT_MS = 90000; // Extended to 90s for fresh provisions
     const POLL_INTERVAL_MS = 1500;
     const CONSECUTIVE_SUCCESS_NEEDED = 2; // Require 2 successful checks in a row
-    const POST_READY_BUFFER_MS = 3000; // Extra buffer after gateway reports ready
-    
     console.log('[warmup] Waiting for gateway to be ready...');
     const startTime = Date.now();
     let consecutiveSuccesses = 0;
@@ -361,8 +359,6 @@ export default function DashboardPage() {
           console.log(`[warmup] Health check passed (${consecutiveSuccesses}/${CONSECUTIVE_SUCCESS_NEEDED})`);
           
           if (consecutiveSuccesses >= CONSECUTIVE_SUCCESS_NEEDED) {
-            console.log(`[warmup] Gateway stable, waiting ${POST_READY_BUFFER_MS}ms buffer...`);
-            await new Promise(r => setTimeout(r, POST_READY_BUFFER_MS));
             console.log('[warmup] Gateway is ready!');
             return true;
           }
