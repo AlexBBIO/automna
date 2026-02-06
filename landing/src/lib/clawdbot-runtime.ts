@@ -580,6 +580,36 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       log(`🔄 Lifecycle: ${phase}`);
       if (phase === 'start') {
         startRecoveryTimer();
+
+        // If there's accumulated streaming text, a new turn is starting after a tool call.
+        // Finalize the current bubble and start a new one.
+        // (The first lifecycle:start has no streaming text yet, so this is a no-op for it.)
+        const currentText = streamingTextRef.current;
+        if (currentText) {
+          const currentRunId = activeRunIdRef.current;
+          const turn = turnCountRef.current;
+          const currentSid = currentRunId
+            ? (turn > 0 ? `streaming-${currentRunId}-t${turn}` : `streaming-${currentRunId}`)
+            : 'streaming';
+          const permanentId = genId();
+
+          log('🔀 New turn detected via lifecycle:start, finalizing bubble', { turn, textLen: currentText.length });
+
+          // Give current bubble a permanent ID
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.role === 'assistant' && m.id === currentSid);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], id: permanentId, content: [{ type: 'text', text: stripMessageMeta(currentText) }] };
+              return updated;
+            }
+            return prev;
+          });
+
+          // Reset accumulator and increment turn for next bubble
+          streamingTextRef.current = '';
+          turnCountRef.current++;
+        }
       }
       // Don't finalize on lifecycle end - wait for chat final event
       return;
