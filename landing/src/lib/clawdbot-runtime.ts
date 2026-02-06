@@ -151,6 +151,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const isRunningRef = useRef(false); // Mirror of isRunning for use in timeouts
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryAttemptsRef = useRef(0);
+  const deltaCountRef = useRef(0); // Count deltas per run for diagnostics
   const configRef = useRef(config);
   configRef.current = config;
 
@@ -193,10 +194,13 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   }
 
   function attemptRecovery() {
-    if (!mountedRef.current || !isRunningRef.current) return;
+    if (!mountedRef.current || !isRunningRef.current) {
+      log('🔄 Recovery skipped (not mounted or not running)');
+      return;
+    }
 
     recoveryAttemptsRef.current++;
-    log(`Recovery attempt ${recoveryAttemptsRef.current}/${MAX_RECOVERY_ATTEMPTS}`);
+    log(`🔄 Recovery attempt ${recoveryAttemptsRef.current}/${MAX_RECOVERY_ATTEMPTS}`);
 
     // Max attempts reached - give up and reset UI
     if (recoveryAttemptsRef.current > MAX_RECOVERY_ATTEMPTS) {
@@ -372,7 +376,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   }
 
   /** Handle chat.send acknowledgment */
-  function handleSendAck() {
+  function handleSendAck(payload: Record<string, unknown>) {
+    log('📤 Run started:', { runId: payload.runId, status: payload.status });
+    deltaCountRef.current = 0;
     setIsRunning(true);
     isRunningRef.current = true;
     startRecoveryTimer();
@@ -412,9 +418,22 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   function handleChatEvent(payload: Record<string, unknown>) {
     const state = payload.state as string | undefined;
     const message = payload.message as { role?: string; content?: ContentPart[] } | undefined;
+    const runId = payload.runId as string | undefined;
+
+    // Log every chat event state for diagnostics
+    if (state !== 'delta') {
+      // Log non-delta events fully (deltas are too noisy)
+      log(`📨 chat event: state=${state} runId=${runId}`, {
+        hasMessage: !!message,
+        messageRole: message?.role,
+        contentTypes: message?.content?.map((c) => c.type),
+        payloadKeys: Object.keys(payload),
+      });
+    }
 
     // Delta: update streaming message with accumulated text
     if (state === 'delta') {
+      deltaCountRef.current++;
       // Reset recovery timer on each delta - agent is still alive
       startRecoveryTimer();
       const textContent = message?.content?.find((c) => c.type === 'text')?.text;
@@ -444,6 +463,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       const finalText = message?.content?.find((c) => c.type === 'text')?.text || '';
       const bestText = streamedText || finalText;
       const cleanedText = bestText ? stripMessageMeta(bestText) : '';
+
+      log('✅ Final event processed:', {
+        deltaCount: deltaCountRef.current,
+        streamedTextLen: streamedText.length,
+        finalTextLen: finalText.length,
+        cleanedTextLen: cleanedText.length,
+        contentTypes: message?.content?.map((c) => c.type),
+      });
 
       // Finalize the streaming message with a permanent ID
       const finalId = genId();
@@ -686,7 +713,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
             // Send acknowledgment
             if (payload.status === 'started' || payload.status === 'in_flight') {
-              handleSendAck();
+              handleSendAck(payload);
               return;
             }
 
@@ -695,6 +722,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
               handleRunCompletion(payload);
               return;
             }
+
+            // Log any unhandled res messages
+            log('📩 Unhandled res:', { keys: Object.keys(payload), status: payload.status, runId: payload.runId });
           }
         } catch (e) {
           console.error('[clawdbot] Failed to parse WebSocket message:', e);
