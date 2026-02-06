@@ -1,23 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-
-interface UsageData {
-  plan: string;
-  usage: {
-    totalTokens: number;
-    costCents: number;
-  };
-  limits: {
-    monthlyTokens: number;
-    monthlyCostCents: number;
-  };
-  percentUsed: {
-    tokens: number;
-    cost: number;
-  };
-}
+import type { UsageData } from '@/hooks/useUsageStatus';
 
 type WarningLevel = 'none' | 'info' | 'warning' | 'limit';
 
@@ -57,31 +42,9 @@ function setDismissedState(level: WarningLevel) {
   }
 }
 
-export function UsageBanner({ gatewayUrl, authToken }: { gatewayUrl: string; authToken?: string }) {
-  const [usage, setUsage] = useState<UsageData | null>(null);
+export function UsageBanner({ usage }: { usage: UsageData | null }) {
   const [dismissed, setDismissed] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
-
-  const fetchUsage = useCallback(async () => {
-    try {
-      // Try fetching from the user-facing usage API
-      const res = await fetch('/api/llm/usage', {
-        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      setUsage(data);
-    } catch {
-      // Silent fail - usage banner is non-critical
-    }
-  }, [authToken]);
-
-  // Fetch usage on mount and every 5 minutes
-  useEffect(() => {
-    fetchUsage();
-    const interval = setInterval(fetchUsage, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchUsage]);
 
   // Check if previously dismissed
   useEffect(() => {
@@ -97,6 +60,8 @@ export function UsageBanner({ gatewayUrl, authToken }: { gatewayUrl: string; aut
       // Re-show if expired, or if we've escalated to hard limit
       if (!isExpired && !isHigherLevel) {
         setDismissed(true);
+      } else {
+        setDismissed(false);
       }
     }
   }, [usage]);

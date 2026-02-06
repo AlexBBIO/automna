@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { AutomnaChat } from "@/components/AutomnaChat";
 import { ChatSkeleton } from "@/components/ChatSkeleton";
 import { UsageBanner } from "@/components/UsageBanner";
+import { useUsageStatus } from "@/hooks/useUsageStatus";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { FileProvider } from "@/lib/file-context";
 import { FileBrowser } from "@/components/FileBrowser";
@@ -77,6 +78,9 @@ export default function DashboardPage() {
   // Tab state
   const [activeTab, setActiveTab] = useState<TabView>('chat');
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  
+  // Usage tracking (shared between banner and chat)
+  const { usage, isOverLimit } = useUsageStatus();
   
   // Set initial sidebar state based on screen size (runs once on mount)
   useEffect(() => {
@@ -730,13 +734,14 @@ export default function DashboardPage() {
               <div className="flex-1 overflow-hidden">
                 {activeTab === 'chat' && (
                   <div className="h-full animate-fadeIn flex flex-col" key={currentConversation}>
-                    <UsageBanner gatewayUrl={gatewayInfo.gatewayUrl} />
+                    <UsageBanner usage={usage} />
                     <div className="flex-1 overflow-hidden">
                       <AutomnaChat
                         gatewayUrl={gatewayInfo.gatewayUrl}
                         sessionKey={currentConversation}
                         initialMessage={pendingMessage}
                         onInitialMessageSent={() => setPendingMessage(null)}
+                        isOverLimit={isOverLimit}
                       />
                     </div>
                   </div>

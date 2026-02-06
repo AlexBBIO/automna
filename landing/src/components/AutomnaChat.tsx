@@ -22,6 +22,7 @@ interface AutomnaChatProps {
   sessionKey?: string;
   initialMessage?: string | null;
   onInitialMessageSent?: () => void;
+  isOverLimit?: boolean;
 }
 
 // Assistant avatar component
@@ -251,7 +252,7 @@ function isToolResultRole(role: string): boolean {
   return r === 'toolresult' || r === 'tool_result';
 }
 
-export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage, onInitialMessageSent }: AutomnaChatProps) {
+export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage, onInitialMessageSent, isOverLimit = false }: AutomnaChatProps) {
   const { messages, isRunning, isConnected, loadingPhase, error, append, cancel } = useClawdbotRuntime({
     gatewayUrl,
     authToken,
@@ -670,8 +671,25 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
       </div>
 
       {/* Input area */}
-      <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 transition-colors">
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+      <div className={`p-4 border-t border-zinc-200 dark:border-zinc-800 transition-colors relative ${
+        isOverLimit ? 'bg-zinc-100 dark:bg-zinc-950' : 'bg-white dark:bg-zinc-900'
+      }`}>
+        {/* Over-limit overlay */}
+        {isOverLimit && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-[1px]">
+            <div className="flex items-center gap-3 px-5 py-3 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700">
+              <span className="text-zinc-400 dark:text-zinc-500">🔒</span>
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">You&apos;ve hit your plan limit.</span>
+              <a
+                href="/pricing"
+                className="text-sm font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 underline"
+              >
+                Upgrade to continue
+              </a>
+            </div>
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className={`max-w-4xl mx-auto ${isOverLimit ? 'opacity-40 pointer-events-none select-none' : ''}`}>
           {/* Pending files preview */}
           {pendingFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3 px-1">
@@ -703,7 +721,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isRunning || isUploading}
+              disabled={isRunning || isUploading || isOverLimit}
               className="p-3 text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl transition-colors flex-shrink-0 disabled:opacity-50"
               title="Attach file"
             >
@@ -725,9 +743,10 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={pendingFiles.length > 0 ? "Add a message (optional)..." : "Ask anything..."}
+              disabled={isOverLimit}
+              placeholder={isOverLimit ? "Plan limit reached" : pendingFiles.length > 0 ? "Add a message (optional)..." : "Ask anything..."}
               rows={1}
-              className="flex-1 bg-transparent text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none resize-none px-1 py-2 text-base min-h-[44px] max-h-[200px] leading-relaxed"
+              className="flex-1 bg-transparent text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none resize-none px-1 py-2 text-base min-h-[44px] max-h-[200px] leading-relaxed disabled:cursor-not-allowed"
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
