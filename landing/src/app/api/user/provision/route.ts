@@ -365,6 +365,20 @@ function cleanEnvValue(value: string | undefined): string {
 }
 
 /**
+ * Get memory allocation based on plan tier
+ * Starter: 2GB, Pro/Business: 4GB
+ */
+function getMemoryForPlan(plan: string): number {
+  switch (plan) {
+    case "pro":
+    case "business":
+      return 4096;
+    default:
+      return 2048;
+  }
+}
+
+/**
  * Create and start a machine in the app
  */
 async function createMachine(
@@ -372,7 +386,8 @@ async function createMachine(
   volumeId: string,
   gatewayToken: string,
   browserbaseContextId: string | null,
-  agentmailInboxId: string | null
+  agentmailInboxId: string | null,
+  plan: string = "starter"
 ): Promise<FlyMachine> {
   
   // Build env vars - only include integrations if configured
@@ -432,7 +447,7 @@ async function createMachine(
     guest: {
       cpu_kind: "shared",
       cpus: 1,
-      memory_mb: 2048,
+      memory_mb: getMemoryForPlan(plan),
     },
     // Initialize session structure with canonical key, then start gateway
     // This fixes the session key mismatch bug where "main" != "agent:main:main"
@@ -649,11 +664,14 @@ export async function POST() {
       }
     }
 
+    // Determine user's plan for resource allocation
+    const userPlan = (user.publicMetadata?.plan as string) || "starter";
+
     // Create new app + machine for user
     const shortId = shortUserId(userId);
     const appName = `automna-u-${shortId}`;
     
-    console.log(`[provision] Creating new app ${appName} for user ${userId}`);
+    console.log(`[provision] Creating new app ${appName} for user ${userId} (plan: ${userPlan}, memory: ${getMemoryForPlan(userPlan)}MB)`);
 
     // Get org ID for app creation
     const orgId = await getPersonalOrgId();
@@ -682,7 +700,7 @@ export async function POST() {
 
     // Step 3: Create machine (env vars passed directly, no Fly secrets needed)
     console.log(`[provision] Creating machine for ${appName}`);
-    const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId, agentmailInboxId);
+    const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId, agentmailInboxId, userPlan);
 
     // Step 4: Wait for machine to be ready
     console.log(`[provision] Waiting for machine ${machine.id} to start`);
