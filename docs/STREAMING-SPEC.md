@@ -636,7 +636,46 @@ pendingRefetchRef.current = { messageId: finalId, streamedText: streamedText };
    return prev;
    ```
 
-#### 2C: Improve Streaming (switch to agent events)
+#### 2C: Fix Hanging Messages (messages with images never complete)
+
+**The bug:** Messages containing images frequently hang - typing indicator stays on forever, message never finalizes. Only a page refresh fixes it.
+
+**Likely causes:**
+
+1. **WebSocket drops during long runs:** Image generation takes 10-30s. If the WS disconnects and reconnects during this time, the `event chat state:"final"` is sent while disconnected and never received by the client.
+
+2. **`res` completion falls through the router:** OpenClaw sends `{ runId, status: "ok" }` in the dedupe cache response. Our router only checks for `"done"|"completed"|"finished"`, so `"ok"` falls through with no handler. If the `event chat final` also doesn't arrive (WS drop, race condition), nothing finalizes the message.
+
+3. **Agent errors during image generation:** If the run errors, `emitChatFinal` sends with `jobState !== "done"` which may not include a proper final message, or the error event doesn't get processed.
+
+**Fixes:**
+
+1. **Add a stale run timeout:** If `isRunning` is true for more than 60 seconds, automatically re-fetch history to check if the message completed server-side:
+   ```typescript
+   const runTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+   
+   // When isRunning becomes true:
+   runTimeoutRef.current = setTimeout(() => {
+     if (isRunning) {
+       log('Run timeout - checking if message completed server-side');
+       wsSend('chat.history', { sessionKey });
+       // Process history response as a potential recovery
+     }
+   }, 60_000);
+   ```
+
+2. **Handle `status: "ok"` in the router:** Add it as a completion signal:
+   ```typescript
+   if (payload.runId && (payload.status === 'ok' || payload.status === 'done' || ...)) {
+     handleRunCompletion(payload);
+     return;
+   }
+   ```
+   But only finalize if `handleChatEvent` hasn't already (use `activeRunIdRef`).
+
+3. **Reconnection recovery:** On WS reconnect, if `isRunning` was true, immediately re-fetch history to recover any missed final events.
+
+#### 2D: Improve Streaming (switch to agent events)
 
 1. **Add `event agent` handler** for `stream: "assistant"` events
    - These fire per-token with no throttle delay
