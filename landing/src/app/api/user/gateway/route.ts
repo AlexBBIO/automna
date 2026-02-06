@@ -9,8 +9,10 @@ async function getPhoneNumber(userId: string): Promise<string | null> {
     const userPhone = await db.query.phoneNumbers.findFirst({
       where: eq(phoneNumbers.userId, userId),
     });
+    console.log(`[api/user/gateway] Phone lookup for ${userId}:`, userPhone?.phoneNumber || 'none');
     return userPhone?.phoneNumber || null;
-  } catch {
+  } catch (err) {
+    console.error(`[api/user/gateway] Phone lookup error for ${userId}:`, err);
     return null;
   }
 }
