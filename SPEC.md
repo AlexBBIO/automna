@@ -30,6 +30,7 @@
 | **Files API** | ✅ Working | Caddy reverse proxy → internal file server |
 | **Agent Config** | ✅ Working | Workspace injection, memory enabled |
 | **Security Hardening** | ✅ Complete | No API keys on user machines |
+| **Voice Calling** | ✅ Working | Twilio + Bland.ai BYOT, outbound + inbound |
 
 ### 🔧 In Progress
 | Component | Status | Notes |
@@ -50,6 +51,33 @@
 | `ghcr.io/phioranex/openclaw-docker` | ❌ Deprecated | Use custom Automna image |
 
 ### 📝 Recent Changes (2026-02-03)
+
+**📞 Voice Calling (2026-02-06):**
+
+Added AI-powered phone calling via Twilio + Bland.ai:
+
+1. **Architecture:** Twilio provides phone numbers, Bland.ai handles AI voice conversations via BYOT (Bring Your Own Twilio)
+2. **Outbound calls:** Agent uses `POST /api/user/call` with task prompt → proxy validates auth + plan limits → Bland makes the call → webhook delivers transcript
+3. **Inbound calls:** Calls to user's number → Twilio routes to Bland → AI answers with user's configured prompt/voice → webhook delivers transcript
+4. **Transcript delivery:** Dual approach - (a) direct file write to `calls/` directory on user's Fly volume, (b) message injected into agent session for follow-up actions
+5. **Auto-provisioning:** Stripe webhook provisions a phone number when user upgrades to Pro/Business
+6. **Default voice:** Alexandra (young chirpy American female, ID: `6277266e-01eb-44c6-b965-438566ef7076`)
+7. **Security:** No Twilio/Bland credentials on user machines. All calls proxied through `automna.ai/api/user/call`. Gateway token is the only auth needed.
+8. **Cost:** Twilio $1.15/mo per number + Bland $0.12/min. Pro tier (60 min cap) worst case ~$8.20/mo at $49 price.
+9. **Plan limits:** Free/Starter: 0 min, Pro: 60 min/mo, Business: 300 min/mo
+
+**DB tables:** `phone_numbers` (user → number mapping, voice/identity config), `call_usage` (call tracking, transcripts, cost)
+
+**API endpoints:**
+- `POST /api/user/call` - make outbound call
+- `POST /api/webhooks/bland/status` - call completion webhook
+- `GET /api/user/call/usage` - usage stats + call history
+
+**Libraries:** `src/lib/twilio.ts` (number provisioning), `src/lib/bland.ts` (BYOT import, inbound config)
+
+**Full spec:** `docs/VOICE-CALLING.md`
+
+---
 
 **🔒 Security Hardening Complete (18:15 UTC):**
 

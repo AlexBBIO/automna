@@ -17,6 +17,8 @@ All external API calls from user machines route through Automna proxies.
 | Browserbase | `/api/browserbase/v1/[path]` | `X-BB-API-Key` | ✅ Production |
 | Brave Search | `/api/brave/[path]` | `X-Subscription-Token` | ✅ Production |
 | Agentmail | `/api/user/email/*` | Bearer token | ✅ Production |
+| Voice Calls | `/api/user/call` | Bearer token | ✅ Production |
+| Call Usage | `/api/user/call/usage` | Bearer token | ✅ Production |
 
 ## Architecture
 
