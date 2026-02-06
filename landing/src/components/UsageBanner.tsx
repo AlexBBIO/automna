@@ -118,8 +118,8 @@ export function UsageBanner({ gatewayUrl, authToken }: { gatewayUrl: string; aut
   };
 
   const planName = usage.plan.charAt(0).toUpperCase() + usage.plan.slice(1);
-  const costDollars = (usage.usage.costCents / 100).toFixed(2);
-  const limitDollars = (usage.limits.monthlyCostCents / 100).toFixed(2);
+  const usedTokensK = Math.round(usage.usage.totalTokens / 1000);
+  const limitTokensK = Math.round(usage.limits.monthlyTokens / 1000);
 
   // Style based on level
   const styles = {
@@ -155,9 +155,9 @@ export function UsageBanner({ gatewayUrl, authToken }: { gatewayUrl: string; aut
   const s = styles[level];
 
   const messages = {
-    info: `You've used ${maxPercent}% of your ${planName} plan this month ($${costDollars}/$${limitDollars}).`,
-    warning: `You're at ${maxPercent}% of your ${planName} plan limit ($${costDollars}/$${limitDollars}). Upgrade to keep chatting uninterrupted.`,
-    limit: `You've reached your ${planName} plan limit ($${costDollars}/$${limitDollars}). Upgrade to continue using your agent.`,
+    info: `You've used ${usedTokensK}K of ${limitTokensK}K tokens on your ${planName} plan this month.`,
+    warning: `You've used ${usedTokensK}K of ${limitTokensK}K tokens on your ${planName} plan. Upgrade to keep chatting uninterrupted.`,
+    limit: `You've reached your ${planName} plan token limit (${limitTokensK}K). Upgrade to continue using your agent.`,
   };
 
   return (
