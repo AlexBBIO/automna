@@ -944,6 +944,75 @@ This handler creates messages without checking if `handleChatEvent` already hand
 
 ---
 
+## Part 9: Image Rendering Regression (Phase 1 Bug)
+
+### 9.1 What Broke
+
+The Phase 1 cleanup inadvertently changed the behavior of the `hasRicherContent` check in the post-final history re-fetch. This causes the re-fetch to skip updating messages that contain images.
+
+### 9.2 Root Cause
+
+In the `handleChatEvent` final handler, a subtle change in what gets stored in `pendingRefetchRef`:
+
+**Old code:**
+```javascript
+const streamedText = streamingTextRef.current || '';  // Raw streaming text (could be empty)
+// ... finalize streaming message ...
+pendingRefetchRef.current = { tempId, streamedText };  // Stores raw streamed text
+```
+
+**New code:**
+```javascript
+const streamedText = streamingTextRef.current;
+const finalText = message?.content?.find(...)?.text || '';  // ← NEW: fallback to final event text
+const bestText = streamedText || finalText;                 // ← NEW: uses final text if no streaming
+const cleanedText = bestText ? stripMessageMeta(bestText) : '';
+pendingRefetchRef.current = { messageId: finalId, streamedText: cleanedText };  // Stores LONGER text
+```
+
+The new code added `|| finalText` as a fallback. This means `cleanedText` could be the full message text (from the final event), instead of empty string.
+
+### 9.3 How This Breaks Images
+
+The re-fetch handler decides whether to update the message with this check:
+
+```javascript
+const hasRicherContent =
+  fullContent.length > 1 ||
+  fullText.length > pending.streamedText.length ||  // ← This comparison
+  hasImage;
+```
+
+**Old behavior:** If no streaming deltas arrived (fast response), `streamedText` was empty (`""`). So `fullText.length > 0` was always true → re-fetch ALWAYS updates → images appear.
+
+**New behavior:** `streamedText` is now the full final event text (from `|| finalText` fallback). So `fullText.length > streamedText.length` is false (they're the same text) → falls through to `hasImage` check → only updates if history has `type: "image"` content parts.
+
+**BUT:** The `hasImage` check should still catch actual image content parts. So the issue might be more specific: MEDIA paths in text (not `type: "image"` base64 parts) would NOT trigger an update, because they come as `type: "text"` parts and `fullContent.length` would be 1 (just the text).
+
+### 9.4 Fix
+
+Remove the `|| finalText` fallback. Store the raw streaming text like the old code did:
+
+```javascript
+// In handleChatEvent final:
+const streamedText = streamingTextRef.current;
+streamingTextRef.current = '';
+
+// For the message content, use finalText as fallback
+const finalText = message?.content?.find(...)?.text || '';
+const displayText = streamedText || finalText;
+const cleanedText = displayText ? stripMessageMeta(displayText) : '';
+
+// But for the re-fetch comparison, use ONLY the streamed text
+pendingRefetchRef.current = { messageId: finalId, streamedText: streamedText };
+```
+
+This way:
+- The displayed message uses `finalText` as fallback (good for commands)
+- The re-fetch comparison uses raw `streamedText` (preserves old behavior where empty streaming → always update)
+
+---
+
 ## Appendix A: Raw Event Log (Annotated)
 
 From debug session 2026-02-05. Agent responding "Ha, yeah? What happened? Technical hiccups or something weirder?"
