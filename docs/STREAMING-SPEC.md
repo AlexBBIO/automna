@@ -675,23 +675,25 @@ pendingRefetchRef.current = { messageId: finalId, streamedText: streamedText };
 
 3. **Reconnection recovery:** On WS reconnect, if `isRunning` was true, immediately re-fetch history to recover any missed final events.
 
-#### 2D: Improve Streaming (switch to agent events)
+#### 2D: Switch to Agent Events for Streaming ✅ DONE
 
-1. **Add `event agent` handler** for `stream: "assistant"` events
-   - These fire per-token with no throttle delay
-   - Accumulate text client-side for smoother streaming
-   - Use `runId` from events for deduplication
+Deployed 2026-02-06. Replaced all chat delta handling with agent event handling.
 
-2. **Change `event chat` delta to no-op** (just return, don't process)
-   - These are throttled at 150ms and always behind agent events
+**What changed:**
+- `event agent stream:"assistant"` → per-token `delta` field, client accumulates
+- `event agent stream:"tool"` → logged, recovery timer reset
+- `event agent stream:"lifecycle"` → phase transitions logged
+- `event chat state:"delta"` → NO-OP (only resets recovery timer)
+- `event chat state:"final"` → unchanged, authoritative completion
 
-3. **Update `event chat` final handler**
-   - Use `runId` as permanent message ID
-   - Clear `activeRunIdRef`
-   - Trigger re-fetch only if needed (check `hasImage` flag from agent events)
+**Why this is better:**
+- Agent deltas are per-token (no 150ms throttle)
+- Text accumulates client-side across tool calls (no resets)
+- Explicit tool/lifecycle events (no heuristics)
+- Our accumulated text is often MORE complete than gateway's final event
+- Non-agent runs (commands) still work via final event's message field
 
-4. **Handle non-agent runs** (commands) via final event's `message` field
-   - No agent events fire for commands, so `event chat` final is the only path
+**Removed:** `completedChunksRef`, 50% length heuristic, chunk concatenation hack
 
 ### Phase 3: Testing
 
