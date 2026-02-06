@@ -150,6 +150,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const pendingRefetchRef = useRef<PendingRefetch | null>(null);
   const isRunningRef = useRef(false); // Mirror of isRunning for use in timeouts
   const activeRunIdRef = useRef<string | null>(null); // Current run ID for deduplication
+  const completedChunksRef = useRef(''); // Text from completed assistant turns (before tool calls)
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryAttemptsRef = useRef(0);
   const deltaCountRef = useRef(0); // Count deltas per run for diagnostics
@@ -374,7 +375,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   function handleSendAck(payload: Record<string, unknown>) {
     const runId = payload.runId as string | undefined;
     log('📤 Run started:', { runId, status: payload.status });
+    // Cancel any pending re-fetch from previous run (prevents cross-run content swap)
+    pendingRefetchRef.current = null;
     activeRunIdRef.current = runId || null;
+    completedChunksRef.current = '';
     deltaCountRef.current = 0;
     setIsRunning(true);
     isRunningRef.current = true;
@@ -408,15 +412,33 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       const streamingId = runId ? `streaming-${runId}` : 'streaming';
       const textContent = message?.content?.find((c) => c.type === 'text')?.text;
       if (message?.role === 'assistant' && typeof textContent === 'string' && textContent) {
-        streamingTextRef.current = textContent;
+        const existing = streamingTextRef.current;
+
+        // Detect text reset: gateway resets accumulated text after tool calls.
+        // When the new text is much shorter than existing, the agent started a new
+        // assistant turn after a tool call. Preserve the previous text.
+        if (existing && textContent.length < existing.length * 0.5) {
+          log('🔧 Tool call detected: text reset from', existing.length, 'to', textContent.length);
+          // Save everything we had as completed chunks
+          completedChunksRef.current = existing;
+        }
+
+        // Build display text: completed chunks + current accumulation
+        if (completedChunksRef.current) {
+          streamingTextRef.current = completedChunksRef.current + '\n\n' + textContent;
+        } else {
+          streamingTextRef.current = textContent;
+        }
+
+        const displayText = streamingTextRef.current;
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === 'assistant' && (last.id === streamingId || last.id === 'streaming')) {
-            return [...prev.slice(0, -1), { ...last, id: streamingId, content: [{ type: 'text', text: textContent }] }];
+            return [...prev.slice(0, -1), { ...last, id: streamingId, content: [{ type: 'text', text: displayText }] }];
           }
           return [
             ...prev,
-            { id: streamingId, role: 'assistant', content: [{ type: 'text', text: textContent }], createdAt: new Date() },
+            { id: streamingId, role: 'assistant', content: [{ type: 'text', text: displayText }], createdAt: new Date() },
           ];
         });
       }
@@ -428,6 +450,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       clearRecoveryTimer();
       const streamedText = streamingTextRef.current;
       streamingTextRef.current = '';
+      completedChunksRef.current = '';
 
       // Get text from the final event's message (fallback for non-agent runs like commands)
       const finalText = message?.content?.find((c) => c.type === 'text')?.text || '';
@@ -539,6 +562,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     mountedRef.current = true;
     connectSentRef.current = false;
     streamingTextRef.current = '';
+    completedChunksRef.current = '';
     historyLoadedRef.current = false;
     pendingRefetchRef.current = null;
     isRunningRef.current = false;
