@@ -119,42 +119,16 @@ function parseContent(raw: unknown): ContentPart[] {
   return [];
 }
 
-/** Convert raw API messages to ThreadMessage[], filtering out system/tool messages
- *  and merging consecutive assistant messages into single bubbles */
+/** Convert raw API messages to ThreadMessage[], filtering out system/tool messages */
 function parseMessages(messages: RawMessage[], prefix: string): ThreadMessage[] {
-  const filtered = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
-  const merged: ThreadMessage[] = [];
-
-  for (let i = 0; i < filtered.length; i++) {
-    const m = filtered[i];
-    const role = m.role as 'user' | 'assistant';
-    const content = parseContent(m.content);
-    const last = merged[merged.length - 1];
-
-    // Merge consecutive assistant messages (separated by tool calls in the original)
-    if (role === 'assistant' && last?.role === 'assistant') {
-      const lastText = last.content.find((p) => p.type === 'text')?.text || '';
-      const newText = content.find((p) => p.type === 'text')?.text || '';
-      // Combine text parts with separator, keep non-text parts (images)
-      const nonTextParts = [
-        ...last.content.filter((p) => p.type !== 'text'),
-        ...content.filter((p) => p.type !== 'text'),
-      ];
-      const combinedText = [lastText, newText].filter(Boolean).join('\n\n');
-      last.content = [
-        { type: 'text', text: combinedText },
-        ...nonTextParts,
-      ];
-    } else {
-      merged.push({
-        id: `${prefix}-${i}`,
-        role,
-        content,
-        createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
-      });
-    }
-  }
-  return merged;
+  return messages
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .map((m, idx) => ({
+      id: `${prefix}-${idx}`,
+      role: m.role as 'user' | 'assistant',
+      content: parseContent(m.content),
+      createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
+    }));
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -176,7 +150,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const pendingRefetchRef = useRef<PendingRefetch | null>(null);
   const isRunningRef = useRef(false); // Mirror of isRunning for use in timeouts
   const activeRunIdRef = useRef<string | null>(null); // Current run ID for deduplication
-  const pendingToolSepRef = useRef(false); // Insert separator before next delta (after tool call)
+  const turnCountRef = useRef(0); // Counts assistant turns within a run (increments on tool calls)
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryAttemptsRef = useRef(0);
   const deltaCountRef = useRef(0); // Count deltas per run for diagnostics
@@ -287,13 +261,17 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     setIsRunning(false);
     isRunningRef.current = false;
 
-    // Keep whatever streamed text we have, just give it a permanent ID
+    // Give any remaining streaming messages permanent IDs
     setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      if (last?.role === 'assistant' && (last.id === 'streaming' || last.id.startsWith('streaming-'))) {
-        return [...prev.slice(0, -1), { ...last, id: genId() }];
-      }
-      return prev;
+      let changed = false;
+      const updated = prev.map((m) => {
+        if (m.role === 'assistant' && (m.id === 'streaming' || m.id.startsWith('streaming-'))) {
+          changed = true;
+          return { ...m, id: genId() };
+        }
+        return m;
+      });
+      return changed ? updated : prev;
     });
   }
 
@@ -347,14 +325,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     httpHistoryAbortRef.current?.abort();
 
     if (wsMessages.length > 0) {
-      // Use parseMessages which filters and merges consecutive assistant messages
-      const history = parseMessages(
-        wsMessages.map((m) => ({
-          ...m,
-          timestamp: m.createdAt ? new Date(m.createdAt).getTime() : undefined,
-        })),
-        'ws'
-      );
+      const history = wsMessages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({
+          id: m.id || genId(),
+          role: m.role as 'user' | 'assistant',
+          content: parseContent(m.content),
+          createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+        }));
       setMessages(history);
     }
     setLoadingPhase('ready');
@@ -404,7 +382,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     // Cancel any pending re-fetch from previous run (prevents cross-run content swap)
     pendingRefetchRef.current = null;
     activeRunIdRef.current = runId || null;
-    pendingToolSepRef.current = false;
+    turnCountRef.current = 0;
     deltaCountRef.current = 0;
     setIsRunning(true);
     isRunningRef.current = true;
@@ -455,12 +433,16 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         contentTypes: message?.content?.map((c) => c.type),
       });
 
-      // Finalize the streaming message with a permanent ID (runId-based for dedup)
+      // Finalize the last streaming message with a permanent ID
       const finalId = runId || genId();
-      const streamingId = runId ? `streaming-${runId}` : 'streaming';
+      const turn = turnCountRef.current;
+      const streamingId = runId
+        ? (turn > 0 ? `streaming-${runId}-t${turn}` : `streaming-${runId}`)
+        : 'streaming';
       activeRunIdRef.current = null;
+      turnCountRef.current = 0;
       setMessages((prev) => {
-        // Find the streaming message for this run (by runId or generic 'streaming')
+        // Find the streaming message for the current turn
         const streamIdx = prev.findIndex((m) =>
           m.role === 'assistant' && (m.id === streamingId || m.id === 'streaming')
         );
@@ -536,24 +518,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         deltaCountRef.current++;
         startRecoveryTimer();
 
-        // Insert separator between assistant turns (after tool calls)
-        if (pendingToolSepRef.current) {
-          streamingTextRef.current += '\n\n';
-          pendingToolSepRef.current = false;
-        }
-
-        // Append delta to our own accumulator (no resets, no heuristics)
+        // Append delta to our accumulator
         streamingTextRef.current += delta;
         const displayText = streamingTextRef.current;
 
+        // Streaming ID includes turn count so each assistant turn gets its own bubble
+        const turn = turnCountRef.current;
+        const sid = runId
+          ? (turn > 0 ? `streaming-${runId}-t${turn}` : `streaming-${runId}`)
+          : 'streaming';
+
         setMessages((prev) => {
           const last = prev[prev.length - 1];
-          if (last?.role === 'assistant' && (last.id === streamingId || last.id === 'streaming')) {
-            return [...prev.slice(0, -1), { ...last, id: streamingId, content: [{ type: 'text', text: displayText }] }];
+          if (last?.role === 'assistant' && last.id === sid) {
+            return [...prev.slice(0, -1), { ...last, content: [{ type: 'text', text: displayText }] }];
           }
           return [
             ...prev,
-            { id: streamingId, role: 'assistant', content: [{ type: 'text', text: displayText }], createdAt: new Date() },
+            { id: sid, role: 'assistant', content: [{ type: 'text', text: displayText }], createdAt: new Date() },
           ];
         });
       }
@@ -561,9 +543,34 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     }
 
     if (stream === 'tool') {
-      // Tool call in progress - reset recovery timer and mark for separator
+      // Tool call - finalize current streaming bubble, start new one for next turn
       startRecoveryTimer();
-      pendingToolSepRef.current = true;
+
+      const currentText = streamingTextRef.current;
+      if (currentText) {
+        const currentRunId = activeRunIdRef.current;
+        const turn = turnCountRef.current;
+        const currentSid = currentRunId
+          ? (turn > 0 ? `streaming-${currentRunId}-t${turn}` : `streaming-${currentRunId}`)
+          : 'streaming';
+        const permanentId = genId();
+
+        // Give current bubble a permanent ID (no longer "streaming")
+        setMessages((prev) => {
+          const idx = prev.findIndex((m) => m.role === 'assistant' && m.id === currentSid);
+          if (idx >= 0) {
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], id: permanentId, content: [{ type: 'text', text: stripMessageMeta(currentText) }] };
+            return updated;
+          }
+          return prev;
+        });
+
+        // Reset accumulator and increment turn for next bubble
+        streamingTextRef.current = '';
+        turnCountRef.current++;
+      }
+
       log('🔧 Tool call:', data ? JSON.stringify(data).slice(0, 100) : '');
       return;
     }
