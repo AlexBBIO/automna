@@ -73,23 +73,40 @@ The token budget = cost cap ÷ $0.0001. If cost caps change, token budgets chang
 > `claude-opus-4-5`. The correct rate is $5/$25. This means we've been overcharging
 > cost calculations by ~3x for Opus 4.5 users. MUST FIX.
 
-**Automna Token cost per LLM request (typical examples):**
+**How LLM Automna Tokens are calculated:**
 
-| Scenario | Real Cost | Automna Tokens |
-|----------|-----------|---------------|
-| Short Sonnet message (500 in, 200 out, 8K cache read) | ~$0.006 | ~60 |
-| Medium Sonnet message (1K in, 1K out, 15K cache read) | ~$0.023 | ~230 |
-| Short Opus 4.5 message (500 in, 200 out, 8K cache read) | ~$0.012 | ~120 |
-| Medium Opus 4.5 message (1K in, 1K out, 15K cache read) | ~$0.040 | ~400 |
-| Heavy Opus 4.5 message (2K in, 3K out, 50K cache read) | ~$0.110 | ~1,100 |
+Automna Tokens for LLM requests are NOT a per-message flat fee. They are computed from
+the **exact token counts** Anthropic reports for each individual API call:
 
-**Conversion formula:**
 ```
-automnaTokens = ceil(costMicrodollars / 100)
+realCost = (inputTokens × modelInputPrice)
+         + (outputTokens × modelOutputPrice)
+         + (cacheCreationTokens × modelCacheWritePrice)
+         + (cacheReadTokens × modelCacheReadPrice)
+
+automnaTokens = ceil(realCost_in_microdollars / 100)
 ```
 
-Where `costMicrodollars` is calculated from ALL token types at their respective rates
-(input, output, cache creation, cache read).
+This means:
+- A request where the model "thinks" for 10K output tokens costs ~50x more than
+  a 200-token response, even if the user typed the same input
+- Extended thinking tokens are included in `output_tokens` (confirmed by Anthropic docs)
+- Long conversation history increases cache read tokens (cheap but nonzero)
+- Tool use adds input tokens (tool definitions) and output tokens (tool calls)
+- Each request is metered individually — no averaging, no estimates
+
+**Cost varies wildly per request.** A simple "hello" reply might cost 30 Automna Tokens.
+A complex reasoning task with extended thinking could cost 5,000+. That's correct and
+intentional — heavier work costs more.
+
+**Real example from production data (Opus 4.5, corrected pricing):**
+
+| Actual Request | Output Tokens | Cache Read | Real Cost | Automna Tokens |
+|---------------|--------------|------------|-----------|---------------|
+| Short reply (8 output) | 8 | 8,000 | ~$0.004 | ~40 |
+| Medium reply (141 output) | 141 | 15,000 | ~$0.011 | ~110 |
+| Long reply (3,600 output) | 3,600 | 50,000 | ~$0.115 | ~1,150 |
+| Heavy thinking (10K output) | 10,000 | 50,000 | ~$0.275 | ~2,750 |
 
 ### Voice Calls (Bland.ai + Twilio)
 
@@ -194,39 +211,42 @@ Gemini embeddings are essentially free. Minimum 1 Automna Token per request.
 
 Quick reference for all billable activities:
 
-| Activity | Automna Tokens | Notes |
-|----------|---------------|-------|
-| **Sonnet chat message** (typical) | 50-300 | Depends on length |
-| **Opus 4.5 chat message** (typical) | 100-1,100 | Depends on length |
+| Activity | Automna Tokens | How Measured |
+|----------|---------------|-------------|
+| **LLM request** | 30 - 5,000+ | Exact cost from Anthropic's reported token counts (input, output, thinking, cache) |
 | **Web search** | 30 | Per query |
-| **Browser session** (per minute) | 20 | Per minute active |
-| **Phone call** (per minute) | 900 | Connected time |
-| **Failed call attempt** | 150 | Flat |
+| **Browser session** | 20/min | Per minute active |
+| **Phone call** | 900/min | Per minute connected |
+| **Failed call attempt** | 150 | Per attempt |
 | **Email sent** | 20 | Per email |
 | **Email read** | 0 | Free |
 | **Embedding** | 1 | Per request |
 
+> **LLM is the only variable-cost item.** Everything else has a fixed per-unit rate.
+> LLM cost depends entirely on what the model actually does for each request (thinking
+> time, response length, conversation history size, tool use, etc.).
+
 ### What does a plan budget feel like?
 
-**Starter (200K tokens):**
-- ~600-4,000 Sonnet chat messages, OR
-- ~200-2,000 Opus 4.5 chat messages, OR
-- ~220 minutes of phone calls, OR
-- ~6,600 web searches
-- Realistic mixed use: ~2-3 weeks of moderate daily chat + occasional search/browse
+These are rough guides based on observed production usage patterns. Actual cost per
+request varies significantly based on model thinking time, conversation length, and
+tool use.
 
-**Pro (1M tokens):**
-- ~3,000-20,000 Sonnet chat messages, OR
-- ~900-10,000 Opus 4.5 chat messages, OR
-- ~1,100 minutes of phone calls, OR
-- ~33,000 web searches
-- Realistic mixed use: heavy daily use all month with room to spare
+**Starter (200K tokens = $20 real cost):**
+- Enough for moderate daily chat use for 2-3 weeks (Sonnet) or 1-2 weeks (Opus)
+- OR ~220 minutes of phone calls
+- OR ~6,600 web searches
+- Heavy thinkers or long conversations burn through faster
 
-**Business (5M tokens):**
-- ~15,000-100,000 Sonnet chat messages, OR
-- ~4,500-50,000 Opus 4.5 chat messages, OR
-- ~5,500 minutes of phone calls
-- Realistic mixed use: multiple agents running continuously
+**Pro (1M tokens = $100 real cost):**
+- Enough for heavy daily use all month on Sonnet, or moderate on Opus
+- OR ~1,100 minutes of phone calls
+- Realistic for power users who chat throughout the day
+
+**Business (5M tokens = $500 real cost):**
+- Enough for multiple agents running continuously
+- OR ~5,500 minutes of phone calls
+- For teams or heavy automation workflows
 
 ---
 
