@@ -4,11 +4,28 @@ import Stripe from 'stripe';
 import { clerkClient } from '@clerk/nextjs/server';
 import { sendSubscriptionStarted, sendSubscriptionCanceled, sendPaymentFailed } from '@/lib/email';
 import { db } from '@/lib/db';
-import { machines } from '@/lib/db/schema';
+import { machines, machineEvents } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 // Initialize Stripe lazily to avoid build-time errors
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
+const FLY_API_BASE = "https://api.machines.dev/v1";
+
+/**
+ * Get memory allocation based on plan tier
+ * Must match the logic in provision/route.ts
+ */
+function getMemoryForPlan(plan: string): number {
+  switch (plan) {
+    case "pro":
+    case "business":
+      return 4096;
+    default:
+      return 2048;
+  }
+}
 
 /**
  * Update the user's plan in the machines table.
@@ -24,6 +41,126 @@ async function updateMachinePlan(userId: string, plan: string): Promise<void> {
   } catch (error) {
     // Log but don't fail the webhook - Clerk update is the primary record
     console.error(`[stripe] Failed to update machines.plan for ${userId}:`, error);
+  }
+}
+
+/**
+ * Scale a user's Fly machine memory to match their plan tier.
+ * Fetches current machine config, updates memory_mb, and logs the event.
+ * Non-fatal: logs errors but doesn't fail the webhook.
+ */
+async function scaleMachineForPlan(userId: string, plan: string): Promise<void> {
+  const targetMemory = getMemoryForPlan(plan);
+  
+  try {
+    // Find user's machine
+    const machine = await db.query.machines.findFirst({
+      where: eq(machines.userId, userId),
+    });
+
+    if (!machine || !machine.appName) {
+      console.log(`[stripe] No machine found for ${userId}, skipping memory scale`);
+      return;
+    }
+
+    // Get current machine config from Fly
+    const statusRes = await fetch(`${FLY_API_BASE}/apps/${machine.appName}/machines/${machine.id}`, {
+      headers: { Authorization: `Bearer ${FLY_API_TOKEN}` },
+    });
+
+    if (!statusRes.ok) {
+      console.error(`[stripe] Failed to get machine status for ${machine.appName}/${machine.id}: ${statusRes.status} ${await statusRes.text()}`);
+      await db.insert(machineEvents).values({
+        machineId: machine.id,
+        eventType: "scale_error",
+        details: JSON.stringify({
+          action: "get_status",
+          plan,
+          targetMemory,
+          error: `HTTP ${statusRes.status}`,
+        }),
+      });
+      return;
+    }
+
+    const flyMachine = await statusRes.json();
+    const currentMemory = flyMachine.config?.guest?.memory_mb || 2048;
+
+    if (currentMemory === targetMemory) {
+      console.log(`[stripe] Machine ${machine.id} already at ${targetMemory}MB, no scale needed`);
+      return;
+    }
+
+    console.log(`[stripe] Scaling machine ${machine.id} (${machine.appName}): ${currentMemory}MB → ${targetMemory}MB (plan: ${plan})`);
+
+    // Update the machine config with new memory
+    // We need to send the full config with only memory changed
+    const updatedConfig = {
+      ...flyMachine.config,
+      guest: {
+        ...flyMachine.config.guest,
+        memory_mb: targetMemory,
+      },
+    };
+
+    const updateRes = await fetch(`${FLY_API_BASE}/apps/${machine.appName}/machines/${machine.id}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${FLY_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ config: updatedConfig }),
+    });
+
+    if (!updateRes.ok) {
+      const errorText = await updateRes.text();
+      console.error(`[stripe] Failed to scale machine ${machine.id}: ${updateRes.status} ${errorText}`);
+      await db.insert(machineEvents).values({
+        machineId: machine.id,
+        eventType: "scale_error",
+        details: JSON.stringify({
+          action: "update_memory",
+          plan,
+          fromMemory: currentMemory,
+          targetMemory,
+          error: `HTTP ${updateRes.status}: ${errorText.slice(0, 500)}`,
+        }),
+      });
+      return;
+    }
+
+    console.log(`[stripe] Successfully scaled machine ${machine.id} to ${targetMemory}MB`);
+
+    // Log success
+    await db.insert(machineEvents).values({
+      machineId: machine.id,
+      eventType: "scaled",
+      details: JSON.stringify({
+        plan,
+        fromMemory: currentMemory,
+        toMemory: targetMemory,
+        triggeredBy: "stripe-webhook",
+      }),
+    });
+  } catch (error) {
+    console.error(`[stripe] Error scaling machine for ${userId}:`, error);
+    // Best-effort event logging
+    try {
+      const machine = await db.query.machines.findFirst({
+        where: eq(machines.userId, userId),
+      });
+      if (machine) {
+        await db.insert(machineEvents).values({
+          machineId: machine.id,
+          eventType: "scale_error",
+          details: JSON.stringify({
+            plan,
+            targetMemory,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        });
+      }
+    } catch { /* ignore logging failures */ }
   }
 }
 
@@ -64,6 +201,9 @@ export async function POST(request: Request) {
           
           // Update machines table (used for rate limiting)
           await updateMachinePlan(clerkUserId, plan);
+          
+          // Scale machine memory to match plan tier (non-blocking, non-fatal)
+          await scaleMachineForPlan(clerkUserId, plan);
           
           console.log(`[stripe] Upgraded user ${clerkUserId} to ${plan}`);
 
@@ -116,6 +256,9 @@ export async function POST(request: Request) {
           
           // Update machines table (rate limiting will revert to free tier)
           await updateMachinePlan(clerkUserId, 'free');
+          
+          // Scale machine memory down to starter tier
+          await scaleMachineForPlan(clerkUserId, 'free');
           
           console.log(`[stripe] Canceled subscription for user ${clerkUserId}`);
 
