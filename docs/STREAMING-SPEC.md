@@ -843,6 +843,107 @@ export const AUTOMNA_COMMANDS = [
 
 ---
 
+## Part 8: Double Message Bug
+
+### 8.1 Symptom
+
+Sometimes the agent sends what appears to be two messages. The first message appears and sits in the chat, then a second message appears which overwrites the first.
+
+### 8.2 Root Cause Analysis
+
+There are **three independent code paths** that can create or modify assistant messages, and they can fire in overlapping sequence:
+
+#### Path 1: Streaming delta → Final event
+```
+event chat state:"delta"  → creates/updates message id:"streaming"
+event chat state:"final"  → replaces id:"streaming" with id:finalId, sets content
+```
+
+#### Path 2: History re-fetch (500ms after final)
+```
+setTimeout(500ms) → wsSend('chat.history')
+                  → handleRefetchResponse() 
+                  → updates message by finalId with richer content
+                  → OR adds new message if finalId not found (!)
+```
+
+#### Path 3: Run completion via `res` message
+```
+res { runId, status:"done"|"completed"|"finished" }
+  → handleRunCompletion()
+  → creates new message OR updates streaming message
+```
+
+### 8.3 Likely Scenarios Causing the Double Message
+
+**Scenario A: Final event + Re-fetch creates visual "jump"**
+
+1. `handleChatEvent` final fires → message appears with streamed text
+2. 500ms later → `handleRefetchResponse` fires → message content REPLACES with history version
+3. If history text is different (longer, formatted differently, has MEDIA), the message visibly changes
+4. User perception: "first message sits, then gets overwritten"
+
+This isn't technically two messages, but the content change is jarring.
+
+**Scenario B: `handleRunCompletion` AND `handleChatEvent` both fire**
+
+Looking at the OpenClaw source:
+- Agent runs: `emitChatFinal()` sends `event chat state:"final"` (from server-chat.js)
+- Non-agent runs: `broadcastChatFinal()` sends `event chat state:"final"` (from chat.send handler)
+- After either: dedupe cache stores `{ runId, status: "ok" }` as a `res` message
+
+Our router checks for `status: "done"|"completed"|"finished"` but NOT `"ok"`. So normally `handleRunCompletion` shouldn't fire. However, if there's any code path that sends a `res` with matching status, BOTH handlers would fire:
+- `handleChatEvent` final → creates message with finalId
+- `handleRunCompletion` → creates ANOTHER message (can't find id:"streaming" because final already changed it)
+
+**Scenario C: Timing race with `pendingRefetchRef`**
+
+1. Final event fires → `handleChatEvent` sets `pendingRefetchRef` after 500ms
+2. But the `handleHistoryResponse` function checks `pendingRefetchRef` immediately
+3. If a stale history response arrives (from initial connect or a previous re-fetch) BEFORE the 500ms setTimeout fires, it could hit the initial-load path instead of the re-fetch path
+4. Or if `pendingRefetchRef` is set but the history response doesn't find the `messageId`, it ADDS a new message instead of updating
+
+**Scenario D: Non-agent run (commands) create a message, then agent re-fetch adds another**
+
+For commands like `/status`:
+1. No streaming deltas (no `event agent` or `event chat delta`)
+2. `event chat state:"final"` fires with `message` content → `handleChatEvent` creates message (no streaming message exists, so adds new one)
+3. Re-fetch fires 500ms later → `handleRefetchResponse` finds the last assistant message in history
+4. If history's last message is DIFFERENT from the command response (e.g., a previous agent message), it might update the wrong message or add another
+
+### 8.4 Specific Code Issues
+
+**Issue 1: `handleRefetchResponse` fallback adds messages**
+```typescript
+if (idx >= 0) {
+  // Update in-place ✓
+} else {
+  // ADDS A NEW MESSAGE if finalId not found!
+  return [...prev, { id: pending.messageId, ... }];
+}
+```
+If the `finalId` message was somehow removed or the state update from `handleChatEvent` hasn't committed yet (React batching), this creates a duplicate.
+
+**Issue 2: No deduplication by runId**
+We don't track `runId`. Multiple events for the same run can each create messages. If we tracked `runId`, we could deduplicate.
+
+**Issue 3: `handleRunCompletion` can create messages independently**
+This handler creates messages without checking if `handleChatEvent` already handled the same run. It's a "fallback" that can accidentally double up.
+
+### 8.5 Proposed Fixes (for Phase 2)
+
+1. **Track `activeRunId`** - Store the current run's ID. All handlers check against it before creating messages.
+
+2. **Remove `handleRunCompletion` or make it no-op when chat event handled it** - The `res` completion path was added as a fallback for "some OpenClaw versions." Verify if it's still needed. If so, gate it behind a check: "only if `handleChatEvent` didn't already finalize this run."
+
+3. **Don't add messages in `handleRefetchResponse`** - If the `finalId` isn't found, log a warning and do nothing instead of adding a duplicate. The message is already displayed from the final event.
+
+4. **Debounce or merge rapid message updates** - Use `requestAnimationFrame` or a short debounce to coalesce multiple state updates within the same frame.
+
+5. **Use `runId` as message ID** - Instead of random `genId()` for finalized messages, use the `runId` from the event. This prevents the same run from creating multiple messages. The streaming message still uses `id: "streaming"`, but on finalize it gets `id: runId`.
+
+---
+
 ## Appendix A: Raw Event Log (Annotated)
 
 From debug session 2026-02-05. Agent responding "Ha, yeah? What happened? Technical hiccups or something weirder?"
