@@ -41,7 +41,7 @@ export async function checkRateLimits(
   // 1. Check monthly usage
   const monthlyUsageResult = await db
     .select({
-      totalTokens: sql<number>`COALESCE(SUM(input_tokens + output_tokens), 0)`.as('total_tokens'),
+      totalTokens: sql<number>`COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0)`.as('total_tokens'),
       totalCost: sql<number>`COALESCE(SUM(cost_microdollars), 0)`.as('total_cost'),
     })
     .from(llmUsage)

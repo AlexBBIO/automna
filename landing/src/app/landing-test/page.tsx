@@ -28,51 +28,145 @@ const integrations = {
 // Demo tabs data
 const demoTabs = [
   {
-    id: 'competitor',
-    title: 'Competitor monitor',
-    oneLiner: 'Track mentions and ship a clean summary to your inbox or Slack.',
-    trigger: 'Check Hacker News and selected sources every hour.',
-    actions: 'Detect high-signal posts → read comments → summarize sentiment.',
-    deliverable: 'Draft email + Slack message, ready for approval.',
+    id: 'ship-feature',
+    tabLabel: 'Ship Features Without Code',
+    title: 'Ship a feature from plain English',
+    oneLiner: 'Describe the feature in plain English. Get a PR you can review and merge.',
+    trigger: 'Paste a feature request (or link an issue).',
+    actions: 'Read repo → plan → implement → update tests/docs → prepare PR.',
+    deliverable: 'PR draft + test notes, ready for approval.',
     buttonText: 'Try this example',
+    buttonAction: 'prefill',
+    comingSoon: false,
+    statusBadge: 'running',
+    headerLine: 'task: Ship feature from spec',
+    logLines: [
+      'agent: Reading requirements…',
+      'agent: Scanning repo structure…',
+      'agent: Implementing changes on branch automna/feature-billing-link…',
+      'agent: Updating tests and docs…',
+      'agent: PR draft ready for review.',
+    ],
+    deliverableCard: {
+      label: 'PULL REQUEST READY',
+      title: 'Add Billing Portal link to Settings',
+      bullets: [
+        'Files: settings.tsx, billing.ts, README.md',
+        'Tests: billing.test.ts updated',
+        'How to test: npm test (or repo command)',
+      ],
+      primaryBtn: 'Approve & open PR',
+      secondaryBtn: 'View diff',
+      footer: 'Approval required before pushing to GitHub.',
+    },
   },
   {
-    id: 'daily-brief',
-    title: 'Daily ops brief',
-    oneLiner: 'Send a daily digest that your team actually reads.',
-    trigger: 'Every weekday at 7:30am.',
-    actions: 'Pull updates from docs, tickets, and dashboards.',
-    deliverable: 'A structured brief posted to Slack + saved to Notion.',
-    buttonText: 'Try this example',
+    id: 'phone-agent',
+    tabLabel: 'Make and Receive Phone Calls',
+    title: 'AI phone agent (coming soon)',
+    oneLiner: 'Answer, qualify, and follow up—while you approve what gets sent.',
+    trigger: 'Inbound call or outbound call list.',
+    actions: 'Qualify → capture notes → summarize → draft follow-up → create next steps.',
+    deliverable: 'Call summary + follow-up email draft, ready for approval.',
+    buttonText: 'Get notified',
+    buttonAction: 'waitlist',
+    comingSoon: true,
+    comingSoonBadge: 'Coming soon · Pro & Business',
+    statusBadge: 'preview',
+    headerLine: 'task: Handle inbound calls',
+    logLines: [
+      'agent: Incoming call…',
+      'agent: Asking qualification questions…',
+      'agent: Capturing requirements and next steps…',
+      'agent: Drafting follow-up email…',
+    ],
+    deliverableCard: {
+      label: 'CALL SUMMARY READY',
+      title: 'Qualified lead · Next step: schedule demo',
+      bullets: [
+        'Summary: caller wants pricing + timeline',
+        'Next steps: propose 3 time slots',
+        'Follow-up email draft ready',
+      ],
+      primaryBtn: 'Approve & send follow-up',
+      secondaryBtn: 'See details',
+      footer: 'Phone agents coming soon · Pro & Business plans.',
+    },
   },
   {
-    id: 'support',
-    title: 'Support triage',
-    oneLiner: 'Turn a messy inbox into prioritized next actions.',
-    trigger: 'New tickets arrive.',
-    actions: 'Categorize → draft replies → flag urgent issues.',
-    deliverable: 'Queue updated + drafts ready for review.',
+    id: 'influencer-research',
+    tabLabel: 'Do Influencer Outreach',
+    title: 'Find 100 high-fit influencers (parallel research)',
+    oneLiner: 'Spin up parallel research workers and deliver a ranked list with notes and contact links.',
+    trigger: 'Run once (or weekly) with your product + audience.',
+    actions: 'Parallel research → score fit → dedupe → compile notes + sources.',
+    deliverable: 'Ranked list (CSV/Notion) + outreach drafts, ready to use.',
     buttonText: 'Try this example',
+    buttonAction: 'prefill',
+    comingSoon: false,
+    statusBadge: 'running',
+    headerLine: 'task: Find 100 fashion influencers (parallel)',
+    logLines: [
+      'agent: Launching 8 parallel research workers…',
+      'agent: Worker 2: collecting TikTok candidates…',
+      'agent: Worker 6: collecting Instagram candidates…',
+      'agent: Deduplicating and scoring…',
+      'agent: List ready (100 entries).',
+    ],
+    deliverableCard: {
+      label: 'DATABASE READY',
+      title: 'Influencers · 100 found · ranked by fit',
+      bullets: [
+        'Fields: handle, platform, followers, fit score, contact path',
+        'Sources included for each entry',
+        'Outreach drafts included (email + DM)',
+      ],
+      primaryBtn: 'Download CSV',
+      secondaryBtn: 'Open in Notion',
+      footer: 'Approval required before sending outreach.',
+    },
   },
   {
-    id: 'engineering',
-    title: 'Engineering helper',
-    oneLiner: 'Keep code, docs, and PRs moving.',
-    trigger: 'New issue or PR opened.',
-    actions: 'Summarize context → propose changes → update docs.',
-    deliverable: 'PR comment + draft patch (approval before pushing).',
+    id: 'inbox-to-done',
+    tabLabel: 'Turn Emails Into Deliverables',
+    title: 'Never drop a follow-up',
+    oneLiner: 'Turn email threads into drafted replies and a prioritized task list—automatically.',
+    trigger: 'Monitor a label/folder like "Follow Up" or "Important".',
+    actions: 'Summarize → extract action items → draft replies → create tasks.',
+    deliverable: 'Reply drafts + task list + digest, ready for approval.',
     buttonText: 'Try this example',
+    buttonAction: 'prefill',
+    comingSoon: false,
+    statusBadge: 'running',
+    headerLine: 'task: Inbox → done',
+    logLines: [
+      'agent: Scanning inbox filter "Follow Up"…',
+      'agent: Found 12 threads…',
+      'agent: Drafted 7 replies…',
+      'agent: Created 5 tasks in Automna Follow-ups…',
+      'agent: Daily digest ready for review.',
+    ],
+    deliverableCard: {
+      label: 'DRAFTS READY',
+      title: '7 replies + 5 tasks prepared',
+      bullets: [
+        'Replies: concise drafts with context',
+        'Tasks: priority + due date suggestions',
+        'Digest: ready to post/send',
+      ],
+      primaryBtn: 'Approve & send digest',
+      secondaryBtn: 'Review drafts',
+      footer: 'Approval required before sending emails or posting digests.',
+    },
   },
 ];
 
-// Examples data (starter jobs users can copy)
+// Examples data (same 4 jobs as demo tabs)
 const examples = [
-  { title: 'Competitor Monitor', description: 'Track mentions and summarize what matters.', output: 'Email + Slack brief' },
-  { title: 'Daily Ops Brief', description: 'Daily digest across your tools.', output: 'Slack post + Notion page' },
-  { title: 'Lead List Builder', description: 'Find and compile prospects with notes.', output: 'Spreadsheet + outreach draft' },
-  { title: 'Support Triage', description: 'Prioritize tickets and draft responses.', output: 'Queue updates + reply drafts' },
-  { title: 'Content Research Pack', description: 'Research a topic and produce a structured outline.', output: 'Doc with sources + outline' },
-  { title: 'Meeting Follow-ups', description: 'Turn notes into tasks and follow-up emails.', output: 'Tasks + email recap' },
+  { id: 'ship-feature', title: 'Ship a feature from plain English', description: 'Describe a feature. Get a PR draft ready for review.', output: 'GitHub PR draft + test notes' },
+  { id: 'phone-agent', title: 'AI phone agent (coming soon)', description: 'Answer, qualify, and draft follow-ups.', output: 'Call summary + follow-up draft', comingSoon: true, badge: 'Coming soon · Pro & Business' },
+  { id: 'influencer-research', title: 'Influencer research (parallel)', description: 'Find 100 high-fit creators with notes and sources.', output: 'CSV/Notion database + outreach drafts' },
+  { id: 'inbox-to-done', title: 'Inbox → done', description: 'Draft replies and turn threads into tasks.', output: 'Reply drafts + task list + digest' },
 ];
 
 // Features data
@@ -91,12 +185,11 @@ const features = [
 const faqItems = [
   { q: 'Do I need my own API key?', a: 'No. Automna is fully hosted—no API setup required.' },
   { q: "What's the difference between an agent and a chat assistant?", a: 'Chat helps you think. Agents run workflows: they can take tool actions, run on schedules, and deliver finished outputs.' },
-  { q: 'Can I control what it does autonomously?', a: 'Yes. Choose read-only, approval-first, or autopilot modes depending on the task.' },
-  { q: 'What happens if it gets something wrong?', a: 'Use approval-first mode for important actions. You can refine instructions and rerun tasks.' },
+  { q: 'Can I control what it does autonomously?', a: 'Yes. You can explain how autonomous you want your agent to be, and the bot will do its best to follow your guidelines.' },
+  { q: 'What happens if it gets something wrong?', a: "Agents aren't perfect—they can make mistakes. In most cases agents are self-correcting or correcting with minimal guidance. But it's important not to give your agent access to information that's more sensitive than you would give to an intern." },
   { q: 'Is my data private?', a: 'Automna only accesses what you connect. You can revoke access at any time.' },
   { q: 'What can it automate?', a: 'Monitoring, research, summaries, drafting, updates across docs/tickets/repos, and scheduled reporting—depending on connected tools.' },
-  { q: 'Can my team share an agent?', a: 'On Business plans, agents can live in a team workspace.' },
-  { q: 'What can it NOT do?', a: "It can't make phone calls, access systems without your credentials, or take actions you haven't approved. It works within the tools and permissions you connect." },
+  { q: 'Can my team share an agent?', a: 'You can add agents to Slack channels, Discord servers, and Telegram groups—so they can collaborate with your team and even talk to each other.' },
 ];
 
 export default function LandingTest() {
@@ -269,31 +362,39 @@ export default function LandingTest() {
                   </div>
                 </div>
                 
-                {/* Demo content - static representation */}
-                <div className="space-y-4 font-mono text-sm">
+                {/* Demo content - ship a feature example */}
+                <div className="space-y-3 font-mono text-sm">
                   <div className="flex gap-3">
                     <span className="text-purple-400 shrink-0">task:</span>
-                    <span className="text-zinc-300">Monitor competitors on HN</span>
+                    <span className="text-zinc-300">Ship feature from spec</span>
                   </div>
                   <div className="flex gap-3">
                     <span className="text-emerald-400 shrink-0">agent:</span>
-                    <span className="text-zinc-400">Found trending post on HN...</span>
+                    <span className="text-zinc-400">Reading requirements…</span>
                   </div>
                   <div className="flex gap-3">
                     <span className="text-emerald-400 shrink-0">agent:</span>
-                    <span className="text-zinc-400">Analyzing 89 comments...</span>
-                  </div>
-                  <div className="my-4 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
-                    <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Draft Email Ready</div>
-                    <div className="text-zinc-300 text-sm">Subject: Competitor Alert - Acme Corp raises $50M...</div>
+                    <span className="text-zinc-400">Implementing on automna/feature-billing-link…</span>
                   </div>
                   <div className="flex gap-3">
-                    <button className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition-colors">
-                      Approve & send
-                    </button>
-                    <button className="px-4 py-2 border border-zinc-700 text-zinc-400 text-sm rounded-lg hover:border-zinc-600 transition-colors">
-                      Edit
-                    </button>
+                    <span className="text-emerald-400 shrink-0">agent:</span>
+                    <span className="text-zinc-400">PR draft ready for review.</span>
+                  </div>
+                  <div className="my-3 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                    <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Pull Request Ready</div>
+                    <div className="text-zinc-200 text-sm font-medium mb-1">Add Billing Portal link to Settings</div>
+                    <div className="text-xs text-zinc-400 space-y-0.5">
+                      <div>• Files: settings.tsx, billing.ts, README.md</div>
+                      <div>• Tests: billing.test.ts updated</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg font-medium">
+                      Approve & open PR
+                    </div>
+                    <div className="px-4 py-2 border border-zinc-700 text-zinc-400 text-sm rounded-lg">
+                      View diff
+                    </div>
                   </div>
                 </div>
               </div>
@@ -345,7 +446,7 @@ export default function LandingTest() {
                       : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
                   }`}
                 >
-                  {tab.title}
+                  {tab.tabLabel}
                 </button>
               ))}
             </div>
@@ -355,8 +456,13 @@ export default function LandingTest() {
               {/* Left - steps */}
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
+                  <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2 flex items-center gap-3 flex-wrap">
                     {demoTabs[activeTab].title}
+                    {demoTabs[activeTab].comingSoon && (
+                      <span className="text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 px-3 py-1 rounded-full font-medium">
+                        {demoTabs[activeTab].comingSoonBadge}
+                      </span>
+                    )}
                   </h3>
                   <p className="text-zinc-600 dark:text-zinc-400">
                     {demoTabs[activeTab].oneLiner}
@@ -394,53 +500,79 @@ export default function LandingTest() {
                 </div>
 
                 <Link
-                  href={`/sign-up?example=${demoTabs[activeTab].id}`}
+                  href={demoTabs[activeTab].buttonAction === 'waitlist' ? '/sign-up?waitlist=phone-agent' : `/sign-up?example=${demoTabs[activeTab].id}`}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all text-sm"
                 >
                   {demoTabs[activeTab].buttonText}
                 </Link>
               </div>
 
-              {/* Right - deliverable preview mock */}
-              <div className="space-y-4">
-                {/* Email draft preview */}
-                <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg">📧</span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Draft Email</span>
-                    <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full">Awaiting approval</span>
+              {/* Right - terminal mock matching hero style */}
+              <div className="bg-gradient-to-b from-zinc-900 to-zinc-950 rounded-2xl border border-zinc-800 p-5 shadow-2xl">
+                {/* Terminal header */}
+                <div className="flex items-center justify-between mb-4 pb-4 border-b border-zinc-800">
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+                    </div>
+                    <span className="text-zinc-500 text-sm">automna agent</span>
                   </div>
-                  <div className="text-sm text-zinc-800 dark:text-zinc-200 font-medium mb-1">Subject: Competitor Alert — Acme Corp raises $50M</div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400 space-y-1">
-                    <p>• Trending on HN with 127 points, 89 comments</p>
-                    <p>• Sentiment: mixed — users praise product, question valuation</p>
-                    <p>• Key risk: they&apos;re hiring in your target market</p>
-                  </div>
-                </div>
-
-                {/* Slack message preview */}
-                <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg">💬</span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Slack Message</span>
-                    <span className="ml-auto text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full">Ready to send</span>
-                  </div>
-                  <div className="text-sm text-zinc-600 dark:text-zinc-300">
-                    <span className="font-medium text-zinc-800 dark:text-zinc-200">#competitive-intel</span>
-                    <p className="mt-1 text-xs">🚨 Acme Corp just raised $50M Series B. Mixed reception on HN — full summary in your inbox.</p>
+                  <div className="flex items-center gap-2">
+                    {demoTabs[activeTab].statusBadge === 'running' ? (
+                      <>
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span className="text-emerald-400/80 text-xs font-medium">running</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                        <span className="text-amber-400/80 text-xs font-medium">preview</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {/* Action buttons */}
-                <div className="flex gap-3">
-                  <div className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg font-medium">
-                    Approve & send
-                  </div>
-                  <div className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-sm rounded-lg">
-                    Edit
+                {/* Task header */}
+                <div className="font-mono text-sm mb-4">
+                  <div className="flex gap-3">
+                    <span className="text-purple-400 shrink-0">task:</span>
+                    <span className="text-zinc-300">{demoTabs[activeTab].headerLine.replace('task: ', '')}</span>
                   </div>
                 </div>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">Approval-first mode — nothing sends without your review.</p>
+
+                {/* Log lines */}
+                <div className="space-y-2 font-mono text-sm mb-4">
+                  {demoTabs[activeTab].logLines.map((line, i) => (
+                    <div key={i} className="flex gap-3">
+                      <span className="text-emerald-400 shrink-0">agent:</span>
+                      <span className="text-zinc-400">{line.replace('agent: ', '')}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Deliverable card */}
+                <div className="my-4 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                  <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">{demoTabs[activeTab].deliverableCard.label}</div>
+                  <div className="text-zinc-200 text-sm font-medium mb-2">{demoTabs[activeTab].deliverableCard.title}</div>
+                  <div className="space-y-1 mb-3">
+                    {demoTabs[activeTab].deliverableCard.bullets.map((bullet, i) => (
+                      <div key={i} className="text-xs text-zinc-400">• {bullet}</div>
+                    ))}
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg font-medium">
+                      {demoTabs[activeTab].deliverableCard.primaryBtn}
+                    </div>
+                    <div className="px-3 py-1.5 border border-zinc-700 text-zinc-400 text-xs rounded-lg">
+                      {demoTabs[activeTab].deliverableCard.secondaryBtn}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer note */}
+                <p className="text-xs text-zinc-600 text-center">{demoTabs[activeTab].deliverableCard.footer}</p>
               </div>
             </div>
 
@@ -511,18 +643,29 @@ export default function LandingTest() {
               </p>
             </div>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-2 gap-4">
               {examples.map((example) => (
-                <div key={example.title} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-5 hover:border-purple-300 dark:hover:border-purple-500/50 hover:shadow-md transition-all group">
-                  <h3 className="font-semibold text-zinc-900 dark:text-white mb-2">{example.title}</h3>
+                <Link
+                  key={example.title}
+                  href={example.comingSoon ? '/sign-up?waitlist=phone-agent' : `/sign-up?example=${example.id}`}
+                  className="block bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-5 hover:border-purple-300 dark:hover:border-purple-500/50 hover:shadow-md transition-all group"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-zinc-900 dark:text-white">{example.title}</h3>
+                    {example.comingSoon && (
+                      <span className="text-[10px] text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0 ml-2">
+                        {example.badge}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">{example.description}</p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-zinc-500 dark:text-zinc-500">Output: {example.output}</span>
-                    <Link href={`/sign-up?example=${example.title.toLowerCase().replace(/\s+/g, '-')}`} className="text-sm text-purple-600 dark:text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Try this example →
-                    </Link>
+                    <span className="text-sm text-purple-600 dark:text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {example.comingSoon ? 'Get notified →' : 'Try this example →'}
+                    </span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
 
@@ -595,7 +738,7 @@ export default function LandingTest() {
             </div>
 
             <div className="flex gap-6 justify-center mt-8 text-sm">
-              <a href="mailto:hello@automna.ai" className="text-purple-600 dark:text-purple-400 hover:underline">
+              <a href="mailto:alex@automna.ai" className="text-purple-600 dark:text-purple-400 hover:underline">
                 Request an integration
               </a>
             </div>
@@ -772,26 +915,30 @@ export default function LandingTest() {
               {/* Starter */}
               <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-6 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all">
                 <h3 className="text-xl font-semibold text-zinc-900 dark:text-white">Starter</h3>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">For getting started</p>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">Get started</p>
                 <div className="text-4xl font-bold mb-6 text-zinc-900 dark:text-white">
                   $79<span className="text-base text-zinc-400 dark:text-zinc-500 font-normal">/mo</span>
                 </div>
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    1 agent
+                    Your own AI agent
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Web chat interface
+                    Web chat + 1 integration
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Basic memory (30 days)
+                    Browser access
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Email support
+                    Personal email inbox
+                  </li>
+                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
+                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
+                    500K tokens/month
                   </li>
                 </ul>
                 <Link
@@ -806,14 +953,14 @@ export default function LandingTest() {
               <div className="bg-gradient-to-b from-purple-50 to-violet-50 dark:from-purple-500/15 dark:to-violet-500/5 border-2 border-purple-300 dark:border-purple-500/40 rounded-xl p-6 shadow-xl shadow-purple-100 dark:shadow-purple-500/10 scale-[1.02]">
                 <div className="text-purple-600 dark:text-purple-400 text-xs font-semibold mb-2 uppercase tracking-wide">Most Popular</div>
                 <h3 className="text-xl font-semibold text-zinc-900 dark:text-white">Pro</h3>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">For operators and power users</p>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">For power users</p>
                 <div className="text-4xl font-bold mb-6 text-zinc-900 dark:text-white">
                   $149<span className="text-base text-zinc-400 dark:text-zinc-500 font-normal">/mo</span>
                 </div>
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
-                    1 agent
+                    Everything in Starter
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
@@ -821,15 +968,15 @@ export default function LandingTest() {
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
-                    Cloud browser access
-                  </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
-                    Agent email inbox
+                    2M tokens/month
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
                     Unlimited memory
+                  </li>
+                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
+                    <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
+                    Email support
                   </li>
                 </ul>
                 <Link
@@ -843,15 +990,11 @@ export default function LandingTest() {
               {/* Business */}
               <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-6 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all">
                 <h3 className="text-xl font-semibold text-zinc-900 dark:text-white">Business</h3>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">For teams and agencies</p>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">For teams</p>
                 <div className="text-4xl font-bold mb-6 text-zinc-900 dark:text-white">
                   $299<span className="text-base text-zinc-400 dark:text-zinc-500 font-normal">/mo</span>
                 </div>
                 <ul className="space-y-3 mb-6">
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    3 agents
-                  </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
                     Everything in Pro
@@ -859,6 +1002,10 @@ export default function LandingTest() {
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
                     Team workspace
+                  </li>
+                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
+                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
+                    10M tokens/month
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
@@ -879,7 +1026,7 @@ export default function LandingTest() {
             </div>
 
             <p className="text-center text-zinc-500 dark:text-zinc-400 text-sm mt-6">
-              No API key required.
+              All plans include Claude AI. No API key needed.
             </p>
           </div>
         </section>
@@ -958,7 +1105,7 @@ export default function LandingTest() {
               <Link href="/privacy" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Privacy</Link>
               <Link href="/terms" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Terms</Link>
               <button onClick={() => scrollTo('security')} className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Security</button>
-              <a href="mailto:hello@automna.ai" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Contact</a>
+              <a href="mailto:alex@automna.ai" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Contact</a>
             </div>
           </div>
         </div>

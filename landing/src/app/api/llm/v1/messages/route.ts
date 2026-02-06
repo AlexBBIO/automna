@@ -3,8 +3,8 @@
  *
  * Proxies requests to Anthropic's Messages API while:
  * - Authenticating via gateway token
- * - Logging usage for billing
- * - Applying rate limits (TODO)
+ * - Logging usage for billing (including cache tokens)
+ * - Applying rate limits
  *
  * Endpoint: POST /api/llm/v1/messages
  * Matches Anthropic's API path structure so we can use ANTHROPIC_BASE_URL.
@@ -101,15 +101,22 @@ export async function POST(request: NextRequest) {
       const data = await response.json();
       const durationMs = Date.now() - startTime;
 
-      // Log usage
+      // Extract all token types from usage
       const usage = data.usage ?? {};
+      const inputTokens = usage.input_tokens ?? 0;
+      const outputTokens = usage.output_tokens ?? 0;
+      const cacheCreationTokens = usage.cache_creation_input_tokens ?? 0;
+      const cacheReadTokens = usage.cache_read_input_tokens ?? 0;
+
       logUsageBackground({
         userId: auth.userId,
         provider: "anthropic",
         model,
         endpoint: "chat",
-        inputTokens: usage.input_tokens ?? 0,
-        outputTokens: usage.output_tokens ?? 0,
+        inputTokens,
+        outputTokens,
+        cacheCreationTokens,
+        cacheReadTokens,
         requestId: data.id,
         durationMs,
         error: data.type === "error" ? JSON.stringify(data.error) : undefined,
@@ -129,12 +136,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a transform stream to extract usage from streaming events
-    // Buffer SSE events to handle chunks that split across event boundaries
+    // Tracks all token types including cache tokens
     let inputTokens = 0;
     let outputTokens = 0;
+    let cacheCreationTokens = 0;
+    let cacheReadTokens = 0;
     let requestId: string | undefined;
     let errorMessage: string | undefined;
-    let sseBuffer = ""; // Buffer for incomplete SSE lines
+    let sseBuffer = "";
 
     const transformStream = new TransformStream({
       transform(chunk, controller) {
@@ -147,7 +156,7 @@ export async function POST(request: NextRequest) {
           
           // Split on newlines, keep incomplete last line in buffer
           const lines = sseBuffer.split("\n");
-          sseBuffer = lines.pop() ?? ""; // Incomplete line stays in buffer
+          sseBuffer = lines.pop() ?? "";
 
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
@@ -162,12 +171,15 @@ export async function POST(request: NextRequest) {
                 requestId = event.message.id;
               }
 
-              // Extract usage from message_start
+              // Extract usage from message_start (includes all input token types)
               if (event.type === "message_start" && event.message?.usage) {
-                inputTokens = event.message.usage.input_tokens ?? 0;
+                const u = event.message.usage;
+                inputTokens = u.input_tokens ?? 0;
+                cacheCreationTokens = u.cache_creation_input_tokens ?? 0;
+                cacheReadTokens = u.cache_read_input_tokens ?? 0;
               }
 
-              // Extract usage from message_delta
+              // Extract output tokens from message_delta (final usage at end of stream)
               if (event.type === "message_delta" && event.usage) {
                 outputTokens = event.usage.output_tokens ?? 0;
               }
@@ -196,6 +208,12 @@ export async function POST(request: NextRequest) {
                 if (event.type === "message_delta" && event.usage) {
                   outputTokens = event.usage.output_tokens ?? 0;
                 }
+                if (event.type === "message_start" && event.message?.usage) {
+                  const u = event.message.usage;
+                  inputTokens = u.input_tokens ?? 0;
+                  cacheCreationTokens = u.cache_creation_input_tokens ?? 0;
+                  cacheReadTokens = u.cache_read_input_tokens ?? 0;
+                }
               } catch {
                 // Ignore
               }
@@ -212,6 +230,8 @@ export async function POST(request: NextRequest) {
           endpoint: "chat",
           inputTokens,
           outputTokens,
+          cacheCreationTokens,
+          cacheReadTokens,
           requestId,
           durationMs,
           error: errorMessage,

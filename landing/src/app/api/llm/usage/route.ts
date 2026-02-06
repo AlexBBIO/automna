@@ -53,12 +53,14 @@ export async function GET(request: Request) {
   monthStart.setUTCHours(0, 0, 0, 0);
   const monthStartUnix = Math.floor(monthStart.getTime() / 1000);
   
-  // Get monthly totals
+  // Get monthly totals (including cache tokens)
   const monthlyStatsResult = await db
     .select({
       totalRequests: sql<number>`COUNT(*)`.as('total_requests'),
       totalInputTokens: sql<number>`COALESCE(SUM(input_tokens), 0)`.as('total_input'),
       totalOutputTokens: sql<number>`COALESCE(SUM(output_tokens), 0)`.as('total_output'),
+      totalCacheCreationTokens: sql<number>`COALESCE(SUM(cache_creation_tokens), 0)`.as('total_cache_creation'),
+      totalCacheReadTokens: sql<number>`COALESCE(SUM(cache_read_tokens), 0)`.as('total_cache_read'),
       totalCostMicro: sql<number>`COALESCE(SUM(cost_microdollars), 0)`.as('total_cost'),
     })
     .from(llmUsage)
@@ -72,7 +74,9 @@ export async function GET(request: Request) {
   const stats = monthlyStatsResult[0];
   const totalInputTokens = Number(stats?.totalInputTokens || 0);
   const totalOutputTokens = Number(stats?.totalOutputTokens || 0);
-  const totalTokens = totalInputTokens + totalOutputTokens;
+  const totalCacheCreationTokens = Number(stats?.totalCacheCreationTokens || 0);
+  const totalCacheReadTokens = Number(stats?.totalCacheReadTokens || 0);
+  const totalTokens = totalInputTokens + totalOutputTokens + totalCacheCreationTokens + totalCacheReadTokens;
   const totalCostMicro = Number(stats?.totalCostMicro || 0);
   const totalCostCents = Math.floor(totalCostMicro / 10_000);
   
@@ -85,6 +89,8 @@ export async function GET(request: Request) {
       requests: sql<number>`COUNT(*)`.as('requests'),
       inputTokens: sql<number>`SUM(input_tokens)`.as('input_tokens'),
       outputTokens: sql<number>`SUM(output_tokens)`.as('output_tokens'),
+      cacheCreationTokens: sql<number>`SUM(cache_creation_tokens)`.as('cache_creation_tokens'),
+      cacheReadTokens: sql<number>`SUM(cache_read_tokens)`.as('cache_read_tokens'),
       cost: sql<number>`SUM(cost_microdollars)`.as('cost'),
     })
     .from(llmUsage)
@@ -103,7 +109,7 @@ export async function GET(request: Request) {
     .select({
       model: llmUsage.model,
       requests: sql<number>`COUNT(*)`.as('requests'),
-      tokens: sql<number>`SUM(input_tokens + output_tokens)`.as('tokens'),
+      tokens: sql<number>`SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens)`.as('tokens'),
       cost: sql<number>`SUM(cost_microdollars)`.as('cost'),
     })
     .from(llmUsage)
@@ -131,6 +137,8 @@ export async function GET(request: Request) {
       requests: Number(stats?.totalRequests || 0),
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
+      cacheCreationTokens: totalCacheCreationTokens,
+      cacheReadTokens: totalCacheReadTokens,
       totalTokens,
       cost: formatCost(totalCostMicro),
       costCents: totalCostCents,
@@ -153,6 +161,8 @@ export async function GET(request: Request) {
       requests: Number(d.requests),
       inputTokens: Number(d.inputTokens || 0),
       outputTokens: Number(d.outputTokens || 0),
+      cacheCreationTokens: Number(d.cacheCreationTokens || 0),
+      cacheReadTokens: Number(d.cacheReadTokens || 0),
       cost: formatCost(Number(d.cost || 0)),
     })),
     modelBreakdown: modelStatsResult.map((m) => ({

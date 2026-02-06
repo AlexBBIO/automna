@@ -38,3 +38,4 @@ AI-written emails are instantly recognizable. They kill response rates. These ru
 18. **Be specific about what Automna does.** Fully agentic, built-in email and browsing, built on OpenClaw, phone call support coming soon. Don't be vague.
 19. **Don't say "no setup, no servers."** It runs on a server. Saying otherwise is misleading and reads like marketing copy.
 20. **Avoid false precision.** Don't say "took months" or "been building since X." Just say it took a lot of work.
+21. **No negative framing.** Don't say "not a wrapper," "not a chatbot," "not a toy." Just say what it IS. Defining yourself by what you're not is weak positioning.

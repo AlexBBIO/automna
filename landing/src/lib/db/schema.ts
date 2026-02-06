@@ -80,6 +80,8 @@ export const llmUsage = sqliteTable("llm_usage", {
   // Token counts
   inputTokens: integer("input_tokens").notNull().default(0),
   outputTokens: integer("output_tokens").notNull().default(0),
+  cacheCreationTokens: integer("cache_creation_tokens").notNull().default(0),
+  cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
   
   // Cost in microdollars (1 USD = 1,000,000 microdollars)
   costMicrodollars: integer("cost_microdollars").notNull().default(0),

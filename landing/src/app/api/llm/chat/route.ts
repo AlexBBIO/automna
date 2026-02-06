@@ -162,6 +162,8 @@ export async function POST(request: Request) {
         endpoint: 'chat',
         inputTokens: tokens.inputTokens,
         outputTokens: tokens.outputTokens,
+        cacheCreationTokens: tokens.cacheCreationTokens,
+        cacheReadTokens: tokens.cacheReadTokens,
         requestId,
         durationMs: Date.now() - startTime,
       });
@@ -189,6 +191,8 @@ export async function POST(request: Request) {
     endpoint: 'chat',
     inputTokens: tokens.inputTokens,
     outputTokens: tokens.outputTokens,
+    cacheCreationTokens: tokens.cacheCreationTokens,
+    cacheReadTokens: tokens.cacheReadTokens,
     requestId,
     durationMs: Date.now() - startTime,
   });

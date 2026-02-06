@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     const byModel = await db
       .select({
         model: llmUsage.model,
-        tokens: sql<number>`COALESCE(SUM(${llmUsage.inputTokens} + ${llmUsage.outputTokens}), 0)`,
+        tokens: sql<number>`COALESCE(SUM(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheCreationTokens} + ${llmUsage.cacheReadTokens}), 0)`,
         cost: sql<number>`COALESCE(SUM(${llmUsage.costMicrodollars}), 0)`,
         requests: sql<number>`COUNT(*)`,
       })
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     const topUsersByCost = await db
       .select({
         userId: llmUsage.userId,
-        tokens: sql<number>`COALESCE(SUM(${llmUsage.inputTokens} + ${llmUsage.outputTokens}), 0)`,
+        tokens: sql<number>`COALESCE(SUM(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheCreationTokens} + ${llmUsage.cacheReadTokens}), 0)`,
         cost: sql<number>`COALESCE(SUM(${llmUsage.costMicrodollars}), 0)`,
         requests: sql<number>`COUNT(*)`,
       })
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
     // Totals
     const [totals] = await db
       .select({
-        totalTokens: sql<number>`COALESCE(SUM(${llmUsage.inputTokens} + ${llmUsage.outputTokens}), 0)`,
+        totalTokens: sql<number>`COALESCE(SUM(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheCreationTokens} + ${llmUsage.cacheReadTokens}), 0)`,
         totalCost: sql<number>`COALESCE(SUM(${llmUsage.costMicrodollars}), 0)`,
         totalRequests: sql<number>`COUNT(*)`,
         uniqueUsers: sql<number>`COUNT(DISTINCT ${llmUsage.userId})`,
