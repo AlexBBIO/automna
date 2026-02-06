@@ -150,6 +150,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const pendingRefetchRef = useRef<PendingRefetch | null>(null);
   const isRunningRef = useRef(false); // Mirror of isRunning for use in timeouts
   const activeRunIdRef = useRef<string | null>(null); // Current run ID for deduplication
+  const pendingToolSepRef = useRef(false); // Insert separator before next delta (after tool call)
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryAttemptsRef = useRef(0);
   const deltaCountRef = useRef(0); // Count deltas per run for diagnostics
@@ -377,6 +378,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     // Cancel any pending re-fetch from previous run (prevents cross-run content swap)
     pendingRefetchRef.current = null;
     activeRunIdRef.current = runId || null;
+    pendingToolSepRef.current = false;
     deltaCountRef.current = 0;
     setIsRunning(true);
     isRunningRef.current = true;
@@ -508,6 +510,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         deltaCountRef.current++;
         startRecoveryTimer();
 
+        // Insert separator between assistant turns (after tool calls)
+        if (pendingToolSepRef.current) {
+          streamingTextRef.current += '\n\n';
+          pendingToolSepRef.current = false;
+        }
+
         // Append delta to our own accumulator (no resets, no heuristics)
         streamingTextRef.current += delta;
         const displayText = streamingTextRef.current;
@@ -527,8 +535,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     }
 
     if (stream === 'tool') {
-      // Tool call in progress - reset recovery timer (agent is alive, just using tools)
+      // Tool call in progress - reset recovery timer and mark for separator
       startRecoveryTimer();
+      pendingToolSepRef.current = true;
       log('🔧 Tool call:', data ? JSON.stringify(data).slice(0, 100) : '');
       return;
     }
