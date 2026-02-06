@@ -151,6 +151,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const isRunningRef = useRef(false); // Mirror of isRunning for use in timeouts
   const activeRunIdRef = useRef<string | null>(null); // Current run ID for deduplication
   const turnCountRef = useRef(0); // Counts assistant turns within a run (increments on tool calls)
+  const streamingMediaRef = useRef<string[]>([]); // Accumulated MEDIA URLs for current turn
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryAttemptsRef = useRef(0);
   const deltaCountRef = useRef(0); // Count deltas per run for diagnostics
@@ -236,6 +237,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
           setIsRunning(false);
           isRunningRef.current = false;
           streamingTextRef.current = '';
+          streamingMediaRef.current = [];
           clearRecoveryTimer();
         } else {
           // Still running on server, check again
@@ -258,6 +260,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     clearRecoveryTimer();
     activeRunIdRef.current = null;
     streamingTextRef.current = '';
+    streamingMediaRef.current = [];
     setIsRunning(false);
     isRunningRef.current = false;
 
@@ -384,6 +387,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     activeRunIdRef.current = runId || null;
     turnCountRef.current = 0;
     deltaCountRef.current = 0;
+    streamingMediaRef.current = [];
     setIsRunning(true);
     isRunningRef.current = true;
     startRecoveryTimer();
@@ -419,6 +423,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       clearRecoveryTimer();
       const streamedText = streamingTextRef.current;
       streamingTextRef.current = '';
+      streamingMediaRef.current = [];
 
       // Get text from the final event's message (fallback for non-agent runs like commands)
       const finalText = message?.content?.find((c) => c.type === 'text')?.text || '';
@@ -485,6 +490,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       clearRecoveryTimer();
       activeRunIdRef.current = null;
       streamingTextRef.current = '';
+      streamingMediaRef.current = [];
       setIsRunning(false);
       isRunningRef.current = false;
       const errorMsg = (payload.errorMessage as string) || 'Something went wrong';
@@ -502,7 +508,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   }
 
   /** Handle agent events (currently debug logging; streaming will use these in Phase 2) */
-  /** Handle event agent - per-token streaming and lifecycle events */
+  /** Handle event agent - per-token streaming, tool boundaries, and lifecycle events */
   function handleAgentEvent(payload: Record<string, unknown>) {
     const stream = payload.stream as string | undefined;
     const data = payload.data as Record<string, unknown> | undefined;
@@ -510,19 +516,34 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     // Capture runId if we missed the send ack
     if (runId && !activeRunIdRef.current) activeRunIdRef.current = runId;
-    const streamingId = runId ? `streaming-${runId}` : 'streaming';
 
+    // ── Assistant text streaming ──
     if (stream === 'assistant' && data) {
       const delta = data.delta as string | undefined;
+      const mediaUrls = data.mediaUrls as string[] | undefined;
+
       if (typeof delta === 'string' && delta) {
         deltaCountRef.current++;
         startRecoveryTimer();
 
         // Append delta to our accumulator
         streamingTextRef.current += delta;
-        const displayText = streamingTextRef.current;
+      }
 
-        // Streaming ID includes turn count so each assistant turn gets its own bubble
+      // Collect MEDIA URLs stripped from text by the server
+      // Re-inject them as MEDIA: lines so MessageContent can render them
+      if (mediaUrls?.length) {
+        for (const url of mediaUrls) {
+          if (!streamingMediaRef.current.includes(url)) {
+            streamingMediaRef.current.push(url);
+            streamingTextRef.current += `\n\nMEDIA:${url}`;
+          }
+        }
+      }
+
+      // Update the streaming message bubble
+      const displayText = streamingTextRef.current;
+      if (displayText) {
         const turn = turnCountRef.current;
         const sid = runId
           ? (turn > 0 ? `streaming-${runId}-t${turn}` : `streaming-${runId}`)
@@ -542,48 +563,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       return;
     }
 
+    // ── Tool events: split bubbles at tool boundaries ──
+    // Requires verboseDefault: "on" in OpenClaw config (otherwise gateway filters these out)
     if (stream === 'tool') {
-      // Tool call - finalize current streaming bubble, start new one for next turn
       startRecoveryTimer();
+      const phase = (data?.phase as string) || '';
 
-      const currentText = streamingTextRef.current;
-      if (currentText) {
-        const currentRunId = activeRunIdRef.current;
-        const turn = turnCountRef.current;
-        const currentSid = currentRunId
-          ? (turn > 0 ? `streaming-${currentRunId}-t${turn}` : `streaming-${currentRunId}`)
-          : 'streaming';
-        const permanentId = genId();
-
-        // Give current bubble a permanent ID (no longer "streaming")
-        setMessages((prev) => {
-          const idx = prev.findIndex((m) => m.role === 'assistant' && m.id === currentSid);
-          if (idx >= 0) {
-            const updated = [...prev];
-            updated[idx] = { ...updated[idx], id: permanentId, content: [{ type: 'text', text: stripMessageMeta(currentText) }] };
-            return updated;
-          }
-          return prev;
-        });
-
-        // Reset accumulator and increment turn for next bubble
-        streamingTextRef.current = '';
-        turnCountRef.current++;
-      }
-
-      log('🔧 Tool call:', data ? JSON.stringify(data).slice(0, 100) : '');
-      return;
-    }
-
-    if (stream === 'lifecycle' && data) {
-      const phase = data.phase as string | undefined;
-      log(`🔄 Lifecycle: ${phase}`);
+      // Only split on tool start (not update/result) to avoid multiple splits per tool call
       if (phase === 'start') {
-        startRecoveryTimer();
-
-        // If there's accumulated streaming text, a new turn is starting after a tool call.
-        // Finalize the current bubble and start a new one.
-        // (The first lifecycle:start has no streaming text yet, so this is a no-op for it.)
         const currentText = streamingTextRef.current;
         if (currentText) {
           const currentRunId = activeRunIdRef.current;
@@ -593,9 +580,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             : 'streaming';
           const permanentId = genId();
 
-          log('🔀 New turn detected via lifecycle:start, finalizing bubble', { turn, textLen: currentText.length });
+          log('🔧 Tool boundary, finalizing bubble', { turn, tool: data?.name, textLen: currentText.length });
 
-          // Give current bubble a permanent ID
+          // Give current bubble a permanent ID (no longer "streaming")
           setMessages((prev) => {
             const idx = prev.findIndex((m) => m.role === 'assistant' && m.id === currentSid);
             if (idx >= 0) {
@@ -606,10 +593,25 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             return prev;
           });
 
-          // Reset accumulator and increment turn for next bubble
+          // Reset accumulators for next bubble
           streamingTextRef.current = '';
+          streamingMediaRef.current = [];
           turnCountRef.current++;
         }
+      }
+
+      log('🔧 Tool:', phase, data?.name || '');
+      return;
+    }
+
+    // ── Lifecycle events: logging only ──
+    // Bubble splitting is handled by tool events (above), not lifecycle.
+    // Lifecycle fires once per run (start/end), not per assistant turn.
+    if (stream === 'lifecycle' && data) {
+      const phase = data.phase as string | undefined;
+      log(`🔄 Lifecycle: ${phase}`);
+      if (phase === 'start') {
+        startRecoveryTimer();
       }
       // Don't finalize on lifecycle end - wait for chat final event
       return;
@@ -641,6 +643,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     mountedRef.current = true;
     connectSentRef.current = false;
     streamingTextRef.current = '';
+    streamingMediaRef.current = [];
     historyLoadedRef.current = false;
     pendingRefetchRef.current = null;
     isRunningRef.current = false;
@@ -858,6 +861,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     ]);
 
     streamingTextRef.current = '';
+    streamingMediaRef.current = [];
     setIsRunning(true);
     isRunningRef.current = true;
     startRecoveryTimer();

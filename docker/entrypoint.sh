@@ -135,6 +135,7 @@ cat > "$CONFIG_FILE" << EOFCONFIG
       "model": {
         "primary": "automna/claude-opus-4-5"
       },
+      "verboseDefault": "on",
       "userTimezone": "America/Los_Angeles",
       "contextPruning": {
         "mode": "cache-ttl",

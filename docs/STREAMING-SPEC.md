@@ -1,7 +1,7 @@
 # Automna Chat Streaming Spec
 
-> Last updated: 2026-02-05
-> Status: Draft, pending implementation
+> Last updated: 2026-02-06
+> Status: Phase 2E in progress (verbose mode + mediaUrls + tool splitting)
 
 ## Overview
 
@@ -694,6 +694,166 @@ Deployed 2026-02-06. Replaced all chat delta handling with agent event handling.
 - Non-agent runs (commands) still work via final event's message field
 
 **Removed:** `completedChunksRef`, 50% length heuristic, chunk concatenation hack
+
+#### 2E: Verbose Mode + Tool Splitting + Media URLs
+
+> Added 2026-02-06 after source code investigation of OpenClaw gateway internals.
+
+**Checkpoint:** `v0.3-pre-streaming-v2`
+
+##### Discovery: Why Tool Events Never Arrive
+
+Source code investigation of `/usr/lib/node_modules/clawdbot/dist/gateway/server-chat.js` revealed:
+
+```javascript
+// In createAgentEventHandler():
+if (evt.stream === "tool" && !shouldEmitToolEvents(evt.runId, sessionKey)) {
+    agentRunSeq.set(evt.runId, evt.seq);
+    return; // ← SILENTLY DROPPED, never broadcast to WS clients
+}
+```
+
+`shouldEmitToolEvents()` checks the session's verbose level. Default is off. So **all `stream: "tool"` events are swallowed before reaching WebSocket clients** unless verbose mode is enabled.
+
+This is why:
+- Phase 2D's `stream === 'tool'` handler never fires
+- The `lifecycle:start` hack (latest commit) doesn't work either (lifecycle fires once per run, not per turn)
+- Bubble splitting has been impossible with current config
+
+##### Discovery: Why Images Are Lost During Streaming
+
+In `pi-embedded-subscribe.handlers.messages.js`, the agent event emitter runs `parseReplyDirectives()` on assistant text before broadcasting:
+
+```javascript
+const { text: cleanedText, mediaUrls } = parseReplyDirectives(next);
+emitAgentEvent({
+    stream: "assistant",
+    data: {
+        text: cleanedText,      // ← MEDIA: lines STRIPPED from text
+        mediaUrls: mediaUrls,   // ← URLs sent as separate field
+    },
+});
+```
+
+Then in `server-chat.js`, `emitChatDelta` only forwards `text`:
+```javascript
+content: [{ type: "text", text }]  // ← no mediaUrls
+```
+
+And our runtime's `handleAgentEvent` only reads `data.delta`:
+```javascript
+streamingTextRef.current += delta;  // ← mediaUrls completely ignored
+```
+
+So images get stripped from text server-side, put into `data.mediaUrls`, and nobody on the client ever reads them.
+
+##### Three Changes Required
+
+**Change 1: Enable verbose mode on Automna user machines**
+
+Add to OpenClaw config template:
+```json
+{
+  "agents": {
+    "defaults": {
+      "verboseDefault": "on"
+    }
+  }
+}
+```
+
+This makes `stream: "tool"` events flow through the WebSocket.
+
+**Change 2: Use `stream: "tool"` for bubble splitting**
+
+Replace the broken `lifecycle:start` hack with proper tool-boundary splitting:
+
+```typescript
+if (stream === 'tool') {
+  const currentText = streamingTextRef.current;
+  if (currentText) {
+    // Finalize current bubble with permanent ID
+    const currentSid = /* current streaming ID */;
+    const permanentId = genId();
+    setMessages(prev => {
+      const idx = prev.findIndex(m => m.id === currentSid);
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], id: permanentId, 
+          content: [{ type: 'text', text: stripMessageMeta(currentText) }] };
+        return updated;
+      }
+      return prev;
+    });
+    // Reset for next bubble
+    streamingTextRef.current = '';
+    turnCountRef.current++;
+  }
+  return;
+}
+```
+
+Remove the `lifecycle:start` splitting code (keep lifecycle for logging only).
+
+**Change 3: Read `data.mediaUrls` during streaming**
+
+When processing `stream === 'assistant'` events, also check for `mediaUrls`:
+
+```typescript
+if (stream === 'assistant' && data) {
+  const delta = data.delta as string | undefined;
+  const mediaUrls = data.mediaUrls as string[] | undefined;
+  
+  if (typeof delta === 'string' && delta) {
+    streamingTextRef.current += delta;
+  }
+  
+  // Build content parts: text + any media
+  const contentParts: ContentPart[] = [];
+  if (streamingTextRef.current) {
+    contentParts.push({ type: 'text', text: streamingTextRef.current });
+  }
+  if (mediaUrls?.length) {
+    // Store media URLs for this message
+    streamingMediaRef.current = [...(streamingMediaRef.current || []), ...mediaUrls];
+  }
+  // Add accumulated media as content parts
+  for (const url of streamingMediaRef.current || []) {
+    contentParts.push({ type: 'media', url });
+  }
+  
+  // Update message with text + media
+  // ... setMessages with contentParts
+}
+```
+
+Note: This requires `MessageContent.tsx` to handle `type: 'media'` parts (render via `/api/files/download?path=`). It may already handle MEDIA: in text, so alternatively we could re-inject `MEDIA:` lines into the text before display.
+
+##### Simpler Alternative for Change 3
+
+Instead of a new content type, re-inject the MEDIA: paths back into the streaming text:
+
+```typescript
+if (mediaUrls?.length) {
+  for (const url of mediaUrls) {
+    if (!streamingMediaRef.current.includes(url)) {
+      streamingMediaRef.current.push(url);
+      streamingTextRef.current += `\n\nMEDIA:${url}`;
+    }
+  }
+}
+```
+
+This works because `MessageContent.tsx` already parses `MEDIA:` lines and renders them as images. No rendering changes needed.
+
+##### Implementation Order
+
+1. Update OpenClaw config template + deploy to existing machines (Change 1)
+2. Replace lifecycle splitting with tool splitting (Change 2)  
+3. Add mediaUrls handling (Change 3)
+4. Remove the lifecycle:start hack
+5. Test with tool-calling queries (web search, image gen, etc.)
+6. Deploy
 
 ### Phase 3: Testing
 
