@@ -119,16 +119,42 @@ function parseContent(raw: unknown): ContentPart[] {
   return [];
 }
 
-/** Convert raw API messages to ThreadMessage[], filtering out system/tool messages */
+/** Convert raw API messages to ThreadMessage[], filtering out system/tool messages
+ *  and merging consecutive assistant messages into single bubbles */
 function parseMessages(messages: RawMessage[], prefix: string): ThreadMessage[] {
-  return messages
-    .filter((m) => m.role === 'user' || m.role === 'assistant')
-    .map((m, idx) => ({
-      id: `${prefix}-${idx}`,
-      role: m.role as 'user' | 'assistant',
-      content: parseContent(m.content),
-      createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
-    }));
+  const filtered = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+  const merged: ThreadMessage[] = [];
+
+  for (let i = 0; i < filtered.length; i++) {
+    const m = filtered[i];
+    const role = m.role as 'user' | 'assistant';
+    const content = parseContent(m.content);
+    const last = merged[merged.length - 1];
+
+    // Merge consecutive assistant messages (separated by tool calls in the original)
+    if (role === 'assistant' && last?.role === 'assistant') {
+      const lastText = last.content.find((p) => p.type === 'text')?.text || '';
+      const newText = content.find((p) => p.type === 'text')?.text || '';
+      // Combine text parts with separator, keep non-text parts (images)
+      const nonTextParts = [
+        ...last.content.filter((p) => p.type !== 'text'),
+        ...content.filter((p) => p.type !== 'text'),
+      ];
+      const combinedText = [lastText, newText].filter(Boolean).join('\n\n');
+      last.content = [
+        { type: 'text', text: combinedText },
+        ...nonTextParts,
+      ];
+    } else {
+      merged.push({
+        id: `${prefix}-${i}`,
+        role,
+        content,
+        createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
+      });
+    }
+  }
+  return merged;
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -321,14 +347,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     httpHistoryAbortRef.current?.abort();
 
     if (wsMessages.length > 0) {
-      const history = wsMessages
-        .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({
-          id: m.id || genId(),
-          role: m.role as 'user' | 'assistant',
-          content: parseContent(m.content),
-          createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
-        }));
+      // Use parseMessages which filters and merges consecutive assistant messages
+      const history = parseMessages(
+        wsMessages.map((m) => ({
+          ...m,
+          timestamp: m.createdAt ? new Date(m.createdAt).getTime() : undefined,
+        })),
+        'ws'
+      );
       setMessages(history);
     }
     setLoadingPhase('ready');
