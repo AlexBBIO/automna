@@ -119,14 +119,16 @@ function parseContent(raw: unknown): ContentPart[] {
   return [];
 }
 
-/** Convert raw API messages to ThreadMessage[] */
+/** Convert raw API messages to ThreadMessage[], filtering out system/tool messages */
 function parseMessages(messages: RawMessage[], prefix: string): ThreadMessage[] {
-  return messages.map((m, idx) => ({
-    id: `${prefix}-${idx}`,
-    role: m.role as 'user' | 'assistant',
-    content: parseContent(m.content),
-    createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
-  }));
+  return messages
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .map((m, idx) => ({
+      id: `${prefix}-${idx}`,
+      role: m.role as 'user' | 'assistant',
+      content: parseContent(m.content),
+      createdAt: m.timestamp ? new Date(m.timestamp) : new Date(),
+    }));
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -211,12 +213,14 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     httpHistoryAbortRef.current?.abort();
 
     if (wsMessages.length > 0) {
-      const history = wsMessages.map((m) => ({
-        id: m.id || genId(),
-        role: m.role as 'user' | 'assistant',
-        content: parseContent(m.content),
-        createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
-      }));
+      const history = wsMessages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({
+          id: m.id || genId(),
+          role: m.role as 'user' | 'assistant',
+          content: parseContent(m.content),
+          createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+        }));
       setMessages(history);
     }
     setLoadingPhase('ready');
