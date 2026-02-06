@@ -683,6 +683,166 @@ Test matrix:
 
 ---
 
+## Part 7: Slash Commands
+
+### 7.1 Current State
+
+The webchat has **zero** slash command support. Users can type `/status` as plain text and it technically works (goes through `chat.send`, OpenClaw processes it as a command), but:
+
+- No autocomplete or suggestions when typing `/`
+- No visual feedback that it's a command vs. regular message
+- No command palette or help
+- Users have no way to discover available commands
+- Command responses aren't styled differently from agent responses
+
+### 7.2 Available Commands (from OpenClaw source)
+
+These are all text-alias commands supported by OpenClaw:
+
+**Session Management:**
+| Command | Aliases | Description | Args |
+|---------|---------|-------------|------|
+| `/status` | | Show current status | None |
+| `/reset` | | Reset the current session | Optional |
+| `/new` | | Start a new session | Optional |
+| `/compact` | | Compact session context | Optional instructions |
+| `/stop` | | Stop the current run | None |
+
+**Model & Thinking:**
+| Command | Aliases | Description | Args |
+|---------|---------|-------------|------|
+| `/model` | | Show or set model | Optional: model id |
+| `/models` | | List available models | Optional: provider |
+| `/think` | `/thinking`, `/t` | Set thinking level | off, minimal, low, medium, high, xhigh |
+| `/reasoning` | `/reason` | Toggle reasoning visibility | on, off, stream |
+
+**Agent Settings:**
+| Command | Aliases | Description | Args |
+|---------|---------|-------------|------|
+| `/verbose` | `/v` | Toggle verbose mode (tool events) | on, off |
+| `/elevated` | `/elev` | Toggle elevated exec mode | on, off, ask, full |
+| `/exec` | | Set exec defaults | host=, security=, ask=, node= |
+| `/send` | | Set send policy | on, off, inherit |
+| `/activation` | | Set group activation mode | mention, always |
+
+**Utility:**
+| Command | Aliases | Description | Args |
+|---------|---------|-------------|------|
+| `/help` | | Show available commands | None |
+| `/commands` | | List all slash commands | None |
+| `/whoami` | `/id` | Show sender id | None |
+| `/usage` | | Usage/cost summary | off, tokens, full, cost |
+| `/tts` | | Configure text-to-speech | Optional |
+| `/context` | | Explain context building | Optional |
+| `/skill` | | Run a skill by name | name, input |
+| `/subagents` | | Manage subagent runs | list, stop, log, info, send |
+
+**Admin:**
+| Command | Aliases | Description | Args |
+|---------|---------|-------------|------|
+| `/config` | | Show or set config | show, get, set, unset + path + value |
+| `/debug` | | Runtime debug overrides | show, reset, set, unset + path + value |
+| `/restart` | | Restart OpenClaw | None |
+| `/allowlist` | | Manage allowlist | Optional |
+| `/approve` | | Approve/deny exec requests | Optional |
+| `/bash` | | Run host shell command | command text |
+| `/queue` | | Adjust queue settings | mode, debounce, cap, drop |
+
+### 7.3 Which Commands Matter for Automna Users
+
+Not all commands make sense for Automna users. Prioritize:
+
+**Tier 1 - Essential (show in UI):**
+- `/status` - See what model, session info
+- `/model` - Switch models
+- `/think` - Adjust thinking level
+- `/new` - Fresh conversation
+- `/reset` - Reset session
+- `/stop` - Stop current run (already have cancel button, but alias is nice)
+- `/help` - Discoverability
+
+**Tier 2 - Power Users:**
+- `/verbose` - Show tool calls
+- `/compact` - Manage context
+- `/usage` - See token usage
+- `/reasoning` - See thinking output
+- `/subagents` - Manage background tasks
+
+**Tier 3 - Admin Only (hide or restrict):**
+- `/config` - Could break things
+- `/debug` - Development only
+- `/restart` - Dangerous
+- `/bash` - Security risk
+- `/allowlist`, `/approve` - Admin functions
+- `/exec`, `/elevated` - Security-sensitive
+
+### 7.4 Implementation Plan
+
+#### Phase A: Basic Command Passthrough (Minimal Effort)
+
+Commands already work via `chat.send`. Just need:
+1. Style command messages differently in the UI (monospace? darker bubble?)
+2. Style command responses differently (system message style)
+3. Test that common commands work end-to-end
+
+#### Phase B: Command Autocomplete (Medium Effort)
+
+When user types `/` in the input:
+1. Show a floating menu above the input with matching commands
+2. Filter as user types more characters
+3. Show command description and args
+4. Tab or click to select
+5. If command has choices (like `/think`), show sub-menu
+
+```tsx
+// Rough UI concept
+function CommandPalette({ query, onSelect }: { query: string; onSelect: (cmd: string) => void }) {
+  const filtered = COMMANDS.filter(c => c.alias.startsWith(query));
+  return (
+    <div className="absolute bottom-full mb-2 bg-white border rounded-lg shadow-lg max-h-64 overflow-y-auto">
+      {filtered.map(cmd => (
+        <button key={cmd.key} onClick={() => onSelect(cmd.alias)}>
+          <span className="font-mono text-purple-600">{cmd.alias}</span>
+          <span className="text-zinc-500 text-sm ml-2">{cmd.description}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+#### Phase C: Command Response Formatting (Polish)
+
+Some commands return structured data (like `/status` returns a status card). We could:
+1. Detect command responses (they come via non-agent final events)
+2. Parse common formats (status cards, lists, tables)
+3. Render with appropriate UI components
+
+### 7.5 Command List as Data
+
+For the autocomplete, we need a static list of commands available on the client:
+
+```typescript
+// Available in landing/src/lib/commands.ts
+export const AUTOMNA_COMMANDS = [
+  { key: 'status', alias: '/status', description: 'Show current status', tier: 1 },
+  { key: 'model', alias: '/model', description: 'Show or set model', tier: 1, args: 'model id' },
+  { key: 'think', alias: '/think', description: 'Set thinking level', tier: 1, 
+    choices: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] },
+  { key: 'new', alias: '/new', description: 'Start a new session', tier: 1 },
+  { key: 'reset', alias: '/reset', description: 'Reset session', tier: 1 },
+  { key: 'stop', alias: '/stop', description: 'Stop current run', tier: 1 },
+  { key: 'help', alias: '/help', description: 'Show available commands', tier: 1 },
+  { key: 'verbose', alias: '/verbose', description: 'Toggle tool call display', tier: 2, choices: ['on', 'off'] },
+  { key: 'compact', alias: '/compact', description: 'Compact session context', tier: 2 },
+  { key: 'usage', alias: '/usage', description: 'Show token usage', tier: 2, choices: ['off', 'tokens', 'full', 'cost'] },
+  { key: 'reasoning', alias: '/reasoning', description: 'Toggle reasoning', tier: 2, choices: ['on', 'off', 'stream'] },
+  { key: 'subagents', alias: '/subagents', description: 'Manage background tasks', tier: 2 },
+] as const;
+```
+
+---
+
 ## Appendix A: Raw Event Log (Annotated)
 
 From debug session 2026-02-05. Agent responding "Ha, yeah? What happened? Technical hiccups or something weirder?"
