@@ -750,7 +750,7 @@ export default function DashboardPage() {
       'syncing': 'connecting',
       'fetching-gateway': 'connecting',
       'provisioning': 'provisioning',
-      'warming': 'warming',
+      'warming': 'provisioning', // Keep tips + timer visible until fully ready
     };
     
     const skeletonPhase = skeletonPhaseMap[loadPhase] || 'connecting';
