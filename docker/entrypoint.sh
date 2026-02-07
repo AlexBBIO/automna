@@ -106,7 +106,111 @@ if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initializ
     echo "[automna] Initializing workspace with defaults..."
     cp -rn /app/default-workspace/* "$OPENCLAW_DIR/workspace/" 2>/dev/null || true
     touch "$OPENCLAW_DIR/workspace/.initialized"
+    echo "2" > "$OPENCLAW_DIR/workspace/.workspace-version"
     echo "[automna] Workspace initialized"
+fi
+
+# Workspace migrations for existing users
+# Each migration checks a version number and applies patches
+WORKSPACE_VERSION=$(cat "$OPENCLAW_DIR/workspace/.workspace-version" 2>/dev/null || echo "0")
+
+# Migration 1→2: Add phone call proxy docs
+if [ "$WORKSPACE_VERSION" -lt 2 ] 2>/dev/null; then
+    echo "[automna] Workspace migration: adding phone call docs..."
+
+    # Patch TOOLS.md - add Voice Calling section if missing
+    if [ -f "$OPENCLAW_DIR/workspace/TOOLS.md" ] && ! grep -q "Voice Calling" "$OPENCLAW_DIR/workspace/TOOLS.md" 2>/dev/null; then
+        cat >> "$OPENCLAW_DIR/workspace/TOOLS.md" << 'TOOLSEOF'
+
+### Voice Calling (Twilio + Bland.ai)
+
+Make and receive phone calls through your dedicated phone number.
+
+**⚠️ Do NOT use the built-in voice-call plugin or look for a `call_phone` tool. It is intentionally disabled.**
+
+**Make an outbound call using exec + curl:**
+```bash
+curl -s -X POST "https://automna.ai/api/user/call" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+12025551234",
+    "task": "Call this person and ask about scheduling a meeting for next week.",
+    "first_sentence": "Hi! I am calling on behalf of my user to schedule a meeting.",
+    "max_duration": 5
+  }'
+```
+
+**Parameters:**
+- `to` (required) - Phone number (E.164 or common formats: +12025551234, (202) 555-1234, 202-555-1234)
+- `task` (required) - Instructions for what the AI should accomplish on the call
+- `first_sentence` (optional) - Specific opening line when the call connects
+- `max_duration` (optional) - Max call length in minutes (default: 5)
+- `voice_id` (optional) - Override the default voice
+- `voicemail_action` (optional) - What to do on voicemail: "hangup" (default), "leave_message", or "ignore"
+- `voicemail_message` (optional) - Message to leave on voicemail
+
+**Response:**
+```json
+{
+  "success": true,
+  "call_id": "uuid",
+  "from": "+17254339890",
+  "to": "+12025551234",
+  "status": "initiated",
+  "remaining_minutes": 55
+}
+```
+
+**After the call:**
+- Transcript is automatically saved to `calls/YYYY-MM-DD_HHMM_outbound_+1234.md`
+- You'll receive a notification with the summary and transcript location
+
+**Check usage:**
+```bash
+curl -s "https://automna.ai/api/user/call/usage" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
+```
+
+**Tips:**
+- Be specific in the `task` - include names, context, and what success looks like
+- The call AI is a separate model, not you. Pack context into the task prompt.
+- US numbers only for now
+- Call transcripts are in the `calls/` directory
+TOOLSEOF
+        echo "[automna] TOOLS.md patched with Voice Calling docs"
+    fi
+
+    # Patch AGENTS.md - add phone call section if missing
+    if [ -f "$OPENCLAW_DIR/workspace/AGENTS.md" ] && ! grep -q "Phone Calls" "$OPENCLAW_DIR/workspace/AGENTS.md" 2>/dev/null; then
+        cat >> "$OPENCLAW_DIR/workspace/AGENTS.md" << 'AGENTSEOF'
+
+## Phone Calls - Voice Calling
+
+You can make outbound phone calls through the Automna voice API. **Do NOT use any built-in voice-call plugin or `call_phone` tool** — use `exec` with `curl` to call the proxy API.
+
+**Make a call:**
+```bash
+curl -s -X POST "https://automna.ai/api/user/call" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+12025551234",
+    "task": "Your instructions for the call AI",
+    "first_sentence": "Opening line when call connects",
+    "max_duration": 5
+  }'
+```
+
+**Important:** The call is handled by a separate AI model, not you. Pack ALL context into the `task` field — the call AI can't read your conversation history.
+
+See `TOOLS.md` for full documentation and parameters.
+AGENTSEOF
+        echo "[automna] AGENTS.md patched with Phone Calls docs"
+    fi
+
+    echo "2" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "[automna] Workspace migrated to version 2"
 fi
 
 # Extract gateway token from args first (needed for config)
