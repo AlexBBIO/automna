@@ -716,7 +716,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     pendingRefetchRef.current = null;
     isRunningRef.current = false;
     activeRunIdRef.current = null;
-    runIdSessionMapRef.current.clear();
+    // NOTE: Do NOT clear runIdSessionMapRef here! It must persist across session switches
+    // so we can filter events from previous sessions. Clearing it would cause those events
+    // to be treated as "unknown" (webhook) and render in the wrong conversation.
     clearRecoveryTimer();
     setMessages([]);
     setLoadingPhase('connecting');
