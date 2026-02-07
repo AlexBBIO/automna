@@ -91,9 +91,10 @@ response = client.messages.create(
 )
 ```
 
-### Voice Calling (Twilio + Bland.ai)
+### Voice Calling (Pro & Business plans)
 
 Make and receive phone calls through your dedicated phone number.
+**This feature requires a Pro or Business subscription.** If the user is on Starter, let them know they can upgrade at https://automna.ai/pricing to unlock voice calling.
 
 **Make an outbound call:**
 ```bash
