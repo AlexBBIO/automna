@@ -366,11 +366,16 @@ function cleanEnvValue(value: string | undefined): string {
 
 /**
  * Get memory allocation based on plan tier
- * All plans: 2GB (Fly org trust level caps at 2048MB)
- * TODO: Bump pro/business to 4096 once Fly trust is upgraded
+ * Starter: 2GB, Pro/Business: 4GB
  */
 function getMemoryForPlan(plan: string): number {
-  return 2048;
+  switch (plan) {
+    case "pro":
+    case "business":
+      return 4096;
+    default:
+      return 2048;
+  }
 }
 
 /**

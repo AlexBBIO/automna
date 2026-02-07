@@ -18,11 +18,16 @@ const FLY_API_BASE = "https://api.machines.dev/v1";
 /**
  * Get memory allocation based on plan tier
  * Must match the logic in provision/route.ts
- * All plans: 2GB (Fly org trust level caps at 2048MB)
- * TODO: Bump pro/business to 4096 once Fly trust is upgraded
+ * Starter: 2GB, Pro/Business: 4GB
  */
 function getMemoryForPlan(plan: string): number {
-  return 2048;
+  switch (plan) {
+    case "pro":
+    case "business":
+      return 4096;
+    default:
+      return 2048;
+  }
 }
 
 /**
