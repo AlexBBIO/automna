@@ -163,9 +163,23 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 }
 ```
 
-**After the call:**
-- Transcript is automatically saved to `calls/YYYY-MM-DD_HHMM_outbound_+1234.md`
-- You'll receive a notification with the summary and transcript location
+**After making a call, poll for completion:**
+```bash
+curl -s "https://automna.ai/api/user/call/status?call_id=CALL_ID_HERE" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
+```
+Poll every 30 seconds until `completed` is `true`. The response includes:
+- `status` - "completed", "failed", "no_answer", "voicemail"
+- `summary` - AI-generated summary of the call
+- `transcript` - Full conversation transcript
+- `duration_seconds` - Call length
+
+**After getting the completed status**, save the transcript locally:
+```bash
+mkdir -p /home/node/.openclaw/workspace/calls
+# Write transcript to a dated file
+```
+Then tell the user what happened (summary, key points from transcript).
 
 **Check usage:**
 ```bash
@@ -177,7 +191,7 @@ curl -s "https://automna.ai/api/user/call/usage" \
 - Be specific in the `task` - include names, context, and what success looks like
 - The call AI is a separate model, not you. Pack context into the task prompt.
 - US numbers only for now
-- Call transcripts are in the `calls/` directory
+- Always poll for completion after making a call - don't just fire and forget
 TOOLSEOF
         echo "[automna] TOOLS.md patched with Voice Calling docs"
     fi
@@ -204,6 +218,13 @@ curl -s -X POST "https://automna.ai/api/user/call" \
     "max_duration": 5
   }'
 ```
+
+**After making a call, you MUST poll for completion:**
+```bash
+curl -s "https://automna.ai/api/user/call/status?call_id=CALL_ID" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
+```
+Poll every 30 seconds until `completed` is `true`. Then save the transcript locally and report back to the user.
 
 **Important:** The call is handled by a separate AI model, not you. Pack ALL context into the `task` field — the call AI can't read your conversation history.
 

@@ -130,9 +130,23 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 }
 ```
 
-**After the call:**
-- Transcript is automatically saved to `calls/YYYY-MM-DD_HHMM_outbound_+1234.md`
-- You'll receive a notification with the summary and transcript location
+**After making a call, poll for completion:**
+```bash
+curl -s "https://automna.ai/api/user/call/status?call_id=CALL_ID_HERE" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
+```
+Poll every 30 seconds until `completed` is `true`. The response includes:
+- `status` - "completed", "failed", "no_answer", "voicemail"
+- `summary` - AI-generated summary of the call
+- `transcript` - Full conversation transcript
+- `duration_seconds` - Call length
+
+**After getting the completed status**, save the transcript locally:
+```bash
+mkdir -p /home/node/.openclaw/workspace/calls
+# Write the transcript to a dated markdown file
+```
+Then tell the user what happened (summary, key points from transcript).
 
 **Check usage:**
 ```bash
@@ -140,13 +154,11 @@ curl -s "https://automna.ai/api/user/call/usage" \
   -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
 ```
 
-**Inbound calls:** Your phone number answers automatically using your configured voice and prompt. Transcripts are saved the same way.
-
 **Tips:**
 - Be specific in the `task` - include names, context, and what success looks like
 - The call AI is a separate model, not you. Pack context into the task prompt.
 - US numbers only for now
-- Call transcripts are in the `calls/` directory
+- Always poll for completion after making a call - don't just fire and forget
 
 ## Integrations
 
@@ -156,7 +168,7 @@ curl -s "https://automna.ai/api/user/call/usage" \
 | Web Search | ✅ Active | Brave Search via `web_search` tool |
 | Browser | ✅ Active | Browserbase via Playwright (see BROWSERBASE.md) |
 | Email | ✅ Active | See AGENTMAIL.md |
-| Voice Calling | ✅ Active | Outbound + Inbound via phone number |
+| Voice Calling | ✅ Pro/Business | Outbound calls via `/api/user/call` proxy |
 | Discord | ❌ Not connected | Ask user for bot token |
 | Telegram | ❌ Not connected | Ask user for bot token |
 
