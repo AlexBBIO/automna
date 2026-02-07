@@ -130,35 +130,15 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 }
 ```
 
-**After making a call, IMMEDIATELY poll for completion using this script:**
-```bash
-CALL_ID="<the call_id from the make-call response>"
-for i in $(seq 1 12); do
-  sleep 30
-  RESULT=$(curl -s "https://automna.ai/api/user/call/status?call_id=$CALL_ID" \
-    -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN")
-  COMPLETED=$(echo "$RESULT" | jq -r '.completed')
-  if [ "$COMPLETED" = "true" ]; then
-    STATUS=$(echo "$RESULT" | jq -r '.status')
-    SUMMARY=$(echo "$RESULT" | jq -r '.summary')
-    TRANSCRIPT=$(echo "$RESULT" | jq -r '.transcript')
-    DURATION=$(echo "$RESULT" | jq -r '.duration_seconds')
-    
-    # Save transcript to file
-    mkdir -p /home/node/.openclaw/workspace/calls
-    FILENAME="calls/$(date +%Y-%m-%d_%H%M)_outbound.md"
-    echo -e "# Call Summary\n\n**Status:** $STATUS\n**Duration:** ${DURATION}s\n\n## Summary\n$SUMMARY\n\n## Transcript\n$TRANSCRIPT" > "/home/node/.openclaw/workspace/$FILENAME"
-    
-    echo "Call complete! Status: $STATUS, Duration: ${DURATION}s"
-    echo "Transcript saved to $FILENAME"
-    echo "Summary: $SUMMARY"
-    break
-  fi
-  echo "Poll $i: call still in progress..."
-done
-```
+**After making a call:** You'll receive an automatic notification when the call completes with the summary, transcript, and status. No need to poll. Just let the user know the call is in progress and you'll update them when it's done.
 
-Run this **immediately** after making the call — do not wait for the user to ask. The script checks every 30 seconds for up to 6 minutes. When done, report the summary to the user.
+**⚠️ Do NOT run any polling loops or sleep commands to wait for call results.** Long-running exec commands will block your entire session and prevent you from responding to ANY messages.
+
+**If you need to manually check a call status (rare):**
+```bash
+curl -s "https://automna.ai/api/user/call/status?call_id=<CALL_ID>" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" | jq '{completed, status, summary, duration_seconds}'
+```
 
 **Response fields when complete:**
 - `status` - "completed", "failed", "no_answer", "voicemail"

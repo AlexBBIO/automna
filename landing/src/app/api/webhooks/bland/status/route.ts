@@ -159,23 +159,26 @@ async function notifyAgent(
 
 Transcript saved to \`calls/${filename}\``;
 
-    // Send as a system event / chat message to the agent
-    const chatResponse = await fetch(`${machineUrl}/api/v1/chat`, {
+    // Send via hooks/agent - runs an agent turn that delivers the response to the user
+    const agentResponse = await fetch(`${machineUrl}/hooks/agent`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${gatewayToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        message,
-        sessionKey: "agent:main",
+        message: `A phone call just completed. Here are the results:\n\n${message}\n\nPlease inform the user about this call result. Keep it concise.`,
+        name: "PhoneCall",
+        deliver: true,
+        channel: "last",
+        wakeMode: "now",
       }),
     });
 
-    if (chatResponse.ok) {
-      console.log(`[bland-webhook] Agent notified on ${appName}`);
+    if (agentResponse.ok) {
+      console.log(`[bland-webhook] Agent notified on ${appName} via hooks/agent`);
     } else {
-      console.warn(`[bland-webhook] Agent notification failed for ${appName}:`, await chatResponse.text());
+      console.warn(`[bland-webhook] Agent notification failed for ${appName}:`, agentResponse.status, await agentResponse.text());
     }
   } catch (err) {
     console.error(`[bland-webhook] Failed to notify agent on ${appName}:`, err);

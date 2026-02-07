@@ -106,7 +106,7 @@ if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initializ
     echo "[automna] Initializing workspace with defaults..."
     cp -rn /app/default-workspace/* "$OPENCLAW_DIR/workspace/" 2>/dev/null || true
     touch "$OPENCLAW_DIR/workspace/.initialized"
-    echo "3" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "4" > "$OPENCLAW_DIR/workspace/.workspace-version"
     echo "[automna] Workspace initialized"
 fi
 
@@ -395,6 +395,63 @@ SCHEDTOOLSEOF
     echo "[automna] Workspace migrated to version 3"
 fi
 
+# Migration 3→4: Remove polling loop from phone call docs (causes session blocking)
+if [ "$WORKSPACE_VERSION" -lt 4 ] 2>/dev/null; then
+    echo "[automna] Workspace migration v4: removing polling loop from phone docs..."
+
+    # Patch TOOLS.md - replace polling loop with webhook notification
+    if [ -f "$OPENCLAW_DIR/workspace/TOOLS.md" ]; then
+        node -e "
+            const fs = require('fs');
+            const file = '$OPENCLAW_DIR/workspace/TOOLS.md';
+            let content = fs.readFileSync(file, 'utf8');
+
+            // Remove old polling script block
+            content = content.replace(/\*\*After making a call, IMMEDIATELY (?:run this )?polling.*?(?=\*\*(?:Response fields|Tips|Check usage))/s,
+                \`**After making a call:** You'll receive an automatic notification when the call completes with the summary, transcript, and status. No need to poll. Just let the user know the call is in progress and you'll update them when it's done.
+
+**⚠️ Do NOT run any polling loops or sleep commands to wait for call results.** Long-running exec commands will block your entire session and prevent you from responding to ANY messages.
+
+**If you need to manually check a call status (rare):**
+\\\`\\\`\\\`bash
+curl -s \"https://automna.ai/api/user/call/status?call_id=<CALL_ID>\" \\\\
+  -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\" | jq '{completed, status, summary, duration_seconds}'
+\\\`\\\`\\\`
+
+\`);
+
+            // Also clean up old 'Always poll' tip
+            content = content.replace(/- Always poll for completion after making a call[^\n]*\n?/, '');
+
+            fs.writeFileSync(file, content);
+            console.log('[automna] TOOLS.md polling loop removed');
+        " 2>/dev/null || echo "[automna] Warning: TOOLS.md patch failed"
+    fi
+
+    # Patch AGENTS.md - replace polling loop with webhook notification
+    if [ -f "$OPENCLAW_DIR/workspace/AGENTS.md" ]; then
+        node -e "
+            const fs = require('fs');
+            const file = '$OPENCLAW_DIR/workspace/AGENTS.md';
+            let content = fs.readFileSync(file, 'utf8');
+
+            // Remove old polling script block
+            content = content.replace(/\*\*After making a call, you MUST (?:immediately )?(?:run this )?poll.*?(?=\*\*Important:\*\*)/s,
+                \`**After making a call:** You'll receive an automatic notification when the call completes with the summary, transcript, and status. No need to poll. Just let the user know the call is in progress and you'll update them when it's done.
+
+**⚠️ Do NOT run any polling loops or sleep commands to wait for call results.** Long-running exec commands will block your entire session and prevent you from responding to messages.
+
+\`);
+
+            fs.writeFileSync(file, content);
+            console.log('[automna] AGENTS.md polling loop removed');
+        " 2>/dev/null || echo "[automna] Warning: AGENTS.md patch failed"
+    fi
+
+    echo "4" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "[automna] Workspace migrated to version 4"
+fi
+
 # Extract gateway token from args first (needed for config)
 # Args come in as: gateway --allow-unconfigured --bind lan --auth token --token <TOKEN>
 GATEWAY_TOKEN=""
@@ -445,6 +502,11 @@ cat > "$CONFIG_FILE" << EOFCONFIG
         ]
       }
     }
+  },
+  "hooks": {
+    "enabled": true,
+    "token": "$GATEWAY_TOKEN",
+    "path": "/hooks"
   },
   "plugins": {
     "entries": {

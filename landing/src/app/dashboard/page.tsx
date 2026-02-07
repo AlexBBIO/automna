@@ -47,7 +47,7 @@ interface GatewayInfo {
   userId?: string;
 }
 
-type LoadPhase = 'init' | 'syncing' | 'fetching-gateway' | 'provisioning' | 'warming' | 'ready' | 'error';
+type LoadPhase = 'init' | 'syncing' | 'fetching-gateway' | 'needs-subscription' | 'provisioning' | 'warming' | 'ready' | 'error';
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
@@ -383,15 +383,69 @@ export default function DashboardPage() {
     return false;
   };
 
+  // Handle checkout for inline subscription card
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const handleInlineCheckout = async (priceId: string, planName: string) => {
+    setCheckoutLoading(planName);
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId, plan: planName }),
+      });
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error('No checkout URL returned');
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+    }
+    setCheckoutLoading(null);
+  };
+
   // Sync user and fetch gateway info on mount
   useEffect(() => {
     if (!isLoaded || !user) return;
     
     const initializeGateway = async () => {
       try {
-        setLoadPhase('fetching-gateway');
-        
+        // Fire off sync in background
         fetch('/api/user/sync', { method: 'POST' }).catch(() => {});
+        
+        // Check subscription status from Clerk metadata FIRST
+        // This prevents the loading skeleton → redirect dance that confuses users
+        const subStatus = user.publicMetadata?.subscriptionStatus as string | undefined;
+        const hasActiveSub = subStatus === 'active' || subStatus === 'trialing';
+        
+        if (!hasActiveSub) {
+          // No subscription - check if they might have one that Clerk hasn't synced yet
+          // (e.g., just completed checkout and webhook is delayed)
+          const gatewayCheck = await fetch('/api/user/gateway');
+          const gatewayCheckData = await gatewayCheck.json();
+          
+          if (gatewayCheckData.needsProvisioning || gatewayCheck.status === 404) {
+            // Confirmed: no subscription, no machine. Show inline pricing.
+            console.log('[dashboard] No active subscription, showing inline pricing');
+            setLoadPhase('needs-subscription');
+            return;
+          }
+          // If they DO have a gateway URL already, proceed normally
+          // (subscription might have been set up before we tracked status)
+          if (gatewayCheckData.gatewayUrl) {
+            setGatewayInfo(gatewayCheckData);
+            setLoadPhase('warming');
+            const isReady = await waitForGatewayReady();
+            if (!isReady) {
+              console.warn('[dashboard] Gateway warmup timed out but proceeding anyway');
+            }
+            setLoadPhase('ready');
+            return;
+          }
+        }
+        
+        setLoadPhase('fetching-gateway');
         
         let gatewayRes = await fetch('/api/user/gateway');
         let gatewayData = await gatewayRes.json();
@@ -414,9 +468,9 @@ export default function DashboardPage() {
           
           if (provisionData.error) {
             console.error('[dashboard] Provisioning failed:', provisionData.error);
-            // Subscription required - redirect to pricing
+            // Subscription required - show inline pricing instead of redirect
             if (provisionData.error === 'subscription_required' || provisionRes.status === 402) {
-              window.location.href = '/pricing?subscribe=true';
+              setLoadPhase('needs-subscription');
               return;
             }
             setLoadError(provisionData.error);
@@ -505,6 +559,143 @@ export default function DashboardPage() {
             >
               Try Again
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Subscription required - inline pricing (no redirect!)
+  if (loadPhase === 'needs-subscription') {
+    const plans = [
+      {
+        name: 'Starter',
+        price: 79,
+        priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER,
+        description: 'Get started',
+        features: [
+          'Your own AI agent',
+          'Web chat + 1 integration',
+          'Browser access',
+          'Personal email inbox',
+          '500K tokens/month',
+        ],
+        cta: 'Start with Starter',
+      },
+      {
+        name: 'Pro',
+        price: 149,
+        priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO,
+        description: 'For power users',
+        features: [
+          'Everything in Starter',
+          'All integrations',
+          '2M tokens/month',
+          'Unlimited memory',
+          'Custom skills',
+          'Email support',
+        ],
+        cta: 'Go Pro',
+        popular: true,
+      },
+      {
+        name: 'Business',
+        price: 299,
+        priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_BUSINESS,
+        description: 'For teams',
+        features: [
+          'Everything in Pro',
+          'Team workspace',
+          '10M tokens/month',
+          'API access',
+          'Analytics dashboard',
+          'Dedicated support',
+        ],
+        cta: 'Go Business',
+      },
+    ];
+
+    return (
+      <div className="h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col transition-colors">
+        <nav className="border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm px-4 py-2 flex justify-between items-center">
+          <Link href="/" className="text-xl font-bold tracking-tight">
+            <span className="text-purple-600 dark:text-purple-400">Auto</span><span className="text-zinc-900 dark:text-white">mna</span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <UserButton />
+          </div>
+        </nav>
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 py-8 md:py-16">
+            {/* Welcome header */}
+            <div className="text-center mb-8 md:mb-12">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-purple-100 dark:bg-purple-500/20 mb-4">
+                <span className="text-3xl">🤖</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white mb-2">
+                Almost there! Choose your plan.
+              </h1>
+              <p className="text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto">
+                Pick a plan to activate your AI agent. It&apos;ll be ready to chat in about 60 seconds.
+              </p>
+            </div>
+
+            {/* Pricing cards */}
+            <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+              {plans.map((plan) => (
+                <div
+                  key={plan.name}
+                  className={`relative rounded-2xl p-6 transition-all ${
+                    plan.popular
+                      ? 'bg-gradient-to-b from-purple-50 to-violet-50 dark:from-purple-500/15 dark:to-violet-500/5 border-2 border-purple-300 dark:border-purple-500/40 shadow-lg shadow-purple-100 dark:shadow-purple-500/10'
+                      : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-purple-600 text-white rounded-full text-xs font-medium">
+                      Most Popular
+                    </div>
+                  )}
+
+                  <div className="mb-4">
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{plan.name}</h3>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">{plan.description}</p>
+                  </div>
+
+                  <div className="mb-5">
+                    <span className="text-3xl font-bold text-zinc-900 dark:text-white">${plan.price}</span>
+                    <span className="text-zinc-400 dark:text-zinc-500">/mo</span>
+                  </div>
+
+                  <ul className="space-y-2 mb-6">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <span className={plan.popular ? 'text-purple-600 dark:text-purple-400 mt-0.5' : 'text-zinc-400 dark:text-zinc-500 mt-0.5'}>✓</span>
+                        <span className="text-zinc-700 dark:text-zinc-300">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    onClick={() => handleInlineCheckout(plan.priceId || '', plan.name.toLowerCase())}
+                    disabled={checkoutLoading === plan.name || !plan.priceId}
+                    className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                      plan.popular
+                        ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                        : 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700'
+                    } disabled:opacity-50`}
+                  >
+                    {checkoutLoading === plan.name ? 'Loading...' : plan.cta}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Bottom note */}
+            <p className="text-center text-sm text-zinc-400 dark:text-zinc-500 mt-6">
+              All plans include Claude AI. No API key needed. Cancel anytime.
+            </p>
           </div>
         </div>
       </div>

@@ -56,6 +56,19 @@ const plans = [
 function SubscriptionBanner() {
   const searchParams = useSearchParams();
   const needsSubscription = searchParams.get('subscribe') === 'true';
+  const wasCanceled = searchParams.get('canceled') === 'true';
+  
+  if (wasCanceled) {
+    return (
+      <div className="container mx-auto px-6">
+        <div className="bg-zinc-800/50 border border-zinc-600/50 rounded-lg p-4 text-center">
+          <p className="text-zinc-300">
+            No worries! Take your time. Pick a plan when you&apos;re ready.
+          </p>
+        </div>
+      </div>
+    );
+  }
   
   if (!needsSubscription) return null;
   
