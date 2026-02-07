@@ -44,6 +44,10 @@ RUN sed -i 's|const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1
 # Copy default workspace files
 COPY workspace/ /app/default-workspace/
 
+# Install jq for JSON parsing in shell scripts (used by phone call polling)
+RUN apt-get update && apt-get install -y --no-install-recommends jq \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Install pip and Python packages for browser automation
 # Playwright connects to Browserbase (remote Chrome), so we only need the library, not browsers
 RUN apt-get update && apt-get install -y --no-install-recommends python3-pip \
