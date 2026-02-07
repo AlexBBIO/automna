@@ -213,7 +213,12 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 - `voicemail_action` (optional) - "hangup" (default), "leave_message", or "ignore"
 - `voicemail_message` (optional) - Message to leave on voicemail
 
-**After making a call:** You'll receive an automatic notification when the call completes with the summary, transcript, and status. No need to poll. Just let the user know the call is in progress and you'll update them when it's done.
+**After making a call:** You'll receive an automatic webhook notification when the call completes with the summary, transcript, and status. No need to poll. Just let the user know the call is in progress and you'll update them when it's done.
+
+**When you receive a call completion notification:**
+1. Inform the user of the call summary (keep it concise)
+2. Save the full transcript to a markdown file in `calls/` directory (create it if it doesn't exist)
+3. Use format: `calls/YYYY-MM-DD_HHMM_outbound_+1XXXXXXXXXX.md`
 
 **⚠️ Do NOT run any polling loops or sleep commands to wait for call results.** Long-running exec commands will block your entire session and prevent you from responding to messages.
 

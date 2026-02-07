@@ -87,7 +87,7 @@ ${callRecord.transcript || "No transcript available."}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        message: `A phone call just completed. Here are the results:\n\n${message}\n\nPlease inform the user about this call result. Keep it concise. Save the transcript to a file in the calls/ directory.`,
+        message: `A phone call just completed. Here are the results:\n\n${message}`,
         name: "PhoneCall",
         deliver: true,
         channel: "last",
