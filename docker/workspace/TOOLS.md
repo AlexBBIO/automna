@@ -156,7 +156,6 @@ curl -s "https://automna.ai/api/user/call/usage" \
 - Be specific in the `task` - include names, context, and what success looks like
 - The call AI is a separate model, not you. Pack context into the task prompt.
 - US numbers only for now
-- Always poll for completion after making a call - don't just fire and forget
 
 ## Integrations
 

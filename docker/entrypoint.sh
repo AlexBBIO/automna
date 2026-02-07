@@ -452,6 +452,48 @@ curl -s \"https://automna.ai/api/user/call/status?call_id=<CALL_ID>\" \\\\
     echo "[automna] Workspace migrated to version 4"
 fi
 
+# Migration 4→5: Force-remove ALL polling instructions from phone docs
+# Previous migration v4 used regex that may not match all variants
+if [ "$WORKSPACE_VERSION" -lt 5 ] 2>/dev/null; then
+    echo "[automna] Workspace migration v5: force-removing all polling instructions..."
+
+    for DOC_FILE in "$OPENCLAW_DIR/workspace/TOOLS.md" "$OPENCLAW_DIR/workspace/AGENTS.md"; do
+        if [ -f "$DOC_FILE" ]; then
+            node -e "
+                const fs = require('fs');
+                let content = fs.readFileSync('$DOC_FILE', 'utf8');
+                const before = content.length;
+
+                // Remove any line containing 'sleep 30' or polling loop patterns
+                content = content.replace(/^.*sleep 30.*$/gm, '');
+                content = content.replace(/^.*seq 1 12.*$/gm, '');
+                content = content.replace(/^.*Poll.*still in progress.*$/gm, '');
+                content = content.replace(/^.*IMMEDIATELY run this polling.*$/gm, '');
+                content = content.replace(/^.*MUST immediately run this polling.*$/gm, '');
+                content = content.replace(/^.*Always poll for completion.*$/gm, '');
+                content = content.replace(/^.*don't just fire and forget.*$/gm, '');
+
+                // Replace any remaining 'After making a call' blocks that mention polling
+                content = content.replace(/\*\*After making a call[^*]*poll[^*]*\*\*/gi,
+                    '**After making a call:** You will receive an automatic notification when the call completes with the summary, transcript, and status. No need to poll.');
+
+                // Clean up excessive blank lines left by removals
+                content = content.replace(/\n{4,}/g, '\n\n\n');
+
+                if (content.length !== before) {
+                    fs.writeFileSync('$DOC_FILE', content);
+                    console.log('[automna] Cleaned polling from $DOC_FILE (' + (before - content.length) + ' chars removed)');
+                } else {
+                    console.log('[automna] No polling found in $DOC_FILE');
+                }
+            " 2>/dev/null || echo "[automna] Warning: $DOC_FILE patch failed"
+        fi
+    done
+
+    echo "5" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "[automna] Workspace migrated to version 5"
+fi
+
 # Extract gateway token from args first (needed for config)
 # Args come in as: gateway --allow-unconfigured --bind lan --auth token --token <TOKEN>
 GATEWAY_TOKEN=""
