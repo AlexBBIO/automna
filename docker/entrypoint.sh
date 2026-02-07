@@ -160,6 +160,13 @@ cat > "$CONFIG_FILE" << EOFCONFIG
       }
     }
   },
+  "plugins": {
+    "entries": {
+      "voice-call": {
+        "enabled": false
+      }
+    }
+  },
   "agents": {
     "defaults": {
       "workspace": "/home/node/.openclaw/workspace",
@@ -199,6 +206,22 @@ if [ -f "$CONFIG_FILE" ] && ! grep -q '"trustedProxies"' "$CONFIG_FILE" 2>/dev/n
         fs.writeFileSync('$CONFIG_FILE', JSON.stringify(config, null, 2));
         console.log('[automna] trustedProxies added');
     " 2>/dev/null || echo "[automna] Warning: trustedProxies migration failed"
+fi
+
+# Migration: Disable built-in voice-call plugin (we use Automna proxy instead)
+if [ -f "$CONFIG_FILE" ] && ! grep -q '"voice-call"' "$CONFIG_FILE" 2>/dev/null; then
+    echo "[automna] Migrating config: disabling built-in voice-call plugin..."
+    node -e "
+        const fs = require('fs');
+        const config = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf8'));
+        if (!config.plugins) config.plugins = {};
+        if (!config.plugins.entries) config.plugins.entries = {};
+        if (!config.plugins.entries['voice-call']) {
+            config.plugins.entries['voice-call'] = { enabled: false };
+        }
+        fs.writeFileSync('$CONFIG_FILE', JSON.stringify(config, null, 2));
+        console.log('[automna] voice-call plugin disabled');
+    " 2>/dev/null || echo "[automna] Warning: voice-call migration failed"
 fi
 
 # Migration: Fix model name to use automna provider with Opus 4.5

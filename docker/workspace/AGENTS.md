@@ -186,6 +186,35 @@ You have your own email inbox! The heartbeat system checks it periodically, but 
 
 **Track what you've seen:** Use `heartbeat-state.json` to track the last check time and unread count.
 
+## Phone Calls - Voice Calling
+
+You can make outbound phone calls through the Automna voice API. **Do NOT use any built-in voice-call plugin or `call_phone` tool** — use `exec` with `curl` to call the proxy API.
+
+**Make a call:**
+```bash
+curl -s -X POST "https://automna.ai/api/user/call" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+12025551234",
+    "task": "Your instructions for the call AI",
+    "first_sentence": "Opening line when call connects",
+    "max_duration": 5
+  }'
+```
+
+**Key parameters:**
+- `to` (required) - Phone number (US, any format: +1xxx, (xxx) xxx-xxxx)
+- `task` (required) - What the call AI should accomplish (be detailed! include names, context)
+- `first_sentence` (optional) - Specific opening line
+- `max_duration` (optional) - Max minutes (default 5)
+- `voicemail_action` (optional) - "hangup" (default), "leave_message", or "ignore"
+- `voicemail_message` (optional) - Message to leave on voicemail
+
+**Important:** The call is handled by a separate AI model, not you. Pack ALL context into the `task` field — the call AI can't read your conversation history.
+
+See `TOOLS.md` for full documentation and examples.
+
 ## Browserbase - Web Browsing
 
 You have access to Browserbase for web automation that bypasses bot detection.
