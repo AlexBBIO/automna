@@ -1,7 +1,7 @@
 # Automna Chat Streaming Spec
 
-> Last updated: 2026-02-06
-> Status: Phase 2E complete ✅ (verbose mode + mediaUrls + tool splitting)
+> Last updated: 2026-02-07
+> Status: Phase 2F complete ✅ (sessionKey-based event routing for webhooks)
 
 ## Overview
 
@@ -856,6 +856,36 @@ This works because `MessageContent.tsx` already parses `MEDIA:` lines and render
 6. ✅ Deploy
 
 **Deployed 2026-02-06.** Tested on grandathrawn's machine. Bubble splitting and image rendering both confirmed working.
+
+#### 2F: Session-Aware Event Routing via `payload.sessionKey` ✅
+
+**Problem:** Webhook-triggered agent runs (e.g., phone call completion via `/hooks/agent`) produce `event chat` and `event agent` events with `runId`s that were never registered in the frontend's `runIdSessionMap`. The original `isEventForDifferentSession()` returned `false` for unknown `runId`s (designed as "allow through for webhooks"). This caused:
+1. Post-call summary rendered in whichever chat was active (wrong conversation)
+2. Post-final history re-fetch pulled data for the active session, which didn't contain the message
+3. Message disappeared on re-fetch (the "ghost message" bug)
+
+**Discovery:** OpenClaw's chat event payloads include a `sessionKey` field (verified in `dist/acp/translator.js` - `const sessionKey = payload.sessionKey`). We weren't reading it.
+
+**Fix (commit `1a9b54b`):**
+
+1. Updated `isEventForDifferentSession()` signature to accept optional `eventSessionKey`:
+   ```typescript
+   function isEventForDifferentSession(
+     runId: string | undefined,
+     currentSession: string,
+     eventSessionKey?: string | undefined,
+   ): boolean
+   ```
+
+2. When `eventSessionKey` is present, canonicalize it and compare directly to `currentSession`. If it doesn't match, the event is for a different session (also registers the `runId` mapping for future events in the same run).
+
+3. Falls back to `runIdSessionMap` lookup when no `eventSessionKey` is present (backward compatible).
+
+4. Both `handleChatEvent()` and `handleAgentEvent()` now extract `payload.sessionKey` and pass it to the filter function.
+
+**Result:** Webhook-triggered events are now correctly routed to (or filtered from) the right conversation. Events for other sessions trigger `markSessionUnread()` for the notification badge. No more ghost messages.
+
+**Deployed 2026-02-07.** Verified on automna.ai production.
 
 ### Phase 3: Testing
 

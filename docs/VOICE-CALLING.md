@@ -1,7 +1,7 @@
 # Voice Calling Feature Spec
 
-**Status:** Planning  
-**Target Tiers:** Mid ($49/mo), Pro ($99/mo)  
+**Status:** Implemented ✅ (deployed 2026-02-07)  
+**Available Tiers:** Pro ($49/mo), Business ($99/mo)  
 **Not included:** Starter (free tier)
 
 ## Overview
@@ -773,29 +773,39 @@ Most users won't max out minutes, so average cost will be lower.
 
 ## Implementation Checklist
 
-### Phase 1: Core Infrastructure
-- [ ] Add database tables (`phoneNumbers`, `callUsage`)
-- [ ] Run Drizzle migration
-- [ ] Set up Twilio account and get credentials
-- [ ] Set up Bland.ai account and get API key
-- [ ] Configure Bland BYOT (get encrypted key)
-- [ ] Add environment variables to Vercel
+### Phase 1: Core Infrastructure ✅
+- [x] Add database tables (`phoneNumbers`, `callUsage`) + migration columns (`sessionKey`, `lastSessionKey`)
+- [x] Run Drizzle migration (Turso)
+- [x] Set up Twilio account and get credentials
+- [x] Set up Bland.ai account and get API key
+- [x] Configure Bland BYOT (get encrypted key)
+- [x] Add environment variables to Vercel
+- [x] Provision test phone number (+17254339890)
 
-### Phase 2: API Endpoints
-- [ ] `POST /api/user/call` - make outbound calls
-- [ ] `POST /api/webhooks/bland/status` - receive call updates
-- [ ] `GET /api/user/call/usage` - get usage stats
+### Phase 2: API Endpoints ✅
+- [x] `POST /api/user/call` - make outbound calls (with session key capture)
+- [x] `POST /api/user/call/status` - poll call status/transcript
+- [x] `POST /api/webhooks/bland/status` - receive call updates + notify agent with session routing
+- [x] `GET /api/user/call/usage` - get usage stats
+- [x] `POST /api/user/sessions/active` - track active conversation for routing
 
-### Phase 3: Provisioning
-- [ ] `lib/twilio.ts` - Twilio number management
-- [ ] `lib/bland.ts` - Bland integration
-- [ ] Update Stripe webhook for auto-provisioning on upgrade
-- [ ] Manual provisioning script for existing Pro/Business users
+### Phase 3: Agent Integration ✅
+- [x] Disabled built-in voice-call plugin in OpenClaw config (avoids tool conflict)
+- [x] Added phone call docs to workspace AGENTS.md and TOOLS.md (curl proxy instructions)
+- [x] Workspace migration system (versioned, patches existing users on boot)
+- [x] Agent polling loop for call completion (bash for-loop in docs)
+- [x] Plan gating (Pro/Business only, 403 for Starter)
+- [x] Docker image rebuilt with `jq` for polling script
+- [x] Automna Token billing for calls (900 AT/min, 150 AT failed)
 
-### Phase 4: OpenClaw Integration
-- [ ] Add `call_phone` tool to agent config template
-- [ ] Update machine provisioning to include tool
-- [ ] Test end-to-end call flow
+### Phase 4: Session Persistence & Routing ✅
+- [x] Frontend `runIdSessionMap` for cross-talk prevention
+- [x] Frontend `isEventForDifferentSession()` with `payload.sessionKey` support
+- [x] Backend session key locked at call initiation time (multi-tab safe)
+- [x] Webhook routes notification to correct conversation
+- [x] Notification persists after page reload
+- [x] Unread badges when events filter to different session
+- [x] See: `docs/PHONE-CALL-SESSION-PERSISTENCE.md` for full details
 
 ### Phase 5: Dashboard UI
 - [ ] Show phone number in settings

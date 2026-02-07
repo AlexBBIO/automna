@@ -1,5 +1,8 @@
 # Session Persistence & Routing Fix
 
+> **Last updated:** 2026-02-07  
+> **Status:** Fully implemented and deployed ✅
+
 ## Problem
 
 Two related issues with Automna's webchat session model:
@@ -232,3 +235,52 @@ Both are `ALTER TABLE ADD COLUMN` with defaults or nullable. In SQLite/Turso:
 | Frontend filters out wanted events | Low | Medium | Unknown `runId`s (from hooks) render normally, only known mismatches are filtered |
 | Migration breaks existing data | None | N/A | Additive columns only, no data modification |
 | Multiple tabs overwrite `lastSessionKey` | Expected | Low | Outbound calls lock session at initiation; inbound uses most-recent (correct behavior) |
+
+---
+
+## Implementation Status (2026-02-07)
+
+All pieces are **fully implemented and deployed to production**.
+
+### What was built:
+
+#### Backend (Vercel + Turso)
+
+1. **`lastSessionKey` column on `machines` table** — tracks user's most recently active conversation
+2. **`sessionKey` column on `callUsage` table** — locks session at call initiation time (multi-tab safe)
+3. **`POST /api/user/sessions/active`** — dashboard reports active session on switch/message send
+4. **`/api/user/call/route.ts`** — captures `lastSessionKey` into `callUsage.sessionKey` at initiation
+5. **`/api/webhooks/bland/status/route.ts`** — passes `sessionKey` to `/hooks/agent` so OpenClaw routes the notification to the correct session. Uses `callUsage.sessionKey` for outbound, `machine.lastSessionKey` for inbound. Bare key format (OpenClaw adds `agent:main:` prefix internally).
+6. **Removed broken `writeTranscriptToMachine()`** — was calling non-existent `/api/v1/exec`. Transcript data is in Turso + included in the hook notification message.
+
+#### Frontend (`clawdbot-runtime.ts`)
+
+1. **`runIdSessionMap`** (module-level `Map<string, string>`) — maps `runId → sessionKey` for cross-talk prevention. Module-level so it survives component remounts when switching conversations.
+2. **`isEventForDifferentSession()`** — checks both `runIdSessionMap` AND the event's `payload.sessionKey` field. This is the critical fix: webhook-triggered runs have unknown `runId`s but DO carry a `sessionKey` in the payload. Without checking `sessionKey`, those events leaked into whichever chat was active.
+3. **Session-aware filtering in `handleChatEvent()` and `handleAgentEvent()`** — extracts `payload.sessionKey`, passes to `isEventForDifferentSession()`. Events for different sessions are silently dropped (with unread badge).
+4. **Unread tracking** — when events are filtered for a different session, `markSessionUnread()` adds a badge so the user knows there's a new message in another conversation.
+5. **Post-final re-fetch scoped to current session** — after a `final` event, re-fetches history for `currentSessionRef.current` to get complete content (images, MEDIA paths).
+
+### Bug fix: "Ghost message" (2026-02-07 late)
+
+**Symptom:** Post-call summary appeared in wrong chat, then disappeared when switching away.
+
+**Root cause:** `isEventForDifferentSession()` only checked the `runIdSessionMap`. Webhook-triggered runs (`/hooks/agent`) produce events with `runId`s that were never registered via `handleSendAck` (because the run wasn't initiated from the UI). The function returned `false` for unknown `runId`s, letting the event render in whatever chat was active. Then the post-final history re-fetch pulled data for the CURRENT session (wrong one), which didn't contain that message, so it vanished.
+
+**Fix:** Updated `isEventForDifferentSession()` to accept an optional `eventSessionKey` parameter. `handleChatEvent()` and `handleAgentEvent()` now extract `payload.sessionKey` from the event and pass it. When present, the `eventSessionKey` is the source of truth for routing. Falls back to `runIdSessionMap` for events without a `sessionKey` field (legacy compatibility).
+
+**Commit:** `1a9b54b` — "fix: use event sessionKey for cross-talk filtering"
+
+### Deployment log:
+- Database migrations: applied (additive columns, no downtime)
+- Docker image: rebuilt and pushed (`registry.fly.io/automna-openclaw-image:latest`)
+- Test user machine: updated (`automna-u-1llgzf6t2spw`)
+- Vercel: deployed to production (`automna.ai`)
+
+### What's verified working:
+- ✅ Outbound calls route notification to correct conversation
+- ✅ Notification persists after page reload
+- ✅ Streaming cross-talk prevented when switching conversations
+- ✅ Session key locked at call initiation (multi-tab safe)
+- ✅ Agent polls for call completion and reports transcript
+- ✅ Webhook-triggered events don't leak into wrong chat
