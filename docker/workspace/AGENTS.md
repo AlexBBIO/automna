@@ -300,3 +300,37 @@ You're a personal AI assistant. Be proactive, resourceful, and genuinely helpful
 ---
 
 *This file is yours to evolve. Add conventions that work for you and your human.*
+
+## Scheduling - Reminders & Recurring Tasks
+
+When a user asks you to do something later or on a schedule, use the `cron` tool.
+
+**One-time reminder:**
+```
+cron(action: "add", job: {
+  text: "Remind Alex to call Bob",
+  payload: { kind: "systemEvent", text: "Reminder: Call Bob! Alex asked you to remind him." },
+  schedule: "2026-02-08T09:00:00",
+  once: true
+})
+```
+
+**Recurring task:**
+```
+cron(action: "add", job: {
+  text: "Daily email summary",
+  payload: { kind: "systemEvent", text: "Time to check email and send Alex a summary of anything new." },
+  schedule: "0 17 * * *"
+})
+```
+
+**Manage jobs:**
+- `cron(action: "list")` — see all scheduled jobs
+- `cron(action: "remove", jobId: "xxx")` — cancel a job
+- `cron(action: "runs", jobId: "xxx")` — see recent runs
+
+**Tips:**
+- Use `once: true` for one-time reminders
+- Use cron syntax for recurring: `"0 9 * * 1-5"` = weekdays at 9am
+- Write the `text` so it reads as an instruction when it fires
+- Include context: "Reminder: Alex asked you to follow up with Dana about dinner plans"

@@ -106,7 +106,7 @@ if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initializ
     echo "[automna] Initializing workspace with defaults..."
     cp -rn /app/default-workspace/* "$OPENCLAW_DIR/workspace/" 2>/dev/null || true
     touch "$OPENCLAW_DIR/workspace/.initialized"
-    echo "2" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "3" > "$OPENCLAW_DIR/workspace/.workspace-version"
     echo "[automna] Workspace initialized"
 fi
 
@@ -243,6 +243,156 @@ AGENTSEOF
 
     echo "2" > "$OPENCLAW_DIR/workspace/.workspace-version"
     echo "[automna] Workspace migrated to version 2"
+fi
+
+# Migration 2→3: Add polling script to phone call docs + scheduling section
+if [ "$WORKSPACE_VERSION" -lt 3 ] 2>/dev/null; then
+    echo "[automna] Workspace migration v3: adding polling script + scheduling docs..."
+
+    # Patch TOOLS.md - add polling script if missing
+    if [ -f "$OPENCLAW_DIR/workspace/TOOLS.md" ] && ! grep -q "call/status" "$OPENCLAW_DIR/workspace/TOOLS.md" 2>/dev/null; then
+        # Find the Voice Calling section and append polling instructions
+        node -e "
+            const fs = require('fs');
+            const file = '$OPENCLAW_DIR/workspace/TOOLS.md';
+            let content = fs.readFileSync(file, 'utf8');
+            
+            const polling = \`
+
+**After making a call, IMMEDIATELY run this polling script:**
+\\\`\\\`\\\`bash
+CALL_ID=\"<the call_id from the make-call response>\"
+for i in \\\$(seq 1 12); do
+  sleep 30
+  RESULT=\\\$(curl -s \"https://automna.ai/api/user/call/status?call_id=\\\$CALL_ID\" \\\\
+    -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\")
+  COMPLETED=\\\$(echo \"\\\$RESULT\" | jq -r '.completed')
+  if [ \"\\\$COMPLETED\" = \"true\" ]; then
+    STATUS=\\\$(echo \"\\\$RESULT\" | jq -r '.status')
+    SUMMARY=\\\$(echo \"\\\$RESULT\" | jq -r '.summary')
+    TRANSCRIPT=\\\$(echo \"\\\$RESULT\" | jq -r '.transcript')
+    DURATION=\\\$(echo \"\\\$RESULT\" | jq -r '.duration_seconds')
+    mkdir -p /home/node/.openclaw/workspace/calls
+    FILENAME=\"calls/\\\$(date +%Y-%m-%d_%H%M)_outbound.md\"
+    echo -e \"# Call Summary\\\\n\\\\n**Status:** \\\$STATUS\\\\n**Duration:** \\\${DURATION}s\\\\n\\\\n## Summary\\\\n\\\$SUMMARY\\\\n\\\\n## Transcript\\\\n\\\$TRANSCRIPT\" > \"/home/node/.openclaw/workspace/\\\$FILENAME\"
+    echo \"Call complete! Transcript saved to \\\$FILENAME\"
+    echo \"Summary: \\\$SUMMARY\"
+    break
+  fi
+  echo \"Poll \\\$i: call still in progress...\"
+done
+\\\`\\\`\\\`
+Run this **immediately** after making the call. Do not wait for the user to ask. Report the summary when done.\`;
+
+            // Insert after the Response JSON block
+            const insertPoint = content.indexOf('**Tips:**');
+            if (insertPoint > 0 && content.indexOf('call/status') === -1) {
+                content = content.slice(0, insertPoint) + polling + '\\n\\n' + content.slice(insertPoint);
+                fs.writeFileSync(file, content);
+                console.log('[automna] TOOLS.md patched with polling script');
+            }
+        " 2>/dev/null || echo "[automna] Warning: TOOLS.md polling patch failed"
+    fi
+
+    # Patch AGENTS.md - add polling script if missing
+    if [ -f "$OPENCLAW_DIR/workspace/AGENTS.md" ] && ! grep -q "call/status" "$OPENCLAW_DIR/workspace/AGENTS.md" 2>/dev/null; then
+        node -e "
+            const fs = require('fs');
+            const file = '$OPENCLAW_DIR/workspace/AGENTS.md';
+            let content = fs.readFileSync(file, 'utf8');
+            
+            const polling = \`
+**After making a call, you MUST immediately run this polling script:**
+\\\`\\\`\\\`bash
+CALL_ID=\"<call_id from response>\"
+for i in \\\$(seq 1 12); do
+  sleep 30
+  RESULT=\\\$(curl -s \"https://automna.ai/api/user/call/status?call_id=\\\$CALL_ID\" -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\")
+  if [ \"\\\$(echo \"\\\$RESULT\" | jq -r '.completed')\" = \"true\" ]; then
+    echo \"\\\$RESULT\" | jq .
+    break
+  fi
+  echo \"Poll \\\$i: still in progress...\"
+done
+\\\`\\\`\\\`
+Run this RIGHT AFTER the call. Do not wait for the user to ask. When complete, save the transcript and tell the user the summary.
+\`;
+
+            // Insert before the 'Important:' line in the phone call section
+            const insertPoint = content.indexOf('**Important:** The call is handled');
+            if (insertPoint > 0 && content.indexOf('call/status') === -1) {
+                content = content.slice(0, insertPoint) + polling + '\\n' + content.slice(insertPoint);
+                fs.writeFileSync(file, content);
+                console.log('[automna] AGENTS.md patched with polling script');
+            }
+        " 2>/dev/null || echo "[automna] Warning: AGENTS.md polling patch failed"
+    fi
+
+    # Add Scheduling section to AGENTS.md if missing
+    if [ -f "$OPENCLAW_DIR/workspace/AGENTS.md" ] && ! grep -q "Scheduling" "$OPENCLAW_DIR/workspace/AGENTS.md" 2>/dev/null; then
+        cat >> "$OPENCLAW_DIR/workspace/AGENTS.md" << 'SCHEDEOF'
+
+## Scheduling - Reminders & Recurring Tasks
+
+When a user asks you to do something later or on a schedule, use the `cron` tool.
+
+**One-time reminder:**
+```
+cron(action: "add", job: {
+  text: "Remind Alex to call Bob",
+  payload: { kind: "systemEvent", text: "Reminder: Call Bob! Alex asked you to remind him." },
+  schedule: "2026-02-08T09:00:00",
+  once: true
+})
+```
+
+**Recurring task:**
+```
+cron(action: "add", job: {
+  text: "Daily email summary",
+  payload: { kind: "systemEvent", text: "Time to check email and send Alex a summary of anything new." },
+  schedule: "0 17 * * *"
+})
+```
+
+**Manage jobs:**
+- `cron(action: "list")` — see all scheduled jobs
+- `cron(action: "remove", jobId: "xxx")` — cancel a job
+- `cron(action: "runs", jobId: "xxx")` — see recent runs
+
+**Tips:**
+- Use `once: true` for one-time reminders
+- Use cron syntax for recurring: `"0 9 * * 1-5"` = weekdays at 9am
+- Write the `text` so it reads as an instruction when it fires
+- Include context: "Reminder: Alex asked you to follow up with Dana about dinner plans"
+SCHEDEOF
+        echo "[automna] AGENTS.md patched with Scheduling docs"
+    fi
+
+    # Add Scheduling section to TOOLS.md if missing
+    if [ -f "$OPENCLAW_DIR/workspace/TOOLS.md" ] && ! grep -q "Scheduling" "$OPENCLAW_DIR/workspace/TOOLS.md" 2>/dev/null; then
+        cat >> "$OPENCLAW_DIR/workspace/TOOLS.md" << 'SCHEDTOOLSEOF'
+
+### Scheduling (Reminders & Recurring Tasks)
+
+Use the `cron` tool to schedule reminders and recurring tasks.
+
+**Examples:**
+- "Remind me at 3pm" → `cron(action: "add", job: {text: "3pm reminder", payload: {kind: "systemEvent", text: "Reminder: ..."}, schedule: "2026-02-07T15:00:00", once: true})`
+- "Check email every morning" → `cron(action: "add", job: {text: "Morning email check", payload: {kind: "systemEvent", text: "Check email and summarize"}, schedule: "0 9 * * *"})`
+- "Cancel that" → `cron(action: "remove", jobId: "xxx")`
+
+**Cron syntax quick reference:**
+- `0 9 * * *` = daily at 9am
+- `0 9 * * 1-5` = weekdays at 9am
+- `*/30 * * * *` = every 30 minutes
+- `0 9,17 * * *` = 9am and 5pm daily
+SCHEDTOOLSEOF
+        echo "[automna] TOOLS.md patched with Scheduling docs"
+    fi
+
+    echo "3" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "[automna] Workspace migrated to version 3"
 fi
 
 # Extract gateway token from args first (needed for config)

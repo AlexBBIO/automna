@@ -226,3 +226,18 @@ curl -s "https://automna.ai/api/user/call/usage" \
 ---
 
 *Keep this updated as you learn the environment.*
+
+### Scheduling (Reminders & Recurring Tasks)
+
+Use the `cron` tool to schedule reminders and recurring tasks.
+
+**Examples:**
+- "Remind me at 3pm" → `cron(action: "add", job: {text: "3pm reminder", payload: {kind: "systemEvent", text: "Reminder: ..."}, schedule: "2026-02-07T15:00:00", once: true})`
+- "Check email every morning" → `cron(action: "add", job: {text: "Morning email check", payload: {kind: "systemEvent", text: "Check email and summarize"}, schedule: "0 9 * * *"})`
+- "Cancel that" → `cron(action: "remove", jobId: "xxx")`
+
+**Cron syntax quick reference:**
+- `0 9 * * *` = daily at 9am
+- `0 9 * * 1-5` = weekdays at 9am
+- `*/30 * * * *` = every 30 minutes
+- `0 9,17 * * *` = 9am and 5pm daily
