@@ -22,6 +22,7 @@ interface ConversationSidebarProps {
   onToggleCollapse: () => void;
   isLoading?: boolean;
   onRefresh?: () => void;
+  unreadKeys?: Set<string>;
 }
 
 export function ConversationSidebar({ 
@@ -36,6 +37,7 @@ export function ConversationSidebar({
   onToggleCollapse,
   isLoading = false,
   onRefresh,
+  unreadKeys,
 }: ConversationSidebarProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newConversationName, setNewConversationName] = useState('');
@@ -155,6 +157,9 @@ export function ConversationSidebar({
               title={conv.name}
             >
               <span className="text-lg">{conv.icon}</span>
+              {unreadKeys?.has(conv.key) && currentConversation !== conv.key && (
+                <span className="absolute top-1.5 left-1.5 w-2 h-2 bg-purple-500 rounded-full" />
+              )}
               {conv.starred && (
                 <span className="absolute top-1 right-1 text-yellow-500 text-[10px]">★</span>
               )}
@@ -264,8 +269,13 @@ export function ConversationSidebar({
                     : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
                 }`}
               >
-                <span className="text-base flex-shrink-0">{conv.icon}</span>
-                <span className="text-sm truncate flex-1">{conv.name}</span>
+                <span className="text-base flex-shrink-0 relative">
+                  {conv.icon}
+                  {unreadKeys?.has(conv.key) && currentConversation !== conv.key && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-purple-500 rounded-full" />
+                  )}
+                </span>
+                <span className={`text-sm truncate flex-1 ${unreadKeys?.has(conv.key) && currentConversation !== conv.key ? 'font-semibold' : ''}`}>{conv.name}</span>
                 
                 {/* Star button - always visible for starred, hover for others */}
                 {onToggleStar && (

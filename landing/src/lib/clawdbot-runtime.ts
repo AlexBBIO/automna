@@ -161,6 +161,10 @@ function parseMessages(messages: RawMessage[], prefix: string): ThreadMessage[] 
 // conversation switch (key={currentConversation}), which destroys all refs.
 const runIdSessionMap = new Map<string, string>();
 
+// Tracks conversations with unread messages (filtered events went to a different session)
+const unreadSessions = new Set<string>();
+let unreadListeners: Array<(keys: Set<string>) => void> = [];
+
 function trackRunIdSession(runId: string, sessionKey: string) {
   runIdSessionMap.set(runId, sessionKey);
   // Keep map bounded
@@ -177,6 +181,45 @@ function isEventForDifferentSession(runId: string | undefined, currentSession: s
   const mapped = runIdSessionMap.get(runId);
   if (!mapped) return false; // Unknown runId (webhook) → allow through
   return mapped !== currentSession;
+}
+
+function markSessionUnread(sessionKey: string) {
+  // Extract bare key from canonical format (agent:main:research → research)
+  const bare = sessionKey.startsWith('agent:main:') ? sessionKey.slice(11) : sessionKey;
+  if (!unreadSessions.has(bare)) {
+    unreadSessions.add(bare);
+    notifyUnreadListeners();
+  }
+}
+
+function clearSessionUnread(sessionKey: string) {
+  const bare = sessionKey.startsWith('agent:main:') ? sessionKey.slice(11) : sessionKey;
+  if (unreadSessions.has(bare)) {
+    unreadSessions.delete(bare);
+    notifyUnreadListeners();
+  }
+}
+
+function notifyUnreadListeners() {
+  const snapshot = new Set(unreadSessions);
+  for (const listener of unreadListeners) {
+    listener(snapshot);
+  }
+}
+
+/** Subscribe to unread session changes. Returns unsubscribe function. */
+export function subscribeUnread(listener: (keys: Set<string>) => void): () => void {
+  unreadListeners.push(listener);
+  // Immediately notify with current state
+  listener(new Set(unreadSessions));
+  return () => {
+    unreadListeners = unreadListeners.filter(l => l !== listener);
+  };
+}
+
+/** Clear unread for a session (call when user switches to it) */
+export function clearUnread(sessionKey: string) {
+  clearSessionUnread(sessionKey);
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -453,6 +496,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     // Session-aware event filtering: prevent cross-talk between conversations
     if (isEventForDifferentSession(runId, currentSessionRef.current)) {
+      const targetSession = runIdSessionMap.get(runId!);
+      if (targetSession && state === 'final') {
+        markSessionUnread(targetSession);
+      }
       log('🚫 Filtered chat event for different session:', { runId, state, current: currentSessionRef.current });
       // For final events, clean up running state if this was our active run
       if (state === 'final' && activeRunIdRef.current === runId) {
@@ -582,6 +629,10 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     // Session-aware event filtering: prevent cross-talk between conversations
     if (isEventForDifferentSession(runId, currentSessionRef.current)) {
+      const targetSession = runIdSessionMap.get(runId!);
+      if (targetSession && stream === 'assistant') {
+        markSessionUnread(targetSession);
+      }
       log('🚫 Filtered agent event for different session:', { runId, current: currentSessionRef.current });
       return;
     }

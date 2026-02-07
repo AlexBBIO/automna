@@ -14,6 +14,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { AnnouncementModal } from "@/components/AnnouncementModal";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { IntegrationsPanel } from "@/components/IntegrationsPanel";
+import { subscribeUnread, clearUnread } from "@/lib/clawdbot-runtime";
 
 type TabView = 'chat' | 'files' | 'settings' | 'integrations';
 
@@ -81,6 +82,18 @@ export default function DashboardPage() {
   
   // Usage tracking (shared between banner and chat)
   const { usage, isOverLimit } = useUsageStatus();
+  
+  // Unread message indicators
+  const [unreadKeys, setUnreadKeys] = useState<Set<string>>(new Set());
+  
+  useEffect(() => {
+    return subscribeUnread(setUnreadKeys);
+  }, []);
+  
+  // Clear unread when switching to a conversation
+  useEffect(() => {
+    clearUnread(currentConversation);
+  }, [currentConversation]);
   
   // Set initial sidebar state based on screen size (runs once on mount)
   useEffect(() => {
@@ -879,6 +892,7 @@ export default function DashboardPage() {
               }}
               isLoading={conversationsLoading}
               onRefresh={fetchConversations}
+              unreadKeys={unreadKeys}
             />
           </div>
           
