@@ -360,7 +360,35 @@ export default function DashboardPage() {
   };
 
   // Wait for gateway to be ready
-  const waitForGatewayReady = async (): Promise<boolean> => {
+  /**
+   * Test if a WebSocket can actually connect to the gateway.
+   * Returns true if connection opens successfully within timeout.
+   */
+  const testWebSocketConnection = (wsUrl: string, timeoutMs = 8000): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        ws.close();
+        console.log('[warmup] WebSocket test timed out');
+        resolve(false);
+      }, timeoutMs);
+      
+      const ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        clearTimeout(timer);
+        ws.close();
+        console.log('[warmup] WebSocket test connected successfully');
+        resolve(true);
+      };
+      ws.onerror = () => {
+        clearTimeout(timer);
+        ws.close();
+        console.log('[warmup] WebSocket test failed');
+        resolve(false);
+      };
+    });
+  };
+
+  const waitForGatewayReady = async (wsUrl?: string): Promise<boolean> => {
     if (prewarmStarted.current) return true;
     prewarmStarted.current = true;
     
@@ -371,6 +399,7 @@ export default function DashboardPage() {
     const startTime = Date.now();
     let consecutiveSuccesses = 0;
     
+    // Phase 1: Wait for HTTP health endpoint
     while (Date.now() - startTime < MAX_WAIT_MS) {
       try {
         const response = await fetch('/api/user/health', {
@@ -385,8 +414,8 @@ export default function DashboardPage() {
           console.log(`[warmup] Health check passed (${consecutiveSuccesses}/${CONSECUTIVE_SUCCESS_NEEDED})`);
           
           if (consecutiveSuccesses >= CONSECUTIVE_SUCCESS_NEEDED) {
-            console.log('[warmup] Gateway is ready!');
-            return true;
+            console.log('[warmup] HTTP health checks passed, testing WebSocket...');
+            break;
           }
         } else {
           consecutiveSuccesses = 0; // Reset on failure
@@ -400,8 +429,28 @@ export default function DashboardPage() {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
     }
     
-    console.warn('[warmup] Timeout after 90s - proceeding anyway');
-    return false;
+    if (Date.now() - startTime >= MAX_WAIT_MS) {
+      console.warn('[warmup] HTTP health timeout after 90s - proceeding anyway');
+      return false;
+    }
+    
+    // Phase 2: Verify WebSocket actually connects
+    // HTTP API can be up before WebSocket handler is ready
+    if (wsUrl) {
+      const WS_MAX_RETRIES = 5;
+      for (let i = 0; i < WS_MAX_RETRIES; i++) {
+        const wsOk = await testWebSocketConnection(wsUrl);
+        if (wsOk) {
+          console.log('[warmup] Gateway is fully ready (HTTP + WebSocket)!');
+          return true;
+        }
+        console.log(`[warmup] WebSocket not ready yet, retry ${i + 1}/${WS_MAX_RETRIES}...`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      console.warn('[warmup] WebSocket failed after retries, proceeding anyway');
+    }
+    
+    return true;
   };
 
   // Handle checkout for inline subscription card
@@ -468,7 +517,7 @@ export default function DashboardPage() {
           if (gatewayCheckData.gatewayUrl) {
             setGatewayInfo(gatewayCheckData);
             setLoadPhase('warming');
-            const isReady = await waitForGatewayReady();
+            const isReady = await waitForGatewayReady(gatewayCheckData.gatewayUrl);
             if (!isReady) {
               console.warn('[dashboard] Gateway warmup timed out but proceeding anyway');
             }
@@ -525,7 +574,7 @@ export default function DashboardPage() {
           
           setLoadPhase('warming');
           const warmupStart = Date.now();
-          const isReady = await waitForGatewayReady();
+          const isReady = await waitForGatewayReady(gatewayData.gatewayUrl);
           
           if (!isReady) {
             console.warn('[dashboard] Gateway warmup timed out but proceeding anyway');
