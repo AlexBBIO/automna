@@ -176,10 +176,34 @@ function trackRunIdSession(runId: string, sessionKey: string) {
   }
 }
 
-function isEventForDifferentSession(runId: string | undefined, currentSession: string): boolean {
+/**
+ * Check if an event belongs to a different session.
+ * Uses both runId→session mapping AND the event's own sessionKey field.
+ * This prevents webhook/hook-triggered events (unknown runId) from leaking
+ * into whichever chat happens to be active.
+ */
+function isEventForDifferentSession(
+  runId: string | undefined,
+  currentSession: string,
+  eventSessionKey?: string | undefined,
+): boolean {
+  // If the event carries its own sessionKey, use that as the source of truth
+  if (eventSessionKey) {
+    const canonical = eventSessionKey.startsWith('agent:main:')
+      ? eventSessionKey
+      : `agent:main:${eventSessionKey}`;
+    if (canonical !== currentSession) {
+      // Also register the runId→session mapping for future events in this run
+      if (runId) trackRunIdSession(runId, canonical);
+      return true;
+    }
+    return false;
+  }
+
+  // Fall back to runId mapping
   if (!runId) return false;
   const mapped = runIdSessionMap.get(runId);
-  if (!mapped) return false; // Unknown runId (webhook) → allow through
+  if (!mapped) return false; // Unknown runId with no sessionKey → allow through (legacy)
   return mapped !== currentSession;
 }
 
@@ -493,12 +517,13 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     const state = payload.state as string | undefined;
     const message = payload.message as { role?: string; content?: ContentPart[] } | undefined;
     const runId = payload.runId as string | undefined;
+    const eventSessionKey = payload.sessionKey as string | undefined;
 
     // Session-aware event filtering: prevent cross-talk between conversations
-    if (isEventForDifferentSession(runId, currentSessionRef.current)) {
-      const targetSession = runIdSessionMap.get(runId!);
+    if (isEventForDifferentSession(runId, currentSessionRef.current, eventSessionKey)) {
+      const targetSession = eventSessionKey || runIdSessionMap.get(runId!);
       if (targetSession && state === 'final') {
-        markSessionUnread(targetSession);
+        markSessionUnread(typeof targetSession === 'string' ? targetSession : targetSession);
       }
       log('🚫 Filtered chat event for different session:', { runId, state, current: currentSessionRef.current });
       // For final events, clean up running state if this was our active run
@@ -626,12 +651,13 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     const stream = payload.stream as string | undefined;
     const data = payload.data as Record<string, unknown> | undefined;
     const runId = payload.runId as string | undefined;
+    const eventSessionKey = payload.sessionKey as string | undefined;
 
     // Session-aware event filtering: prevent cross-talk between conversations
-    if (isEventForDifferentSession(runId, currentSessionRef.current)) {
-      const targetSession = runIdSessionMap.get(runId!);
+    if (isEventForDifferentSession(runId, currentSessionRef.current, eventSessionKey)) {
+      const targetSession = eventSessionKey || runIdSessionMap.get(runId!);
       if (targetSession && stream === 'assistant') {
-        markSessionUnread(targetSession);
+        markSessionUnread(typeof targetSession === 'string' ? targetSession : targetSession);
       }
       log('🚫 Filtered agent event for different session:', { runId, current: currentSessionRef.current });
       return;
