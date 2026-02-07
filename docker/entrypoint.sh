@@ -163,23 +163,23 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 }
 ```
 
-**After making a call, poll for completion:**
+**After making a call, IMMEDIATELY run this polling script:**
 ```bash
-curl -s "https://automna.ai/api/user/call/status?call_id=CALL_ID_HERE" \
-  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
+CALL_ID="<the call_id from the response>"
+for i in $(seq 1 12); do
+  sleep 30
+  RESULT=$(curl -s "https://automna.ai/api/user/call/status?call_id=$CALL_ID" -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN")
+  COMPLETED=$(echo "$RESULT" | jq -r '.completed')
+  if [ "$COMPLETED" = "true" ]; then
+    echo "$RESULT" | jq .
+    mkdir -p /home/node/.openclaw/workspace/calls
+    echo "$RESULT" | jq -r '"# Call Summary\n\n**Status:** \(.status)\n**Duration:** \(.duration_seconds)s\n\n## Summary\n\(.summary)\n\n## Transcript\n\(.transcript)"' > "/home/node/.openclaw/workspace/calls/$(date +%Y-%m-%d_%H%M)_outbound.md"
+    break
+  fi
+  echo "Poll $i: still in progress..."
+done
 ```
-Poll every 30 seconds until `completed` is `true`. The response includes:
-- `status` - "completed", "failed", "no_answer", "voicemail"
-- `summary` - AI-generated summary of the call
-- `transcript` - Full conversation transcript
-- `duration_seconds` - Call length
-
-**After getting the completed status**, save the transcript locally:
-```bash
-mkdir -p /home/node/.openclaw/workspace/calls
-# Write transcript to a dated file
-```
-Then tell the user what happened (summary, key points from transcript).
+Run this right after making the call. Do NOT wait for the user to ask. Report the summary when complete.
 
 **Check usage:**
 ```bash
@@ -219,14 +219,22 @@ curl -s -X POST "https://automna.ai/api/user/call" \
   }'
 ```
 
-**After making a call, you MUST poll for completion:**
+**After making a call, you MUST immediately run this polling script:**
 ```bash
-curl -s "https://automna.ai/api/user/call/status?call_id=CALL_ID" \
-  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
+CALL_ID="<call_id from response>"
+for i in $(seq 1 12); do
+  sleep 30
+  RESULT=$(curl -s "https://automna.ai/api/user/call/status?call_id=$CALL_ID" -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN")
+  if [ "$(echo "$RESULT" | jq -r '.completed')" = "true" ]; then
+    echo "$RESULT" | jq .
+    break
+  fi
+  echo "Poll $i: still in progress..."
+done
 ```
-Poll every 30 seconds until `completed` is `true`. Then save the transcript locally and report back to the user.
+Run this RIGHT AFTER the call. Do not wait for the user to ask. When complete, save the transcript and tell the user the summary.
 
-**Important:** The call is handled by a separate AI model, not you. Pack ALL context into the `task` field — the call AI can't read your conversation history.
+**Important:** The call is handled by a separate AI model, not you. Pack ALL context into the `task` field.
 
 See `TOOLS.md` for full documentation and parameters.
 AGENTSEOF

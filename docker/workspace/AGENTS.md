@@ -213,12 +213,22 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 - `voicemail_action` (optional) - "hangup" (default), "leave_message", or "ignore"
 - `voicemail_message` (optional) - Message to leave on voicemail
 
-**After making a call, you MUST poll for completion:**
+**After making a call, you MUST poll for completion using this script:**
 ```bash
-curl -s "https://automna.ai/api/user/call/status?call_id=CALL_ID" \
-  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
+CALL_ID="<the call_id from the response>"
+for i in $(seq 1 12); do
+  sleep 30
+  RESULT=$(curl -s "https://automna.ai/api/user/call/status?call_id=$CALL_ID" \
+    -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN")
+  COMPLETED=$(echo "$RESULT" | jq -r '.completed')
+  if [ "$COMPLETED" = "true" ]; then
+    echo "$RESULT" | jq .
+    break
+  fi
+  echo "Poll $i: still in progress..."
+done
 ```
-Poll every 30 seconds until `completed` is `true`. Then save the transcript locally and report back to the user.
+Run this immediately after making the call. It checks every 30 seconds for up to 6 minutes. When complete, save the transcript locally and report back to the user with the summary.
 
 **Important:** The call is handled by a separate AI model, not you. Pack ALL context into the `task` field — the call AI can't read your conversation history.
 

@@ -130,23 +130,41 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 }
 ```
 
-**After making a call, poll for completion:**
+**After making a call, IMMEDIATELY poll for completion using this script:**
 ```bash
-curl -s "https://automna.ai/api/user/call/status?call_id=CALL_ID_HERE" \
-  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
+CALL_ID="<the call_id from the make-call response>"
+for i in $(seq 1 12); do
+  sleep 30
+  RESULT=$(curl -s "https://automna.ai/api/user/call/status?call_id=$CALL_ID" \
+    -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN")
+  COMPLETED=$(echo "$RESULT" | jq -r '.completed')
+  if [ "$COMPLETED" = "true" ]; then
+    STATUS=$(echo "$RESULT" | jq -r '.status')
+    SUMMARY=$(echo "$RESULT" | jq -r '.summary')
+    TRANSCRIPT=$(echo "$RESULT" | jq -r '.transcript')
+    DURATION=$(echo "$RESULT" | jq -r '.duration_seconds')
+    
+    # Save transcript to file
+    mkdir -p /home/node/.openclaw/workspace/calls
+    FILENAME="calls/$(date +%Y-%m-%d_%H%M)_outbound.md"
+    echo -e "# Call Summary\n\n**Status:** $STATUS\n**Duration:** ${DURATION}s\n\n## Summary\n$SUMMARY\n\n## Transcript\n$TRANSCRIPT" > "/home/node/.openclaw/workspace/$FILENAME"
+    
+    echo "Call complete! Status: $STATUS, Duration: ${DURATION}s"
+    echo "Transcript saved to $FILENAME"
+    echo "Summary: $SUMMARY"
+    break
+  fi
+  echo "Poll $i: call still in progress..."
+done
 ```
-Poll every 30 seconds until `completed` is `true`. The response includes:
+
+Run this **immediately** after making the call — do not wait for the user to ask. The script checks every 30 seconds for up to 6 minutes. When done, report the summary to the user.
+
+**Response fields when complete:**
 - `status` - "completed", "failed", "no_answer", "voicemail"
 - `summary` - AI-generated summary of the call
 - `transcript` - Full conversation transcript
 - `duration_seconds` - Call length
-
-**After getting the completed status**, save the transcript locally:
-```bash
-mkdir -p /home/node/.openclaw/workspace/calls
-# Write the transcript to a dated markdown file
-```
-Then tell the user what happened (summary, key points from transcript).
 
 **Check usage:**
 ```bash
