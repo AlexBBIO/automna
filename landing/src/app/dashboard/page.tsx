@@ -426,9 +426,15 @@ export default function DashboardPage() {
     setCheckoutLoading(null);
   };
 
+  // Track whether initialization has started to prevent re-runs
+  const initStarted = useRef(false);
+  
   // Sync user and fetch gateway info on mount
   useEffect(() => {
     if (!isLoaded || !user) return;
+    // Only run initialization once - prevent re-runs when Clerk refreshes user object
+    if (initStarted.current) return;
+    initStarted.current = true;
     
     const initializeGateway = async () => {
       try {
@@ -440,9 +446,14 @@ export default function DashboardPage() {
         const subStatus = user.publicMetadata?.subscriptionStatus as string | undefined;
         const hasActiveSub = subStatus === 'active' || subStatus === 'trialing';
         
-        if (!hasActiveSub) {
-          // No subscription - check if they might have one that Clerk hasn't synced yet
-          // (e.g., just completed checkout and webhook is delayed)
+        // Also check URL params - if coming back from Stripe checkout, 
+        // give the webhook a moment to process before showing pricing
+        const urlParams = new URLSearchParams(window.location.search);
+        const justSubscribed = urlParams.get('success') === 'true';
+        
+        if (!hasActiveSub && !justSubscribed) {
+          // No subscription and didn't just come from checkout
+          // Check if they have an existing gateway (legacy user without metadata)
           const gatewayCheck = await fetch('/api/user/gateway');
           const gatewayCheckData = await gatewayCheck.json();
           
@@ -513,10 +524,18 @@ export default function DashboardPage() {
           setGatewayInfo(gatewayData);
           
           setLoadPhase('warming');
+          const warmupStart = Date.now();
           const isReady = await waitForGatewayReady();
           
           if (!isReady) {
             console.warn('[dashboard] Gateway warmup timed out but proceeding anyway');
+          }
+          
+          // Ensure warmup phase shows for at least 3s so the UI doesn't flash
+          const warmupElapsed = Date.now() - warmupStart;
+          const MIN_WARMUP_MS = 3000;
+          if (warmupElapsed < MIN_WARMUP_MS) {
+            await new Promise(r => setTimeout(r, MIN_WARMUP_MS - warmupElapsed));
           }
           
           setLoadPhase('ready');
@@ -531,6 +550,7 @@ export default function DashboardPage() {
     };
     
     initializeGateway();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initStarted ref prevents re-runs; user changes shouldn't restart init
   }, [isLoaded, user]);
 
   // Keep-alive pings
