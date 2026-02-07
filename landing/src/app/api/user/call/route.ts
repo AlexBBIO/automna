@@ -159,7 +159,8 @@ export async function POST(req: NextRequest) {
 
     const blandData = await blandResponse.json();
 
-    // 7. Log call initiation
+    // 7. Log call initiation (lock session key at initiation time for multi-tab safety)
+    const sessionKey = machine.lastSessionKey || 'main';
     await db.insert(callUsage).values({
       userId,
       blandCallId: blandData.call_id,
@@ -168,6 +169,7 @@ export async function POST(req: NextRequest) {
       fromNumber: userPhone.phoneNumber,
       status: "initiated",
       task: body.task,
+      sessionKey,
     });
 
     // 8. Return success

@@ -39,99 +39,14 @@ interface BlandWebhookPayload {
 }
 
 /**
- * Format transcript as readable markdown
- */
-function formatTranscript(raw: string): string {
-  if (!raw) return "";
-  return raw
-    .split("\n")
-    .map(line => {
-      const trimmed = line.trim();
-      if (trimmed.startsWith("user:")) return `**Caller:** ${trimmed.slice(5).trim()}`;
-      if (trimmed.startsWith("assistant:")) return `**Agent:** ${trimmed.slice(10).trim()}`;
-      if (trimmed.startsWith("agent-action:")) return `*[${trimmed.slice(13).trim()}]*`;
-      return trimmed;
-    })
-    .filter(Boolean)
-    .join("\n\n");
-}
-
-/**
- * Write transcript file to user's Fly machine
- */
-async function writeTranscriptToMachine(
-  appName: string,
-  gatewayToken: string,
-  callRecord: {
-    direction: string;
-    toNumber: string;
-    fromNumber: string;
-    summary: string;
-    transcript: string;
-    durationSeconds: number;
-    status: string;
-    task?: string | null;
-    createdAt: Date | null;
-  }
-) {
-  const now = callRecord.createdAt || new Date();
-  const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
-  const timeStr = now.toISOString().slice(11, 16).replace(":", ""); // HHMM
-  const otherNumber = callRecord.direction === "outbound" ? callRecord.toNumber : callRecord.fromNumber;
-  const sanitizedNumber = otherNumber.replace(/[^0-9+]/g, "");
-  const filename = `${dateStr}_${timeStr}_${callRecord.direction}_${sanitizedNumber}.md`;
-
-  const content = `# Call: ${callRecord.summary?.split(".")[0] || callRecord.direction + " call"}
-**Date:** ${now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}
-**Direction:** ${callRecord.direction === "outbound" ? "📞 Outbound" : "📲 Inbound"}
-**${callRecord.direction === "outbound" ? "To" : "From"}:** ${otherNumber}
-**${callRecord.direction === "outbound" ? "From" : "To"}:** ${callRecord.direction === "outbound" ? callRecord.fromNumber : callRecord.toNumber}
-**Duration:** ${Math.ceil((callRecord.durationSeconds || 0) / 60)} min ${(callRecord.durationSeconds || 0) % 60}s
-**Status:** ${callRecord.status}
-${callRecord.task ? `\n**Task:** ${callRecord.task}\n` : ""}
-## Summary
-${callRecord.summary || "No summary available."}
-
-## Transcript
-${formatTranscript(callRecord.transcript)}
-`;
-
-  try {
-    // Write via the OpenClaw file API on the user's machine
-    const machineUrl = `https://${appName}.fly.dev`;
-
-    // Use the gateway REST API to send a chat message that writes the file
-    // The agent will save it - but we also try direct file write via exec endpoint
-    const writeCommand = `mkdir -p /home/node/.openclaw/calls && cat > /home/node/.openclaw/calls/${filename} << 'TRANSCRIPT_EOF'\n${content}\nTRANSCRIPT_EOF`;
-
-    // Try gateway exec endpoint
-    const execResponse = await fetch(`${machineUrl}/api/v1/exec`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${gatewayToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        command: writeCommand,
-        timeout: 5000,
-      }),
-    });
-
-    if (execResponse.ok) {
-      console.log(`[bland-webhook] Transcript written to ${appName}:/home/node/.openclaw/calls/${filename}`);
-      return filename;
-    } else {
-      console.warn(`[bland-webhook] Exec write failed for ${appName}:`, await execResponse.text());
-    }
-  } catch (err) {
-    console.error(`[bland-webhook] Failed to write transcript to ${appName}:`, err);
-  }
-
-  return filename; // Return filename even if write failed (for notification)
-}
-
-/**
  * Notify user's agent about call completion
+ * 
+ * Routes notification to the correct conversation session.
+ * For outbound calls: uses sessionKey locked at call initiation time (multi-tab safe).
+ * For inbound calls: uses machine.lastSessionKey (most recently active conversation).
+ * 
+ * ⚠️ IMPORTANT: Pass bare session key (e.g., "research"), NOT canonical key ("agent:main:research").
+ * OpenClaw's buildAgentMainSessionKey() adds the "agent:main:" prefix internally.
  */
 async function notifyAgent(
   appName: string,
@@ -144,8 +59,9 @@ async function notifyAgent(
     transcript: string;
     durationSeconds: number;
     task?: string | null;
+    sessionKey?: string | null;
   },
-  filename: string
+  lastSessionKey: string | null,
 ) {
   try {
     const machineUrl = `https://${appName}.fly.dev`;
@@ -157,7 +73,11 @@ async function notifyAgent(
 
 **Summary:** ${callRecord.summary || "No summary available."}
 
-Transcript saved to \`calls/${filename}\``;
+**Transcript:**
+${callRecord.transcript || "No transcript available."}`;
+
+    // Resolve session key: outbound uses locked key, inbound uses lastSessionKey
+    const targetSessionKey = callRecord.sessionKey || lastSessionKey || 'main';
 
     // Send via hooks/agent - runs an agent turn that delivers the response to the user
     const agentResponse = await fetch(`${machineUrl}/hooks/agent`, {
@@ -167,16 +87,18 @@ Transcript saved to \`calls/${filename}\``;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        message: `A phone call just completed. Here are the results:\n\n${message}\n\nPlease inform the user about this call result. Keep it concise.`,
+        message: `A phone call just completed. Here are the results:\n\n${message}\n\nPlease inform the user about this call result. Keep it concise. Save the transcript to a file in the calls/ directory.`,
         name: "PhoneCall",
         deliver: true,
         channel: "last",
         wakeMode: "now",
+        // ⚠️ Bare key only! OpenClaw adds "agent:main:" prefix via buildAgentMainSessionKey()
+        sessionKey: targetSessionKey,
       }),
     });
 
     if (agentResponse.ok) {
-      console.log(`[bland-webhook] Agent notified on ${appName} via hooks/agent`);
+      console.log(`[bland-webhook] Agent notified on ${appName} via hooks/agent (session: ${targetSessionKey})`);
     } else {
       console.warn(`[bland-webhook] Agent notification failed for ${appName}:`, agentResponse.status, await agentResponse.text());
     }
@@ -277,20 +199,15 @@ export async function POST(req: NextRequest) {
         status: finalStatus,
         task: callRecord.task,
         createdAt: callRecord.createdAt,
+        sessionKey: callRecord.sessionKey,
       };
 
-      // Write transcript file and notify agent (parallel)
-      const filename = await writeTranscriptToMachine(
-        machine.appName,
-        machine.gatewayToken,
-        updatedRecord
-      );
-
+      // Notify agent with session routing (transcript included in message for agent to save)
       await notifyAgent(
         machine.appName,
         machine.gatewayToken,
         updatedRecord,
-        filename
+        machine.lastSessionKey,
       );
     }
 

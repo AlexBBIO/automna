@@ -159,10 +159,18 @@ export default function DashboardPage() {
     }
   }, [loadPhase, fetchConversations]);
 
-  // Save current conversation to localStorage when it changes
+  // Save current conversation to localStorage and report to backend when it changes
   useEffect(() => {
     localStorage.setItem('automna-current-conversation', currentConversation);
-  }, [currentConversation]);
+    // Report active session to backend for webhook routing (fire-and-forget)
+    if (loadPhase === 'ready') {
+      fetch('/api/user/sessions/active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionKey: currentConversation }),
+      }).catch(() => {});
+    }
+  }, [currentConversation, loadPhase]);
   
   // Create a new conversation
   const handleCreateConversation = useCallback(async (name: string) => {

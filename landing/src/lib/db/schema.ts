@@ -28,6 +28,7 @@ export const machines = sqliteTable("machines", {
   browserbaseContextId: text("browserbase_context_id"), // Browserbase persistent context for this user
   agentmailInboxId: text("agentmail_inbox_id"), // Agentmail inbox for this user (e.g., automna-abc123@agentmail.to)
   plan: text("plan").default("starter"), // User's subscription plan: free, starter, pro, business
+  lastSessionKey: text("last_session_key").default("main"), // Last active conversation key (for webhook routing)
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   lastActiveAt: integer("last_active_at", { mode: "timestamp" }),
@@ -252,6 +253,9 @@ export const callUsage = sqliteTable("call_usage", {
 
   status: text("status").notNull().default("initiated"), // initiated | in_progress | completed | failed | no_answer | voicemail
   durationSeconds: integer("duration_seconds"), // Filled after call ends
+
+  // Session context
+  sessionKey: text("session_key"), // Conversation that initiated this call (locked at initiation time)
 
   // Call metadata
   task: text("task"), // Outbound: the prompt/task given

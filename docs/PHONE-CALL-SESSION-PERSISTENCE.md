@@ -1,193 +1,234 @@
-# Phone Call Post-Notification: Session Persistence Bug
+# Session Persistence & Routing Fix
 
 ## Problem
 
-When a phone call completes, the agent is notified and the notification appears in the user's chat in real-time. However, **the message does not persist to conversation history**. If the user reloads the page, the notification is gone.
+Two related issues with Automna's webchat session model:
 
-## Root Cause
+### 1. Webhook notifications don't persist to conversation history
+When a phone call completes, the Bland webhook sends a notification via `/hooks/agent` on the user's Fly machine **without a `sessionKey`**. OpenClaw generates a throwaway `hook:<uuid>` session key. The agent runs in that ephemeral session. While `deliver: true` + `channel: "last"` pushes the message to the user's active WebSocket in real-time, the history is written to the throwaway session's JSONL file, not the user's actual conversation. Page reload = message gone.
 
-The Bland webhook handler sends the call completion notification via `/hooks/agent` on the user's Fly machine **without a `sessionKey`**. OpenClaw's hook dispatcher generates a throwaway `hook:<uuid>` session key when none is provided. The agent run executes in that ephemeral session, and while `deliver: true` + `channel: "last"` pushes the message to the user's active WebSocket in real-time, the history is written to the throwaway session's JSONL file, not the user's actual conversation.
+### 2. Streaming cross-talk when switching conversations
+The dashboard uses a single WebSocket connection that multiplexes all conversations. Agent events (`event agent`, `event chat`) carry a `runId` but the frontend doesn't filter by session. If the user sends a message in conversation A, switches to conversation B, and conversation A's response arrives, it renders in conversation B's view.
 
-## Current Architecture
+### Why OpenClaw handles this natively for Discord/Telegram but not webchat
+OpenClaw's channel plugins (Discord, Telegram, etc.) provide natural session isolation: each Discord channel maps to a unique session key, and the plugin routes responses back to the originating channel. Automna's webchat is the `INTERNAL_MESSAGE_CHANNEL` and is **not** in the deliverable channels list. Session multiplexing happens in the frontend, not at OpenClaw's level.
 
-### Call Initiation Flow
+### Secondary issue: Transcript file write silently fails
+The webhook calls `/api/v1/exec` to write transcript files to the user's machine. This endpoint doesn't exist on OpenClaw. Fails silently every time.
+
+## Root Cause Analysis
+
+### Current Architecture
+
+**Call Initiation Flow:**
 1. User types "Call John" in conversation "research" on the Automna dashboard
-2. Dashboard has a **direct WebSocket** to the Fly machine: `wss://<app>.fly.dev/ws?token=<token>&clientId=webchat`
+2. Dashboard has a direct WebSocket to the Fly machine: `wss://<app>.fly.dev/ws?token=<token>&clientId=webchat`
 3. Browser sends `chat.send` with `sessionKey: "agent:main:research"` directly to the Fly machine
 4. OpenClaw runs the agent in session `agent:main:research`
 5. Agent executes `curl -X POST https://automna.ai/api/user/call` with the gateway token
 6. `/api/user/call` (Vercel) authenticates via gateway token, calls Bland API, stores a `callUsage` record in Turso
 
-### Call Completion Flow
+**Call Completion Flow (the bug):**
 7. Call completes. Bland sends webhook to `https://automna.ai/api/webhooks/bland/status`
-8. Webhook handler (`landing/src/app/api/webhooks/bland/status/route.ts`):
-   - Updates `callUsage` record with transcript, summary, duration, cost
-   - Attempts to write transcript file via `POST https://<app>.fly.dev/api/v1/exec` (**this fails silently** - endpoint doesn't exist on OpenClaw)
-   - Sends notification via `POST https://<app>.fly.dev/hooks/agent`
+8. Webhook handler updates `callUsage` record with transcript, summary, duration, cost
+9. Webhook sends notification via `POST https://<app>.fly.dev/hooks/agent` **without sessionKey**
+10. OpenClaw's `normalizeAgentPayload()` generates `hook:<uuid>` as the session key
+11. `dispatchAgentHook()` passes this to `runCronIsolatedAgentTurn()`
+12. `runCronIsolatedAgentTurn()` calls `buildAgentMainSessionKey({ mainKey: "hook:<uuid>" })` → `agent:main:hook:<uuid>`
+13. Agent runs in throwaway session, response delivered via WebSocket (appears in real-time)
+14. History saved to `agent:main:hook:<uuid>` JSONL (wrong place)
 
-### Hook Dispatch (on Fly machine)
-9. OpenClaw's `createGatewayHooksRequestHandler` in `gateway/server/hooks.js` receives the POST
-10. `dispatchAgentHook()` checks for `sessionKey` in payload - finds none, generates `hook:<uuid>`
-11. Runs `runCronIsolatedAgentTurn()` with that throwaway session key
-12. Agent response is delivered to `channel: "last"` (the user's WebSocket) - **appears in real-time**
-13. History is saved to JSONL under `hook:<uuid>` session - **not in the user's conversation**
-
-## Key Code Locations
+### Key Code Locations
 
 | File | What it does |
 |------|-------------|
 | `landing/src/app/api/user/call/route.ts` | Initiates outbound calls via Bland API |
 | `landing/src/app/api/webhooks/bland/status/route.ts` | Receives Bland completion webhook, updates DB, notifies agent |
-| `landing/src/app/api/user/call/status/route.ts` | Optional polling endpoint for call status (not used in current flow) |
-| `landing/src/app/api/user/gateway/route.ts` | Returns `wss://<app>.fly.dev/ws?token=...` - direct WS URL |
-| `landing/src/lib/clawdbot-runtime.ts` | Dashboard WebSocket client, sends `chat.send` with sessionKey |
-| `landing/src/app/api/ws/[...path]/route.ts` | HTTP-only proxy for `/ws/api/history` etc. (NOT the WebSocket) |
-| `landing/src/app/dashboard/page.tsx` | Dashboard page, manages conversations, passes sessionKey to AutomnaChat |
-| `docker/entrypoint.sh` (line ~506) | Configures `hooks.enabled: true` with gateway token |
-| OpenClaw `dist/gateway/server/hooks.js` | `dispatchAgentHook()` - generates throwaway session if none provided |
-| OpenClaw `dist/gateway/server-http.js` | Routes `/hooks/agent` POST to the dispatcher |
-| OpenClaw `dist/gateway/hooks.js` | `normalizeAgentPayload()` - validates hook payload, defaults sessionKey to `hook:<uuid>` |
+| `landing/src/lib/clawdbot-runtime.ts` | Dashboard WebSocket client, streaming, history loading |
+| `landing/src/app/dashboard/page.tsx` | Dashboard page, manages conversations and session state |
+| `landing/src/lib/db/schema.ts` | Database schema (Drizzle ORM) |
+| OpenClaw `dist/gateway/hooks.js` | `normalizeAgentPayload()` - generates throwaway session if none provided |
+| OpenClaw `dist/gateway/server/hooks.js` | `dispatchAgentHook()` - runs isolated agent turn |
+| OpenClaw `dist/cron/isolated-agent/run.js` | `runCronIsolatedAgentTurn()` - wraps sessionKey via `buildAgentMainSessionKey()` |
+| OpenClaw `dist/routing/session-key.js` | `buildAgentMainSessionKey()` - prefixes `agent:{agentId}:` to mainKey |
 
-## Current Webhook Notification Code (the bug)
+### ⚠️ Critical: Session Key Format
 
-```typescript
-// landing/src/app/api/webhooks/bland/status/route.ts, notifyAgent()
-const agentResponse = await fetch(`${machineUrl}/hooks/agent`, {
-  method: "POST",
-  headers: {
-    "Authorization": `Bearer ${gatewayToken}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    message: `A phone call just completed...`,
-    name: "PhoneCall",
-    deliver: true,
-    channel: "last",
-    wakeMode: "now",
-    // BUG: no sessionKey here!
-    // OpenClaw generates hook:<uuid>, message doesn't persist to conversation
-  }),
-});
+OpenClaw's `buildAgentMainSessionKey()` always prefixes the provided key:
+```
+buildAgentMainSessionKey({ agentId: "main", mainKey: "research" })
+→ "agent:main:research"
 ```
 
-## Why This Is Hard to Fix
+**The webhook must pass just the bare key (e.g., `"research"`), NOT the full canonical key (e.g., `"agent:main:research"`).** Passing the full key would result in double-prefixing: `agent:main:agent:main:research`.
 
-The WebSocket connection is **direct from browser to Fly machine**. Automna's Vercel backend never sees which conversation/session the user is in. When the call API (`/api/user/call`) is hit, it only receives the gateway token (identifies the user/machine), not the session context.
+## Solution
 
-The session key is only known by:
-- The **browser** (stores it in localStorage, sends it via `chat.send`)
-- The **Fly machine's OpenClaw gateway** (running the agent in that session)
+Two complementary pieces that together fix all session routing issues.
 
-Neither passes it to Automna's backend.
+### Piece 1: Frontend Session-Aware Event Routing
 
-## Secondary Issue: Transcript File Write Fails
+**Goal:** Prevent streaming responses from one conversation appearing in another.
 
-The webhook also tries to write the transcript file to the user's machine:
+**Implementation in `clawdbot-runtime.ts`:**
 
+1. Add a `Map<string, string>` ref: `runIdSessionMap` (maps `runId → sessionKey`)
+2. On `chat.send` acknowledgment (which returns `runId`): store `runId → currentSessionKey` in the map
+3. On incoming `event agent` / `event chat`:
+   - Extract `runId` from the event payload
+   - If `runId` exists in `runIdSessionMap`:
+     - If it matches the current session → render normally
+     - If it doesn't match → silently ignore (history is saved correctly on the backend)
+   - If `runId` is NOT in the map (e.g., from a webhook-triggered hook): render normally (best-effort delivery to current view)
+4. On conversation switch: clear streaming state (already happens via `useEffect` cleanup on `sessionKey` change)
+
+**Multi-tab safety:** Each browser tab runs its own instance of `clawdbot-runtime.ts` with its own `runIdSessionMap`. No shared state, no cross-tab interference.
+
+**Edge case - unknown `runId`:** Webhook-triggered agent runs produce events with a `runId` the frontend never saw via `chat.send`. These render in the currently-viewed conversation (same as today). History is correct because Piece 2 ensures the webhook targets the right session. This is acceptable behavior, and a future enhancement could add a notification badge ("New message in Research") instead of rendering in the wrong conversation.
+
+### Piece 2: Backend Active Session Tracking
+
+**Goal:** Give webhooks/notifications a way to route to the correct conversation.
+
+#### 2a. Track active session on the machines table
+
+Add `lastSessionKey TEXT DEFAULT 'main'` to the `machines` table.
+
+**New endpoint:** `POST /api/user/sessions/active`
 ```typescript
-const execResponse = await fetch(`${machineUrl}/api/v1/exec`, { ... });
-```
-
-This fails silently because **`/api/v1/exec` does not exist** on the OpenClaw gateway. The handler logs a warning and continues. The transcript data is still in the Turso DB and included in the hook notification message, so the agent gets it. But no persistent `calls/*.md` file is saved on the user's volume.
-
-## Proposed Fix: Track Active Session Key
-
-### Approach: Frontend reports active session to backend
-
-Since the WebSocket is direct (browser → Fly machine), the backend needs another signal. Have the dashboard frontend report which conversation is active.
-
-**1. Add `lastSessionKey` column to `machines` table:**
-```sql
-ALTER TABLE machines ADD COLUMN last_session_key TEXT DEFAULT 'main';
-```
-
-**2. Create `POST /api/user/sessions/active` endpoint:**
-```typescript
-// Called by frontend when user switches conversations or sends a message
+// Called by dashboard when user switches conversations or sends a message
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   const { sessionKey } = await req.json();
   await db.update(machines)
-    .set({ lastSessionKey: sessionKey })
+    .set({ lastSessionKey: sessionKey, lastActiveAt: new Date() })
     .where(eq(machines.userId, userId));
   return NextResponse.json({ ok: true });
 }
 ```
 
-**3. Update dashboard to call it:**
-In `dashboard/page.tsx`, when `currentConversation` changes or a message is sent:
-```typescript
-// Fire-and-forget, don't block UI
-fetch('/api/user/sessions/active', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ sessionKey: currentConversation }),
-}).catch(() => {}); // Silent failure is fine
-```
+**Dashboard calls it** (fire-and-forget) in two places:
+1. When `currentConversation` changes (conversation switch)
+2. When a message is sent (confirms active conversation)
 
-**4. Update `/api/user/call` to capture session key:**
+#### 2b. Capture session key at call initiation time
+
+Add `sessionKey TEXT` to the `callUsage` table.
+
+In `/api/user/call/route.ts`, when a call is initiated:
 ```typescript
-// In the call initiation handler, after auth:
 const sessionKey = machine.lastSessionKey || 'main';
 
-// Store it with the call record:
 await db.insert(callUsage).values({
   ...existingFields,
-  sessionKey, // NEW: which conversation initiated this call
+  sessionKey, // Locked at initiation time
 });
 ```
 
-**5. Update `callUsage` schema:**
-```typescript
-// Add to schema:
-sessionKey: text("session_key").default("main"),
-```
+**Why initiation time, not webhook time:** Makes the fix multi-tab safe. If the user has multiple tabs viewing different conversations, `lastSessionKey` gets overwritten by whichever tab reports last. By capturing the session at call initiation, we lock it before the call even starts. The webhook fires minutes later and reads from `callUsage.sessionKey`, not from `machines.lastSessionKey`.
 
-**6. Update webhook handler to pass session key:**
-```typescript
-// In notifyAgent():
-const canonicalSessionKey = callRecord.sessionKey 
-  ? (callRecord.sessionKey.startsWith('agent:main:') 
-      ? callRecord.sessionKey 
-      : `agent:main:${callRecord.sessionKey}`)
-  : undefined;
+**Inbound calls** (no user action): Route to `machines.lastSessionKey` as best-effort. There's no "source conversation" for inbound calls, so most-recently-active is the reasonable default.
 
+#### 2c. Update webhook to pass session key
+
+In `notifyAgent()` within `/api/webhooks/bland/status/route.ts`:
+```typescript
 body: JSON.stringify({
   message: `A phone call just completed...`,
   name: "PhoneCall",
   deliver: true,
   channel: "last",
   wakeMode: "now",
-  sessionKey: canonicalSessionKey, // FIX: targets the right conversation
+  sessionKey: callRecord.sessionKey || machine.lastSessionKey || 'main',
+  // ⚠️ Pass bare key only! OpenClaw's buildAgentMainSessionKey adds the agent:main: prefix.
 }),
 ```
 
-### Race Condition Note
+#### 2d. Remove broken transcript file write
 
-There is a small race window: if the user sends "Call John" in Research, then immediately switches to General AND sends another message before the agent's curl hits `/api/user/call`, the `lastSessionKey` would be wrong. In practice this window is 2-3 seconds and requires active user action, so it's unlikely. Even if it happens, the notification just appears in the wrong conversation - not catastrophic.
+Remove the `writeTranscriptToMachine()` function and its `/api/v1/exec` call. The transcript data is already:
+- Stored in Turso (`callUsage.transcript`)
+- Included in the hook notification message to the agent
+- The agent can save it to a file if needed
 
-For a more robust (but more complex) solution, the session key could be resolved on the Fly machine side (OpenClaw knows which session the agent is running in), but this would require OpenClaw modifications.
+No more silent failures.
 
-### Alternative Considered: `/hooks/wake`
+## Database Migration
 
-Using `/hooks/wake` instead of `/hooks/agent` was considered. Wake injects a system event into the main session. However, this was previously tested and **did not work** (the notification didn't reach the user). The current `/hooks/agent` approach successfully delivers messages in real-time, so the fix should preserve that behavior and add session persistence on top.
+```sql
+-- Add active session tracking to machines
+ALTER TABLE machines ADD COLUMN last_session_key TEXT DEFAULT 'main';
 
-## Testing Plan
+-- Add session context to call records
+ALTER TABLE call_usage ADD COLUMN session_key TEXT;
+```
 
-1. Open dashboard, create a conversation called "test-calls"
-2. Switch to "test-calls", initiate a phone call
-3. Verify `lastSessionKey` is updated in Turso machines table
-4. Verify `callUsage` record has `session_key = "test-calls"`
-5. Wait for call to complete
-6. Verify webhook sends `sessionKey: "agent:main:test-calls"` to `/hooks/agent`
-7. Verify notification appears in chat AND persists after page reload
-8. Edge case: initiate call in "test-calls", switch to "main", reload - notification should be in "test-calls" history
+Both are `ALTER TABLE ADD COLUMN` with defaults or nullable. In SQLite/Turso:
+- Instant execution, no table rewrite
+- No downtime
+- Existing rows get `'main'` or `NULL`
+- Backward compatible
 
 ## Files to Modify
 
-1. `landing/src/lib/db/schema.ts` - Add `lastSessionKey` to machines, `sessionKey` to callUsage
-2. `landing/src/app/api/user/sessions/active/route.ts` - New endpoint (or add to existing sessions route)
-3. `landing/src/app/dashboard/page.tsx` - Report active conversation to backend
-4. `landing/src/app/api/user/call/route.ts` - Read lastSessionKey, store with call record
-5. `landing/src/app/api/webhooks/bland/status/route.ts` - Pass sessionKey in hook payload
-6. Run Drizzle migration for new columns
+| # | File | Change |
+|---|------|--------|
+| 1 | `landing/src/lib/clawdbot-runtime.ts` | Add `runIdSessionMap` ref, filter events by current session |
+| 2 | `landing/src/lib/db/schema.ts` | Add `lastSessionKey` to machines, `sessionKey` to callUsage |
+| 3 | `landing/src/app/dashboard/page.tsx` | Report active conversation on switch and message send |
+| 4 | `landing/src/app/api/user/sessions/active/route.ts` | New endpoint (simple DB update) |
+| 5 | `landing/src/app/api/user/call/route.ts` | Read `lastSessionKey`, store with call record |
+| 6 | `landing/src/app/api/webhooks/bland/status/route.ts` | Pass `sessionKey` in hook payload, remove broken `writeTranscriptToMachine()` |
+| 7 | Drizzle migration | Two new columns |
+
+## What This Fixes
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| Phone call notification | Appears in real-time, gone on reload | Persists in the correct conversation |
+| Switch conversations mid-response | Response bleeds into wrong conversation | Silently ignored, appears in correct conversation's history |
+| Inbound call notification | Goes to throwaway session | Routes to most recently active conversation |
+| Future webhooks (email, integrations) | Would have same persistence bug | Automatically routed via `lastSessionKey` |
+| Transcript file write | Fails silently every time | Removed (data in Turso + hook message) |
+| User offline when call completes | Notification lost | Persists in correct session, shows on next load |
+| Multiple browser tabs | N/A | Safe: session locked at initiation for outbound calls |
+
+## Testing Plan
+
+### Phase 1: Frontend streaming isolation
+1. Open dashboard, create conversations "alpha" and "beta"
+2. Send a message in "alpha" that will take a few seconds to respond
+3. Immediately switch to "beta"
+4. Verify: no streaming text appears in "beta"
+5. Switch back to "alpha" - verify response is in history
+
+### Phase 2: Phone call persistence
+1. Open dashboard in conversation "test-calls"
+2. Verify `lastSessionKey` is updated in Turso machines table
+3. Initiate a phone call
+4. Verify `callUsage` record has correct `session_key`
+5. Wait for call to complete
+6. Verify notification appears in chat
+7. Reload page - verify notification persists in "test-calls"
+
+### Phase 3: Multi-tab safety
+1. Open Tab A viewing "research", Tab B viewing "general"
+2. In Tab A, initiate a phone call
+3. In Tab B, switch to a different conversation
+4. Wait for call to complete
+5. Verify notification appears in "research" history (not wherever Tab B ended up)
+
+### Phase 4: Inbound call routing
+1. Note current `lastSessionKey` in Turso
+2. Trigger an inbound call
+3. Verify notification routes to the `lastSessionKey` conversation
+
+## Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| Session key double-prefixing | Eliminated | High | Pass bare key, not canonical key. Verified in code. |
+| `lastSessionKey` stale for inbound calls | Low | Low | Best-effort routing is acceptable for events with no source conversation |
+| Frontend filters out wanted events | Low | Medium | Unknown `runId`s (from hooks) render normally, only known mismatches are filtered |
+| Migration breaks existing data | None | N/A | Additive columns only, no data modification |
+| Multiple tabs overwrite `lastSessionKey` | Expected | Low | Outbound calls lock session at initiation; inbound uses most-recent (correct behavior) |

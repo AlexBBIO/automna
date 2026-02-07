@@ -178,6 +178,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryAttemptsRef = useRef(0);
   const deltaCountRef = useRef(0); // Count deltas per run for diagnostics
+  const runIdSessionMapRef = useRef<Map<string, string>>(new Map()); // Maps runId → sessionKey for cross-talk prevention
   const configRef = useRef(config);
   configRef.current = config;
 
@@ -411,6 +412,15 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     turnCountRef.current = 0;
     deltaCountRef.current = 0;
     streamingMediaRef.current = [];
+    // Map this runId to the current session for cross-talk prevention
+    if (runId) {
+      runIdSessionMapRef.current.set(runId, currentSessionRef.current);
+      // Keep map bounded (clean up old entries)
+      if (runIdSessionMapRef.current.size > 50) {
+        const entries = Array.from(runIdSessionMapRef.current.entries());
+        runIdSessionMapRef.current = new Map(entries.slice(-25));
+      }
+    }
     setIsRunning(true);
     isRunningRef.current = true;
     startRecoveryTimer();
@@ -421,6 +431,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     const state = payload.state as string | undefined;
     const message = payload.message as { role?: string; content?: ContentPart[] } | undefined;
     const runId = payload.runId as string | undefined;
+
+    // Session-aware event filtering: prevent cross-talk between conversations
+    if (runId) {
+      const mappedSession = runIdSessionMapRef.current.get(runId);
+      if (mappedSession && mappedSession !== currentSessionRef.current) {
+        log('🚫 Filtered chat event for different session:', { runId, state, mapped: mappedSession, current: currentSessionRef.current });
+        // For final events, clean up running state if this was our active run
+        if (state === 'final' && activeRunIdRef.current === runId) {
+          clearRecoveryTimer();
+          activeRunIdRef.current = null;
+          streamingTextRef.current = '';
+          streamingMediaRef.current = [];
+          setIsRunning(false);
+          isRunningRef.current = false;
+        }
+        return;
+      }
+    }
 
     // Log every chat event state for diagnostics
     if (state !== 'delta') {
@@ -530,12 +558,23 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     }
   }
 
-  /** Handle agent events (currently debug logging; streaming will use these in Phase 2) */
   /** Handle event agent - per-token streaming, tool boundaries, and lifecycle events */
   function handleAgentEvent(payload: Record<string, unknown>) {
     const stream = payload.stream as string | undefined;
     const data = payload.data as Record<string, unknown> | undefined;
     const runId = payload.runId as string | undefined;
+
+    // Session-aware event filtering: prevent cross-talk between conversations
+    if (runId) {
+      const mappedSession = runIdSessionMapRef.current.get(runId);
+      if (mappedSession && mappedSession !== currentSessionRef.current) {
+        // This event belongs to a different conversation - silently ignore
+        // History is saved correctly on the backend; it'll appear when user switches back
+        log('🚫 Filtered event for different session:', { runId, mapped: mappedSession, current: currentSessionRef.current });
+        return;
+      }
+      // Unknown runId (e.g., from webhook hooks) → allow through (best-effort delivery)
+    }
 
     // Capture runId if we missed the send ack
     if (runId && !activeRunIdRef.current) activeRunIdRef.current = runId;
@@ -677,6 +716,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     pendingRefetchRef.current = null;
     isRunningRef.current = false;
     activeRunIdRef.current = null;
+    runIdSessionMapRef.current.clear();
     clearRecoveryTimer();
     setMessages([]);
     setLoadingPhase('connecting');
