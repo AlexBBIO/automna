@@ -154,6 +154,31 @@ function parseMessages(messages: RawMessage[], prefix: string): ThreadMessage[] 
     }));
 }
 
+// ─── Module-level state (persists across component remounts) ─────────────────
+
+// Maps runId → sessionKey for cross-talk prevention.
+// Must be module-level because the dashboard remounts the chat component on
+// conversation switch (key={currentConversation}), which destroys all refs.
+const runIdSessionMap = new Map<string, string>();
+
+function trackRunIdSession(runId: string, sessionKey: string) {
+  runIdSessionMap.set(runId, sessionKey);
+  // Keep map bounded
+  if (runIdSessionMap.size > 100) {
+    const entries = Array.from(runIdSessionMap.entries());
+    const trimmed = entries.slice(-50);
+    runIdSessionMap.clear();
+    for (const [k, v] of trimmed) runIdSessionMap.set(k, v);
+  }
+}
+
+function isEventForDifferentSession(runId: string | undefined, currentSession: string): boolean {
+  if (!runId) return false;
+  const mapped = runIdSessionMap.get(runId);
+  if (!mapped) return false; // Unknown runId (webhook) → allow through
+  return mapped !== currentSession;
+}
+
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useClawdbotRuntime(config: ClawdbotConfig) {
@@ -178,7 +203,6 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const recoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryAttemptsRef = useRef(0);
   const deltaCountRef = useRef(0); // Count deltas per run for diagnostics
-  const runIdSessionMapRef = useRef<Map<string, string>>(new Map()); // Maps runId → sessionKey for cross-talk prevention
   const configRef = useRef(config);
   configRef.current = config;
 
@@ -412,14 +436,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     turnCountRef.current = 0;
     deltaCountRef.current = 0;
     streamingMediaRef.current = [];
-    // Map this runId to the current session for cross-talk prevention
+    // Map this runId to the current session for cross-talk prevention (module-level, survives remounts)
     if (runId) {
-      runIdSessionMapRef.current.set(runId, currentSessionRef.current);
-      // Keep map bounded (clean up old entries)
-      if (runIdSessionMapRef.current.size > 50) {
-        const entries = Array.from(runIdSessionMapRef.current.entries());
-        runIdSessionMapRef.current = new Map(entries.slice(-25));
-      }
+      trackRunIdSession(runId, currentSessionRef.current);
     }
     setIsRunning(true);
     isRunningRef.current = true;
@@ -433,21 +452,18 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     const runId = payload.runId as string | undefined;
 
     // Session-aware event filtering: prevent cross-talk between conversations
-    if (runId) {
-      const mappedSession = runIdSessionMapRef.current.get(runId);
-      if (mappedSession && mappedSession !== currentSessionRef.current) {
-        log('🚫 Filtered chat event for different session:', { runId, state, mapped: mappedSession, current: currentSessionRef.current });
-        // For final events, clean up running state if this was our active run
-        if (state === 'final' && activeRunIdRef.current === runId) {
-          clearRecoveryTimer();
-          activeRunIdRef.current = null;
-          streamingTextRef.current = '';
-          streamingMediaRef.current = [];
-          setIsRunning(false);
-          isRunningRef.current = false;
-        }
-        return;
+    if (isEventForDifferentSession(runId, currentSessionRef.current)) {
+      log('🚫 Filtered chat event for different session:', { runId, state, current: currentSessionRef.current });
+      // For final events, clean up running state if this was our active run
+      if (state === 'final' && activeRunIdRef.current === runId) {
+        clearRecoveryTimer();
+        activeRunIdRef.current = null;
+        streamingTextRef.current = '';
+        streamingMediaRef.current = [];
+        setIsRunning(false);
+        isRunningRef.current = false;
       }
+      return;
     }
 
     // Log every chat event state for diagnostics
@@ -565,15 +581,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     const runId = payload.runId as string | undefined;
 
     // Session-aware event filtering: prevent cross-talk between conversations
-    if (runId) {
-      const mappedSession = runIdSessionMapRef.current.get(runId);
-      if (mappedSession && mappedSession !== currentSessionRef.current) {
-        // This event belongs to a different conversation - silently ignore
-        // History is saved correctly on the backend; it'll appear when user switches back
-        log('🚫 Filtered event for different session:', { runId, mapped: mappedSession, current: currentSessionRef.current });
-        return;
-      }
-      // Unknown runId (e.g., from webhook hooks) → allow through (best-effort delivery)
+    if (isEventForDifferentSession(runId, currentSessionRef.current)) {
+      log('🚫 Filtered agent event for different session:', { runId, current: currentSessionRef.current });
+      return;
     }
 
     // Capture runId if we missed the send ack
@@ -716,9 +726,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     pendingRefetchRef.current = null;
     isRunningRef.current = false;
     activeRunIdRef.current = null;
-    // NOTE: Do NOT clear runIdSessionMapRef here! It must persist across session switches
-    // so we can filter events from previous sessions. Clearing it would cause those events
-    // to be treated as "unknown" (webhook) and render in the wrong conversation.
+    // runIdSessionMap is module-level, no need to clear here
     clearRecoveryTimer();
     setMessages([]);
     setLoadingPhase('connecting');
