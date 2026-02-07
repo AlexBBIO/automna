@@ -126,32 +126,56 @@ export const emailSends = sqliteTable("email_sends", {
   userSentAtIdx: index("idx_email_sends_user_sent_at").on(table.userId, table.sentAt),
 }));
 
+// ============================================
+// UNIFIED USAGE EVENTS (Automna Token billing)
+// ============================================
+
+// Tracks ALL billable activity: LLM, search, browser, calls, email
+export const usageEvents = sqliteTable("usage_events", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull(),
+  timestamp: integer("timestamp").notNull().$defaultFn(() => Math.floor(Date.now() / 1000)),
+  eventType: text("event_type").notNull(), // 'llm' | 'search' | 'browser' | 'call' | 'email' | 'embedding'
+  automnaTokens: integer("automna_tokens").notNull().default(0),
+  costMicrodollars: integer("cost_microdollars").notNull().default(0),
+  metadata: text("metadata"), // JSON
+  error: text("error"),
+}, (table) => ({
+  userTimestampIdx: index("idx_usage_events_user_ts").on(table.userId, table.timestamp),
+  eventTypeIdx: index("idx_usage_events_type").on(table.eventType),
+}));
+
 // Plan limits (stored in code for simplicity)
+// monthlyAutomnaTokens = cost cap / $0.0001 (1 AT = 100 microdollars)
 export const PLAN_LIMITS = {
   free: {
-    monthlyTokens: 100_000,        // 100K tokens
-    monthlyCostCents: 100,         // $1 cap
+    monthlyAutomnaTokens: 10_000,   // $1 real cost cap
+    monthlyTokens: 100_000,         // LEGACY — remove after migration
+    monthlyCostCents: 100,          // LEGACY — remove after migration
     requestsPerMinute: 5,
     tokensPerMinute: 10_000,
     monthlyCallMinutes: 0,
   },
   starter: {
-    monthlyTokens: 500_000,        // 500K tokens
-    monthlyCostCents: 2000,        // $20 cap
+    monthlyAutomnaTokens: 200_000,  // $20 real cost cap
+    monthlyTokens: 500_000,         // LEGACY — remove after migration
+    monthlyCostCents: 2000,         // LEGACY — remove after migration
     requestsPerMinute: 20,
     tokensPerMinute: 50_000,
-    monthlyCallMinutes: 0,         // No calling on starter
+    monthlyCallMinutes: 0,          // No calling on starter
   },
   pro: {
-    monthlyTokens: 2_000_000,      // 2M tokens
-    monthlyCostCents: 10000,       // $100 cap
+    monthlyAutomnaTokens: 1_000_000, // $100 real cost cap
+    monthlyTokens: 2_000_000,        // LEGACY — remove after migration
+    monthlyCostCents: 10000,         // LEGACY — remove after migration
     requestsPerMinute: 60,
     tokensPerMinute: 150_000,
-    monthlyCallMinutes: 60,        // 60 minutes/month
+    monthlyCallMinutes: 60,           // 60 minutes/month
   },
   business: {
-    monthlyTokens: 10_000_000,     // 10M tokens
-    monthlyCostCents: 50000,       // $500 cap
+    monthlyAutomnaTokens: 5_000_000, // $500 real cost cap
+    monthlyTokens: 10_000_000,       // LEGACY — remove after migration
+    monthlyCostCents: 50000,         // LEGACY — remove after migration
     requestsPerMinute: 120,
     tokensPerMinute: 300_000,
     monthlyCallMinutes: 300,       // 300 minutes/month
@@ -270,3 +294,5 @@ export type PhoneNumber = typeof phoneNumbers.$inferSelect;
 export type NewPhoneNumber = typeof phoneNumbers.$inferInsert;
 export type CallUsage = typeof callUsage.$inferSelect;
 export type NewCallUsage = typeof callUsage.$inferInsert;
+export type UsageEvent = typeof usageEvents.$inferSelect;
+export type NewUsageEvent = typeof usageEvents.$inferInsert;

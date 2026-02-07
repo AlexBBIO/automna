@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { callUsage, machines, phoneNumbers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { logUsageEventBackground } from "@/app/api/_lib/usage-events";
+import { COSTS } from "@/app/api/_lib/cost-constants";
 
 interface BlandWebhookPayload {
   call_id: string;
@@ -237,6 +239,24 @@ export async function POST(req: NextRequest) {
       .where(eq(callUsage.blandCallId, callId));
 
     console.log(`[bland-webhook] Call ${callId} updated: ${finalStatus}, ${durationSeconds}s, $${(costCents / 100).toFixed(2)}`);
+
+    // Log to unified usage_events for Automna Token billing
+    const callCostMicrodollars = durationSeconds > 0
+      ? Math.round((durationSeconds / 60) * COSTS.CALL_PER_MINUTE)
+      : COSTS.CALL_FAILED_ATTEMPT;
+    logUsageEventBackground({
+      userId: callRecord.userId,
+      eventType: 'call',
+      costMicrodollars: callCostMicrodollars,
+      metadata: {
+        blandCallId: callId,
+        direction: callRecord.direction,
+        toNumber: callRecord.toNumber,
+        fromNumber: callRecord.fromNumber,
+        durationSeconds,
+        status: finalStatus,
+      },
+    });
 
     // Find the user's machine for file write + notification
     const machine = await db.query.machines.findFirst({

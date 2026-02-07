@@ -18,6 +18,7 @@ import { NextRequest } from "next/server";
 import { authenticateGatewayToken } from "../../llm/_lib/auth";
 import { logUsageBackground } from "../../llm/_lib/usage";
 import { checkRateLimits, rateLimited } from "../../llm/_lib/rate-limit";
+import { logUsageEventBackground } from "@/app/api/_lib/usage-events";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -171,6 +172,21 @@ async function handleRequest(request: NextRequest, method: string) {
         error: data.error ? JSON.stringify(data.error) : undefined,
       });
 
+      // Log to unified usage_events for Automna Token billing
+      // Gemini pricing: use approximate rates (embeddings are ~free)
+      const isEmbedding = endpoint === 'embedContent' || endpoint === 'batchEmbedContents';
+      // Flash-Lite: $0.10/$0.40 per M. Pro: $2/$12 per M. Flash: $0.50/$3 per M.
+      const geminiInputRate = model.includes('pro') ? 2.0 : model.includes('flash-lite') ? 0.10 : 0.50;
+      const geminiOutputRate = model.includes('pro') ? 12.0 : model.includes('flash-lite') ? 0.40 : 3.0;
+      const geminiCostMicro = Math.round(inputTokens * geminiInputRate + outputTokens * geminiOutputRate);
+      logUsageEventBackground({
+        userId: auth.userId,
+        eventType: isEmbedding ? 'embedding' : 'llm',
+        costMicrodollars: geminiCostMicro,
+        metadata: { model, inputTokens, outputTokens, endpoint },
+        error: data.error ? JSON.stringify(data.error) : undefined,
+      });
+
       return new Response(JSON.stringify(data), {
         status: response.status,
         headers: { "Content-Type": "application/json" },
@@ -219,6 +235,18 @@ async function handleRequest(request: NextRequest, method: string) {
           inputTokens,
           outputTokens,
           durationMs,
+        });
+
+        // Log to unified usage_events for Automna Token billing
+        const isEmbedding = endpoint === 'embedContent' || endpoint === 'batchEmbedContents';
+        const geminiInputRate = model.includes('pro') ? 2.0 : model.includes('flash-lite') ? 0.10 : 0.50;
+        const geminiOutputRate = model.includes('pro') ? 12.0 : model.includes('flash-lite') ? 0.40 : 3.0;
+        const geminiCostMicro = Math.round(inputTokens * geminiInputRate + outputTokens * geminiOutputRate);
+        logUsageEventBackground({
+          userId: auth.userId,
+          eventType: isEmbedding ? 'embedding' : 'llm',
+          costMicrodollars: geminiCostMicro,
+          metadata: { model, inputTokens, outputTokens, endpoint, durationMs },
         });
       },
     });

@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines, emailSends } from "@/lib/db/schema";
 import { eq, and, gte, count } from "drizzle-orm";
+import { logUsageEventBackground } from "@/app/api/_lib/usage-events";
+import { COSTS } from "@/app/api/_lib/cost-constants";
 
 const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY;
 const DAILY_EMAIL_LIMIT = 50;
@@ -135,6 +137,18 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await agentmailResponse.json();
+
+    // Log to unified usage_events for Automna Token billing
+    logUsageEventBackground({
+      userId,
+      eventType: 'email',
+      costMicrodollars: COSTS.EMAIL_SEND,
+      metadata: {
+        recipient: Array.isArray(to) ? to[0] : to,
+        subject,
+        messageId: result.message_id,
+      },
+    });
 
     // Record the send
     await db.insert(emailSends).values({

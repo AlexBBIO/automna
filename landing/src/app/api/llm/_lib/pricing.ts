@@ -27,14 +27,19 @@ function makePricing(input: number, output: number): ModelPricing {
 
 const PRICING: Record<string, ModelPricing> = {
   // Claude 4.5 models - short names (what OpenClaw sends)
-  "claude-opus-4-5": makePricing(15.0, 75.0),
+  // Opus 4.5: $5/$25 (NOT $15/$75 — that's Opus 4)
+  "claude-opus-4-5": makePricing(5.0, 25.0),
   "claude-sonnet-4-5": makePricing(3.0, 15.0),
-  "claude-haiku-4-5": makePricing(0.8, 4.0),
+  "claude-haiku-4-5": makePricing(1.0, 5.0),
 
   // Claude 4.5 models - full names with dates
   "claude-sonnet-4-5-20250514": makePricing(3.0, 15.0),
-  "claude-opus-4-5-20250514": makePricing(15.0, 75.0),
-  "claude-haiku-4-5-20250514": makePricing(0.8, 4.0),
+  "claude-opus-4-5-20250514": makePricing(5.0, 25.0),
+  "claude-haiku-4-5-20250514": makePricing(1.0, 5.0),
+
+  // Claude 4.6 models
+  "claude-opus-4-6": makePricing(5.0, 25.0),
+  "claude-opus-4-6-20260101": makePricing(5.0, 25.0),
 
   // Claude 4 models - short names
   "claude-opus-4": makePricing(15.0, 75.0),

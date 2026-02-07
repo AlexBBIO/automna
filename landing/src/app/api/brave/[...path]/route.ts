@@ -18,6 +18,8 @@ import { NextRequest } from "next/server";
 import { authenticateGatewayToken } from "../../llm/_lib/auth";
 import { logUsageBackground } from "../../llm/_lib/usage";
 import { checkRateLimits, rateLimited } from "../../llm/_lib/rate-limit";
+import { logUsageEventBackground } from "@/app/api/_lib/usage-events";
+import { COSTS } from "@/app/api/_lib/cost-constants";
 
 const BRAVE_API_BASE = "https://api.search.brave.com";
 const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
@@ -155,6 +157,20 @@ async function handleRequest(request: NextRequest, method: string) {
       durationMs,
       error: data.type === "ErrorResponse" ? data.message : undefined,
     });
+
+    // Log to unified usage_events for Automna Token billing
+    if (data.type !== "ErrorResponse") {
+      logUsageEventBackground({
+        userId: auth.userId,
+        eventType: 'search',
+        costMicrodollars: COSTS.BRAVE_SEARCH_PER_QUERY,
+        metadata: {
+          endpoint,
+          query: url.searchParams.get('q') || undefined,
+          resultCount,
+        },
+      });
+    }
 
     return new Response(JSON.stringify(data), {
       status: response.status,

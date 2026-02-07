@@ -133,7 +133,8 @@ export async function POST(req: NextRequest) {
         app_name: machine.appName,
         automna: true,
       },
-      background_track: "office",
+      background_track: null,
+      wait_for_greeting: true,
     };
 
     console.log(`[call] Outbound call for user ${userId}: ${userPhone.phoneNumber} → ${e164}`);

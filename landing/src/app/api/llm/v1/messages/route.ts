@@ -14,6 +14,8 @@ import { NextRequest } from "next/server";
 import { authenticateGatewayToken, anthropicError } from "../../_lib/auth";
 import { logUsageBackground } from "../../_lib/usage";
 import { checkRateLimits, rateLimited } from "../../_lib/rate-limit";
+import { logUsageEventBackground } from "@/app/api/_lib/usage-events";
+import { calculateCostMicrodollars } from "../../_lib/pricing";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -119,6 +121,21 @@ export async function POST(request: NextRequest) {
         cacheReadTokens,
         requestId: data.id,
         durationMs,
+        error: data.type === "error" ? JSON.stringify(data.error) : undefined,
+      });
+
+      // Log to unified usage_events for Automna Token billing
+      const costMicro = calculateCostMicrodollars(
+        model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens
+      );
+      logUsageEventBackground({
+        userId: auth.userId,
+        eventType: 'llm',
+        costMicrodollars: costMicro,
+        metadata: {
+          model, provider: 'anthropic', inputTokens, outputTokens,
+          cacheCreationTokens, cacheReadTokens, requestId: data.id, durationMs,
+        },
         error: data.type === "error" ? JSON.stringify(data.error) : undefined,
       });
 
@@ -234,6 +251,21 @@ export async function POST(request: NextRequest) {
           cacheReadTokens,
           requestId,
           durationMs,
+          error: errorMessage,
+        });
+
+        // Log to unified usage_events for Automna Token billing
+        const costMicro = calculateCostMicrodollars(
+          model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens
+        );
+        logUsageEventBackground({
+          userId: auth.userId,
+          eventType: 'llm',
+          costMicrodollars: costMicro,
+          metadata: {
+            model, provider: 'anthropic', inputTokens, outputTokens,
+            cacheCreationTokens, cacheReadTokens, requestId, durationMs,
+          },
           error: errorMessage,
         });
       },

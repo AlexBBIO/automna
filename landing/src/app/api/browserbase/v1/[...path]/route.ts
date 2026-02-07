@@ -18,6 +18,8 @@ import { NextRequest } from "next/server";
 import { authenticateGatewayToken } from "../../../llm/_lib/auth";
 import { logUsageBackground } from "../../../llm/_lib/usage";
 import { checkRateLimits, rateLimited } from "../../../llm/_lib/rate-limit";
+import { logUsageEventBackground } from "@/app/api/_lib/usage-events";
+import { COSTS } from "@/app/api/_lib/cost-constants";
 
 const BROWSERBASE_API_BASE = "https://api.browserbase.com/v1";
 const BROWSERBASE_API_KEY = process.env.BROWSERBASE_API_KEY?.replace(/[\r\n]+$/, "");
@@ -170,6 +172,16 @@ async function handleRequest(request: NextRequest, method: string) {
         outputTokens: 0,
         requestId: responseData?.id as string | undefined,
         durationMs,
+      });
+
+      // Log to unified usage_events for Automna Token billing
+      logUsageEventBackground({
+        userId: auth.userId,
+        eventType: 'browser',
+        costMicrodollars: COSTS.BROWSERBASE_PER_SESSION,
+        metadata: {
+          sessionId: responseData?.id,
+        },
       });
     } else if (!response.ok) {
       logUsageBackground({
