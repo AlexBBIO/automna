@@ -52,6 +52,17 @@
 
 ### 📝 Recent Changes (2026-02-03)
 
+**🔧 Provisioning Loading Screen Fix (2026-02-08):**
+
+Fixed new-user provisioning loading screen exiting prematurely:
+
+1. **Problem:** `waitForGatewayReady()` had no real failure path — every branch (HTTP timeout, WS test failure) proceeded to show chat UI anyway, resulting in users seeing WebSocket errors
+2. **Root cause:** Redundant WebSocket test (separate from the real WS in `useClawdbotRuntime`) would fail 5 times, give up, and loading screen would disappear
+3. **Fix:** Removed `testWebSocketConnection()` and `waitForGatewayReady()` entirely. Replaced with `waitForNewProvisionReady()` — only runs for fresh provisions, only does HTTP health polling, shows error + retry button on timeout
+4. **Existing users:** Skip warmup entirely, go straight to chat (faster than before)
+5. **ChatSkeleton:** Warming phase now shows tips + timer instead of fake "Creating your agent..." text
+6. **Result:** -48 lines, simpler flow, no silent failures
+
 **📞 Voice Calling (2026-02-06):**
 
 Added AI-powered phone calling via Twilio + Bland.ai:

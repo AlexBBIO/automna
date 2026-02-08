@@ -53,9 +53,8 @@ export async function POST(request: Request) {
     );
   }
   
-  // 3. Check rate limits
-  const estimatedTokens = Math.ceil(content.length / 4);
-  const rateLimitResult = await checkRateLimits(user, estimatedTokens);
+  // 3. Check rate limits (monthly AT budget + RPM)
+  const rateLimitResult = await checkRateLimits(user);
   
   if (!rateLimitResult.allowed) {
     console.log(`[llm/embed] Rate limited user ${user.userId}: ${rateLimitResult.reason}`);

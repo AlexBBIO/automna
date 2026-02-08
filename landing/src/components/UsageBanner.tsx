@@ -83,8 +83,15 @@ export function UsageBanner({ usage }: { usage: UsageData | null }) {
   };
 
   const planName = usage.plan.charAt(0).toUpperCase() + usage.plan.slice(1);
-  const usedTokensK = Math.round(usage.usage.totalTokens / 1000);
-  const limitTokensK = Math.round(usage.limits.monthlyTokens / 1000);
+  
+  // Format token counts for display (e.g., "45K", "1.2M")
+  const formatTokens = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+    if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+    return n.toString();
+  };
+  const usedDisplay = formatTokens(usage.usage.totalTokens);
+  const limitDisplay = formatTokens(usage.limits.monthlyTokens);
 
   // Style based on level
   const styles = {
@@ -120,9 +127,9 @@ export function UsageBanner({ usage }: { usage: UsageData | null }) {
   const s = styles[level];
 
   const messages = {
-    info: `You've used ${usedTokensK}K of ${limitTokensK}K tokens on your ${planName} plan this month.`,
-    warning: `You've used ${usedTokensK}K of ${limitTokensK}K tokens on your ${planName} plan. Upgrade to keep chatting uninterrupted.`,
-    limit: `You've reached your ${planName} plan token limit (${limitTokensK}K). Upgrade to continue using your agent.`,
+    info: `You've used ${usedDisplay} of ${limitDisplay} tokens on your ${planName} plan this month.`,
+    warning: `You've used ${usedDisplay} of ${limitDisplay} tokens on your ${planName} plan. Upgrade to keep chatting uninterrupted.`,
+    limit: `You've reached your ${planName} plan limit. Upgrade to continue using your agent.`,
   };
 
   return (

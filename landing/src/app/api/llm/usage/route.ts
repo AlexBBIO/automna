@@ -1,8 +1,8 @@
 /**
- * LLM Usage Stats API
+ * Usage Stats API (Automna Token System)
  * 
- * Returns usage statistics for the authenticated user.
- * Used by the dashboard to show token/cost usage.
+ * Returns Automna Token usage for the authenticated user.
+ * Reads from usage_events table (unified billing).
  * 
  * GET /api/llm/usage
  * Auth: Clerk session (dashboard) or gateway token (agent)
@@ -10,9 +10,8 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
-import { llmUsage, machines, PLAN_LIMITS } from '@/lib/db/schema';
+import { usageEvents, machines, PLAN_LIMITS } from '@/lib/db/schema';
 import { eq, sql, and, gte } from 'drizzle-orm';
-import { formatCost } from '../_lib/pricing';
 import { authenticateGatewayToken } from '../_lib/auth';
 import type { PlanType } from '@/lib/db/schema';
 
@@ -27,7 +26,6 @@ export async function GET(request: Request) {
   
   if (clerkUserId) {
     userId = clerkUserId;
-    // Get plan from machine record
     const machine = await db.query.machines.findFirst({
       where: eq(machines.userId, clerkUserId),
     });
@@ -53,79 +51,74 @@ export async function GET(request: Request) {
   monthStart.setUTCHours(0, 0, 0, 0);
   const monthStartUnix = Math.floor(monthStart.getTime() / 1000);
   
-  // Get monthly totals (including cache tokens)
-  const monthlyStatsResult = await db
+  // Get monthly totals from usage_events
+  const monthlyTotalResult = await db
     .select({
-      totalRequests: sql<number>`COUNT(*)`.as('total_requests'),
-      totalInputTokens: sql<number>`COALESCE(SUM(input_tokens), 0)`.as('total_input'),
-      totalOutputTokens: sql<number>`COALESCE(SUM(output_tokens), 0)`.as('total_output'),
-      totalCacheCreationTokens: sql<number>`COALESCE(SUM(cache_creation_tokens), 0)`.as('total_cache_creation'),
-      totalCacheReadTokens: sql<number>`COALESCE(SUM(cache_read_tokens), 0)`.as('total_cache_read'),
+      totalAutomnaTokens: sql<number>`COALESCE(SUM(automna_tokens), 0)`.as('total_at'),
       totalCostMicro: sql<number>`COALESCE(SUM(cost_microdollars), 0)`.as('total_cost'),
+      totalRequests: sql<number>`COUNT(*)`.as('total_requests'),
     })
-    .from(llmUsage)
+    .from(usageEvents)
     .where(
       and(
-        eq(llmUsage.userId, userId),
-        gte(llmUsage.timestamp, monthStartUnix)
+        eq(usageEvents.userId, userId),
+        gte(usageEvents.timestamp, monthStartUnix)
       )
     );
   
-  const stats = monthlyStatsResult[0];
-  const totalInputTokens = Number(stats?.totalInputTokens || 0);
-  const totalOutputTokens = Number(stats?.totalOutputTokens || 0);
-  const totalCacheCreationTokens = Number(stats?.totalCacheCreationTokens || 0);
-  const totalCacheReadTokens = Number(stats?.totalCacheReadTokens || 0);
-  const totalTokens = totalInputTokens + totalOutputTokens + totalCacheCreationTokens + totalCacheReadTokens;
-  const totalCostMicro = Number(stats?.totalCostMicro || 0);
-  const totalCostCents = Math.floor(totalCostMicro / 10_000);
+  const totalAutomnaTokens = Number(monthlyTotalResult[0]?.totalAutomnaTokens || 0);
+  const totalCostMicro = Number(monthlyTotalResult[0]?.totalCostMicro || 0);
+  const totalRequests = Number(monthlyTotalResult[0]?.totalRequests || 0);
+  
+  // Get breakdown by event type
+  const breakdownResult = await db
+    .select({
+      eventType: usageEvents.eventType,
+      tokens: sql<number>`COALESCE(SUM(automna_tokens), 0)`.as('tokens'),
+      count: sql<number>`COUNT(*)`.as('count'),
+    })
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.userId, userId),
+        gte(usageEvents.timestamp, monthStartUnix)
+      )
+    )
+    .groupBy(usageEvents.eventType);
+  
+  const breakdown: Record<string, number> = {};
+  for (const row of breakdownResult) {
+    breakdown[row.eventType] = Number(row.tokens);
+  }
   
   // Get daily breakdown (last 30 days)
   const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
   
-  const dailyStatsResult = await db
+  const dailyResult = await db
     .select({
       day: sql<string>`date(timestamp, 'unixepoch')`.as('day'),
+      tokens: sql<number>`SUM(automna_tokens)`.as('tokens'),
       requests: sql<number>`COUNT(*)`.as('requests'),
-      inputTokens: sql<number>`SUM(input_tokens)`.as('input_tokens'),
-      outputTokens: sql<number>`SUM(output_tokens)`.as('output_tokens'),
-      cacheCreationTokens: sql<number>`SUM(cache_creation_tokens)`.as('cache_creation_tokens'),
-      cacheReadTokens: sql<number>`SUM(cache_read_tokens)`.as('cache_read_tokens'),
       cost: sql<number>`SUM(cost_microdollars)`.as('cost'),
     })
-    .from(llmUsage)
+    .from(usageEvents)
     .where(
       and(
-        eq(llmUsage.userId, userId),
-        gte(llmUsage.timestamp, thirtyDaysAgo)
+        eq(usageEvents.userId, userId),
+        gte(usageEvents.timestamp, thirtyDaysAgo)
       )
     )
     .groupBy(sql`date(timestamp, 'unixepoch')`)
     .orderBy(sql`date(timestamp, 'unixepoch') DESC`)
     .limit(30);
   
-  // Get model breakdown for this month
-  const modelStatsResult = await db
-    .select({
-      model: llmUsage.model,
-      requests: sql<number>`COUNT(*)`.as('requests'),
-      tokens: sql<number>`SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens)`.as('tokens'),
-      cost: sql<number>`SUM(cost_microdollars)`.as('cost'),
-    })
-    .from(llmUsage)
-    .where(
-      and(
-        eq(llmUsage.userId, userId),
-        gte(llmUsage.timestamp, monthStartUnix)
-      )
-    )
-    .groupBy(llmUsage.model)
-    .orderBy(sql`SUM(cost_microdollars) DESC`)
-    .limit(10);
-  
   // Calculate end of month
   const monthEnd = new Date(monthStart);
   monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+  
+  const percentUsed = Math.min(100, Math.round(
+    (totalAutomnaTokens / limits.monthlyAutomnaTokens) * 100
+  ));
   
   return Response.json({
     plan,
@@ -134,42 +127,39 @@ export async function GET(request: Request) {
       end: monthEnd.toISOString(),
     },
     usage: {
-      requests: Number(stats?.totalRequests || 0),
-      inputTokens: totalInputTokens,
-      outputTokens: totalOutputTokens,
-      cacheCreationTokens: totalCacheCreationTokens,
-      cacheReadTokens: totalCacheReadTokens,
-      totalTokens,
-      cost: formatCost(totalCostMicro),
-      costCents: totalCostCents,
+      automnaTokens: totalAutomnaTokens,
+      requests: totalRequests,
+      // Legacy fields for backward compat (will remove later)
+      totalTokens: totalAutomnaTokens,
+      costCents: Math.floor(totalCostMicro / 10_000),
     },
     limits: {
-      monthlyTokens: limits.monthlyTokens,
-      monthlyCostCents: limits.monthlyCostCents,
+      monthlyAutomnaTokens: limits.monthlyAutomnaTokens,
       requestsPerMinute: limits.requestsPerMinute,
+      // Legacy fields for backward compat
+      monthlyTokens: limits.monthlyAutomnaTokens,
+      monthlyCostCents: Math.floor(limits.monthlyAutomnaTokens / 100),
     },
     remaining: {
-      tokens: Math.max(0, limits.monthlyTokens - totalTokens),
-      costCents: Math.max(0, limits.monthlyCostCents - totalCostCents),
+      automnaTokens: Math.max(0, limits.monthlyAutomnaTokens - totalAutomnaTokens),
     },
     percentUsed: {
-      tokens: Math.min(100, Math.round((totalTokens / limits.monthlyTokens) * 100)),
-      cost: Math.min(100, Math.round((totalCostCents / limits.monthlyCostCents) * 100)),
+      tokens: percentUsed,
+      cost: percentUsed,  // Same number now — both derived from AT
     },
-    dailyBreakdown: dailyStatsResult.map((d) => ({
+    breakdown: {
+      llm: breakdown.llm || 0,
+      search: breakdown.search || 0,
+      browser: breakdown.browser || 0,
+      call: breakdown.call || 0,
+      email: breakdown.email || 0,
+      embedding: breakdown.embedding || 0,
+    },
+    dailyBreakdown: dailyResult.map((d) => ({
       date: d.day,
-      requests: Number(d.requests),
-      inputTokens: Number(d.inputTokens || 0),
-      outputTokens: Number(d.outputTokens || 0),
-      cacheCreationTokens: Number(d.cacheCreationTokens || 0),
-      cacheReadTokens: Number(d.cacheReadTokens || 0),
-      cost: formatCost(Number(d.cost || 0)),
-    })),
-    modelBreakdown: modelStatsResult.map((m) => ({
-      model: m.model,
-      requests: Number(m.requests),
-      tokens: Number(m.tokens || 0),
-      cost: formatCost(Number(m.cost || 0)),
+      tokens: Number(d.tokens || 0),
+      requests: Number(d.requests || 0),
+      cost: `$${(Number(d.cost || 0) / 1_000_000).toFixed(2)}`,
     })),
   });
 }

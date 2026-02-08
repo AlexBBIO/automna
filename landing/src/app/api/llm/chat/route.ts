@@ -67,10 +67,8 @@ export async function POST(request: Request) {
     );
   }
   
-  // 3. Check rate limits
-  // Estimate input tokens (rough: ~4 chars per token)
-  const estimatedInputTokens = Math.ceil(JSON.stringify(messages).length / 4);
-  const rateLimitResult = await checkRateLimits(user, estimatedInputTokens);
+  // 3. Check rate limits (monthly AT budget + RPM)
+  const rateLimitResult = await checkRateLimits(user);
   
   if (!rateLimitResult.allowed) {
     console.log(`[llm/chat] Rate limited user ${user.userId}: ${rateLimitResult.reason}`);
