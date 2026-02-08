@@ -969,13 +969,17 @@ export default function DashboardPage() {
                   <div className="h-full animate-fadeIn flex flex-col" key={currentConversation}>
                     <UsageBanner usage={usage} />
                     <div className="flex-1 overflow-hidden">
-                      <AutomnaChat
-                        gatewayUrl={gatewayInfo.gatewayUrl}
-                        sessionKey={currentConversation}
-                        initialMessage={pendingMessage}
-                        onInitialMessageSent={() => setPendingMessage(null)}
-                        isOverLimit={isOverLimit}
-                      />
+                      {loadPhase === 'ready' && gatewayInfo?.gatewayUrl ? (
+                        <AutomnaChat
+                          gatewayUrl={gatewayInfo.gatewayUrl}
+                          sessionKey={currentConversation}
+                          initialMessage={pendingMessage}
+                          onInitialMessageSent={() => setPendingMessage(null)}
+                          isOverLimit={isOverLimit}
+                        />
+                      ) : (
+                        <ChatSkeleton phase="connecting" />
+                      )}
                     </div>
                   </div>
                 )}

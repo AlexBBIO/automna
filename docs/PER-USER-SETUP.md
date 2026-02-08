@@ -1,6 +1,6 @@
 # Per-User Instance Setup
 
-**Last Updated:** 2026-02-03 04:32 UTC  
+**Last Updated:** 2026-02-08  
 **Status:** Production (MVP)
 
 This document covers everything needed to provision, configure, and troubleshoot per-user OpenClaw instances on Fly.io.
@@ -103,6 +103,15 @@ fly machines update <machine-id> -a automna-u-xxx --image registry.fly.io/automn
 
 **What it does:**
 
+0. **Determine plan** from Clerk metadata + Stripe fallback
+   ```typescript
+   // First checks user.publicMetadata.plan from Clerk
+   // If "starter" but user has stripeCustomerId, verifies with Stripe directly
+   // This handles the race condition where the Stripe webhook hasn't updated
+   // Clerk metadata yet (user just completed checkout)
+   // Also fixes Clerk metadata in-flight if Stripe shows a different plan
+   ```
+
 1. **Generate short ID** from Clerk userId
    ```typescript
    // user_2abc123def456 → 3def456 (last 12 chars, lowercase)
@@ -137,11 +146,12 @@ fly machines update <machine-id> -a automna-u-xxx --image registry.fly.io/automn
    { "name": "openclaw_data", "region": "sjc", "size_gb": 1, "encrypted": true }
    ```
 
-6. **Create machine** with full config
+6. **Create machine** with full config (specs vary by plan)
    ```json
    {
      "image": "registry.fly.io/automna-openclaw-image:latest",
-     "guest": { "cpu_kind": "shared", "cpus": 1, "memory_mb": 2048 },
+     "guest": { "cpu_kind": "shared", "cpus": 1, "memory_mb": 2048 },  // Starter
+     // Pro/Business: { "cpus": 2, "memory_mb": 4096 }
      "init": {
        "cmd": ["gateway", "--allow-unconfigured", "--bind", "lan", "--auth", "token", "--token", "<gatewayToken>"]
      },
@@ -166,7 +176,7 @@ fly machines update <machine-id> -a automna-u-xxx --image registry.fly.io/automn
 7. **Wait for machine** (polls until `state === "started"`)
 
 8. **Store in Turso**
-   - `machines` table: id, userId, appName, region, volumeId, status, gatewayToken
+   - `machines` table: id, userId, appName, region, volumeId, status, gatewayToken, plan
 
 ### Critical Configuration Details
 
@@ -468,6 +478,7 @@ DELETE FROM machines WHERE user_id = 'user_xxx';
 
 When provisioning is triggered:
 
+- [ ] Plan determined correctly (Clerk metadata → Stripe fallback if needed)
 - [ ] App created with correct name (`automna-u-{shortId}`)
 - [ ] IPs allocated (both v4 and v6)
 - [ ] Volume created (1GB, encrypted, in same region)
@@ -479,7 +490,7 @@ When provisioning is triggered:
 - [ ] Machine reaches "started" state
 - [ ] Entrypoint creates `clawdbot.json` config (workspace + memory settings)
 - [ ] Session key fixer running in background
-- [ ] Record stored in Turso (machines table)
+- [ ] Record stored in Turso (machines table, including plan)
 - [ ] Event logged (machine_events table)
 - [ ] Gateway responds to health check
 

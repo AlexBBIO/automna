@@ -908,6 +908,18 @@ This is NOT a chatbot. Users will have their agents:
 
 ## Known Issues & Workarounds
 
+### Plan Race Condition in Provisioning (2026-02-08) — ✅ FIXED
+
+**Issue:** Users who subscribe to Pro/Business plans could be provisioned as Starter. The provisioning endpoint reads `user.publicMetadata.plan` from Clerk, but the Stripe `checkout.session.completed` webhook that updates Clerk metadata may not have fired yet when the user lands on the dashboard and triggers provisioning.
+
+**Root Cause:** Race condition between Stripe webhook → Clerk metadata update → provision endpoint reading the plan. Even though Bobby's checkout completed 11 minutes before provisioning, Clerk metadata hadn't been updated yet.
+
+**Fix:** When `publicMetadata.plan` is `"starter"` but the user has a `stripeCustomerId`, the provision endpoint now checks Stripe directly via `subscriptions.list()` for their active subscription. Maps the Stripe price ID to plan name. Also fixes Clerk metadata in-flight so subsequent requests are correct. Additionally, the `plan` field is now written to the `machines` table during initial provisioning (was previously only set by the Stripe webhook).
+
+**Commit:** `dfb3b04`
+
+---
+
 ### OpenClaw Streaming Truncates MEDIA Paths (2026-02-05) — ✅ FIXED 2026-02-06
 
 **Issue:** OpenClaw truncates `MEDIA:/path/to/file` strings during streaming. The streaming `chat` events arrive with truncated text, but the stored message in history is complete.
