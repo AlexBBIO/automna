@@ -7,14 +7,24 @@ Check these periodically (every 30 minutes):
 2. Note any new unread messages since last check
 3. Update heartbeat-state.json with timestamp and count
 
-When the user next messages you, naturally mention new emails:
-- "By the way, you have 2 new emails since we last talked"
-- "I noticed an email from [sender] about [subject]"
+## Notifications Channel
 
-Keep it conversational, not robotic.
+When you find something worth reporting (new emails, completed tasks, alerts):
+
+1. Send a summary to the **Notifications** conversation:
+   ```
+   sessions_send(label: "notifications", message: "📧 2 new emails: ...")
+   ```
+2. Keep notifications concise and scannable
+3. Group multiple items into one message when possible
+
+**Examples:**
+- "📧 New email from GitHub: PR review requested on repo-name"
+- "📧 3 new emails since last check (2 from newsletters, 1 from dana@example.com about dinner plans)"
+- "✅ Reminder: You asked me to remind you about the 3pm meeting"
 
 ## Rules
 - If nothing new: reply HEARTBEAT_OK
-- Don't message the user during heartbeat - just build awareness
+- Use the Notifications conversation for all periodic findings
 - Update heartbeat-state.json to track what you've seen
-- Mention new mail naturally when the user chats next
+- Keep it scannable — no walls of text

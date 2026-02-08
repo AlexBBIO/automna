@@ -494,6 +494,50 @@ if [ "$WORKSPACE_VERSION" -lt 5 ] 2>/dev/null; then
     echo "[automna] Workspace migrated to version 5"
 fi
 
+# Migration 5→6: Update HEARTBEAT.md to use Notifications channel
+if [ "$WORKSPACE_VERSION" -lt 6 ] 2>/dev/null; then
+    echo "[automna] Workspace migration v6: updating HEARTBEAT.md with Notifications channel..."
+
+    if [ -f "$OPENCLAW_DIR/workspace/HEARTBEAT.md" ]; then
+        cat > "$OPENCLAW_DIR/workspace/HEARTBEAT.md" << 'HEARTBEATEOF'
+# Heartbeat Tasks
+
+Check these periodically (every 30 minutes):
+
+## Email Check
+1. Check your inbox for new messages using Agentmail
+2. Note any new unread messages since last check
+3. Update heartbeat-state.json with timestamp and count
+
+## Notifications Channel
+
+When you find something worth reporting (new emails, completed tasks, alerts):
+
+1. Send a summary to the **Notifications** conversation:
+   ```
+   sessions_send(label: "notifications", message: "📧 2 new emails: ...")
+   ```
+2. Keep notifications concise and scannable
+3. Group multiple items into one message when possible
+
+**Examples:**
+- "📧 New email from GitHub: PR review requested on repo-name"
+- "📧 3 new emails since last check (2 from newsletters, 1 from dana@example.com about dinner plans)"
+- "✅ Reminder: You asked me to remind you about the 3pm meeting"
+
+## Rules
+- If nothing new: reply HEARTBEAT_OK
+- Use the Notifications conversation for all periodic findings
+- Update heartbeat-state.json to track what you've seen
+- Keep it scannable — no walls of text
+HEARTBEATEOF
+        echo "[automna] HEARTBEAT.md updated with Notifications channel"
+    fi
+
+    echo "6" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "[automna] Workspace migrated to version 6"
+fi
+
 # Extract gateway token from args first (needed for config)
 # Args come in as: gateway --allow-unconfigured --bind lan --auth token --token <TOKEN>
 GATEWAY_TOKEN=""
@@ -565,6 +609,14 @@ cat > "$CONFIG_FILE" << EOFCONFIG
       },
       "verboseDefault": "on",
       "userTimezone": "America/Los_Angeles",
+      "heartbeat": {
+        "every": "30m",
+        "activeHours": {
+          "start": "08:00",
+          "end": "23:00"
+        },
+        "target": "last"
+      },
       "contextPruning": {
         "mode": "cache-ttl",
         "ttl": "1h"
