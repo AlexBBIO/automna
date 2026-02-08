@@ -72,6 +72,25 @@ function TypingIndicator() {
   );
 }
 
+// Tool status indicator - shown during tool execution with friendly status message
+function ToolStatusIndicator({ status }: { status: string }) {
+  return (
+    <div className="flex gap-3 items-start animate-fadeIn">
+      <AssistantAvatar />
+      <div className="bg-zinc-100 dark:bg-zinc-800 rounded-2xl px-4 py-3 shadow-sm border border-zinc-200 dark:border-zinc-700">
+        <div className="flex items-center gap-2.5">
+          <span className="text-sm text-zinc-600 dark:text-zinc-300">{status}</span>
+          <span className="flex gap-1">
+            <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Connection status
 function ConnectionStatus({ phase, error }: { phase: string; error: string | null }) {
   if (phase === 'error') {
@@ -253,7 +272,7 @@ function isToolResultRole(role: string): boolean {
 }
 
 export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage, onInitialMessageSent, isOverLimit = false }: AutomnaChatProps) {
-  const { messages, isRunning, isConnected, loadingPhase, error, append, cancel } = useClawdbotRuntime({
+  const { messages, isRunning, isConnected, loadingPhase, error, toolStatus, append, cancel } = useClawdbotRuntime({
     gatewayUrl,
     authToken,
     sessionKey,
@@ -660,8 +679,13 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
               </div>
             ))}
 
-            {/* Typing indicator */}
-            {isRunning && (messages.length === 0 || messages[messages.length - 1]?.role !== 'assistant') && (
+            {/* Tool status indicator (shown during tool execution) */}
+            {toolStatus && (
+              <ToolStatusIndicator status={toolStatus} />
+            )}
+
+            {/* Typing indicator (shown when running but no text yet and no tool active) */}
+            {isRunning && !toolStatus && (messages.length === 0 || messages[messages.length - 1]?.role !== 'assistant') && (
               <TypingIndicator />
             )}
 

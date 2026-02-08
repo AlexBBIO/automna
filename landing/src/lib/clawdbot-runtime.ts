@@ -66,6 +66,91 @@ interface PendingRefetch {
   streamedText: string;
 }
 
+// ─── Tool Status ─────────────────────────────────────────────────────────────
+
+/** Map tool names to user-friendly status messages shown during execution */
+function getToolStatusMessage(toolName: string): string {
+  switch (toolName) {
+    // File operations
+    case 'Read':
+    case 'read':
+      return '📄 Reading a file…';
+    case 'Write':
+    case 'write':
+      return '✏️ Writing a file…';
+    case 'Edit':
+    case 'edit':
+      return '✏️ Editing a file…';
+
+    // Shell & code
+    case 'exec':
+      return '💻 Running a command…';
+
+    // Web
+    case 'web_search':
+      return '🔍 Searching the web…';
+    case 'web_fetch':
+      return '🌐 Fetching a page…';
+    case 'browser':
+      return '🌐 Browsing…';
+
+    // Communication
+    case 'message':
+      return '💬 Sending a message…';
+    case 'tts':
+      return '🔊 Generating audio…';
+    case 'voice_call':
+    case 'call':
+      return '📞 Making a phone call…';
+
+    // Email (agentmail via exec, but also possible as skill/tool)
+    case 'email':
+    case 'send_email':
+    case 'check_email':
+      return '📧 Checking email…';
+
+    // Media & analysis
+    case 'image':
+      return '🖼️ Analyzing an image…';
+
+    // Memory
+    case 'supermemory_search':
+      return '🧠 Searching memory…';
+    case 'supermemory_store':
+      return '🧠 Saving to memory…';
+    case 'supermemory_forget':
+      return '🧠 Updating memory…';
+    case 'supermemory_profile':
+      return '🧠 Loading profile…';
+
+    // Sub-agents & scheduling
+    case 'sessions_spawn':
+      return '🤖 Starting a sub-task…';
+    case 'sessions_send':
+      return '🤖 Messaging a sub-agent…';
+    case 'cron':
+      return '⏰ Managing a scheduled task…';
+
+    // Calendar & productivity
+    case 'calendar':
+    case 'gcal':
+      return '📅 Checking calendar…';
+
+    // Nodes & devices
+    case 'nodes':
+      return '📱 Communicating with device…';
+    case 'canvas':
+      return '🎨 Rendering canvas…';
+
+    // Gateway & config
+    case 'gateway':
+      return '⚙️ Updating configuration…';
+
+    default:
+      return '⚙️ Working on it…';
+  }
+}
+
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
 const genId = () => crypto.randomUUID();
@@ -254,6 +339,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
   const [isConnected, setIsConnected] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('connecting');
   const [error, setError] = useState<string | null>(null);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
 
   // Refs for mutable state that doesn't trigger re-renders
   const wsRef = useRef<WebSocket | null>(null);
@@ -560,6 +646,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     // Final: message complete
     if (state === 'final') {
       clearRecoveryTimer();
+      setToolStatus(null);
       const streamedText = streamingTextRef.current;
       streamingTextRef.current = '';
       streamingMediaRef.current = [];
@@ -627,6 +714,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     // Error state
     if (state === 'error') {
       clearRecoveryTimer();
+      setToolStatus(null);
       activeRunIdRef.current = null;
       streamingTextRef.current = '';
       streamingMediaRef.current = [];
@@ -672,6 +760,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       const mediaUrls = data.mediaUrls as string[] | undefined;
 
       if (typeof delta === 'string' && delta) {
+        // Clear tool status as soon as text starts flowing again
+        setToolStatus(null);
+
         deltaCountRef.current++;
         startRecoveryTimer();
 
@@ -712,14 +803,18 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       return;
     }
 
-    // ── Tool events: split bubbles at tool boundaries ──
+    // ── Tool events: split bubbles at tool boundaries + show status indicator ──
     // Requires verboseDefault: "on" in OpenClaw config (otherwise gateway filters these out)
     if (stream === 'tool') {
       startRecoveryTimer();
       const phase = (data?.phase as string) || '';
+      const toolName = (data?.name as string) || '';
 
       // Only split on tool start (not update/result) to avoid multiple splits per tool call
       if (phase === 'start') {
+        // Show tool status indicator
+        setToolStatus(getToolStatusMessage(toolName));
+
         const currentText = streamingTextRef.current;
         if (currentText) {
           const currentRunId = activeRunIdRef.current;
@@ -729,7 +824,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
             : 'streaming';
           const permanentId = genId();
 
-          log('🔧 Tool boundary, finalizing bubble', { turn, tool: data?.name, textLen: currentText.length });
+          log('🔧 Tool boundary, finalizing bubble', { turn, tool: toolName, textLen: currentText.length });
 
           // Give current bubble a permanent ID (no longer "streaming")
           setMessages((prev) => {
@@ -749,7 +844,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         }
       }
 
-      log('🔧 Tool:', phase, data?.name || '');
+      // Clear status when tool finishes
+      if (phase === 'end') {
+        setToolStatus(null);
+      }
+
+      log('🔧 Tool:', phase, toolName);
       return;
     }
 
@@ -1108,5 +1208,5 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     setMessages([]);
   }, []);
 
-  return { messages, isRunning, isConnected, loadingPhase, error, append, cancel, clearHistory };
+  return { messages, isRunning, isConnected, loadingPhase, error, toolStatus, append, cancel, clearHistory };
 }
