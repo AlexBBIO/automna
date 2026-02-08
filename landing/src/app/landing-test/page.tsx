@@ -252,7 +252,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg font-medium transition-all"
               >
-                Delegate a task
+                Get work done
               </Link>
             )}
           </div>
@@ -269,7 +269,7 @@ export default function LandingTest() {
           href="/sign-up"
           className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white text-center rounded-lg font-medium transition-all"
         >
-          Delegate a task
+          Get work done
         </Link>
       </div>
 
@@ -328,7 +328,7 @@ export default function LandingTest() {
                   href="/sign-up"
                   className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-purple-200 dark:shadow-purple-500/25 hover:shadow-purple-300 dark:hover:shadow-purple-500/40 text-base whitespace-nowrap text-center"
                 >
-                  Delegate a task
+                  Get work done
                 </Link>
               </div>
 
@@ -581,7 +581,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all text-center"
               >
-                Delegate a task
+                Get work done
               </Link>
 
             </div>
@@ -623,7 +623,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all text-center"
               >
-                Delegate a task
+                Get work done
               </Link>
 
             </div>
@@ -674,7 +674,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all text-center"
               >
-                Delegate a task
+                Get work done
               </Link>
             </div>
           </div>
@@ -748,7 +748,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all text-center"
               >
-                Delegate a task
+                Get work done
               </Link>
 
             </div>
@@ -1082,7 +1082,7 @@ export default function LandingTest() {
               Ready to delegate?
             </h2>
             <p className="text-zinc-500 dark:text-zinc-400 text-lg mb-8">
-              Delegate a task in minutes. Keep control with approvals.
+              Get work done in minutes. Keep control with approvals.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -1090,7 +1090,7 @@ export default function LandingTest() {
                 href="/sign-up"
                 className="px-8 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-purple-200 dark:shadow-purple-500/25"
               >
-                Delegate your first task
+                Get work done
               </Link>
 
             </div>
