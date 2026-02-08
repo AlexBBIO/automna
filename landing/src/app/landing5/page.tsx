@@ -214,7 +214,7 @@ export default function Home() {
       </div>
     );
 
-    const logLines = compact ? tab.logLines.slice(-3) : tab.logLines;
+    const logLines = compact ? tab.logLines.slice(-2) : tab.logLines.slice(-3);
 
     return (
       <div className={`bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 ${compact ? 'p-3' : 'p-4 md:p-5'} shadow-lg h-full flex flex-col`}>
@@ -411,7 +411,7 @@ export default function Home() {
             </div>
 
             {/* Right column - Hero chat (desktop only) */}
-            <div className="hidden md:block max-h-[480px] overflow-hidden rounded-2xl">
+            <div className="hidden md:block">
               <TerminalMock tab={demoTabs[0]} />
             </div>
           </div>
