@@ -14,7 +14,7 @@
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { machines, machineEvents } from "@/lib/db/schema";
+import { machines, machineEvents, phoneNumbers } from "@/lib/db/schema";
 import Stripe from "stripe";
 import { sendMachineReady } from "@/lib/email";
 
@@ -787,10 +787,18 @@ export async function POST() {
     console.log(`[provision] Successfully created ${appName} with machine ${machine.id}`);
 
     // Send machine ready email (non-blocking)
+    // Include phone number if already provisioned (Pro/Business plans get it from Stripe webhook)
     const userEmail = user.emailAddresses?.[0]?.emailAddress;
     if (userEmail && agentmailInboxId) {
-      sendMachineReady(userEmail, agentmailInboxId, user.firstName || undefined)
-        .catch((err) => console.error("[provision] Failed to send machine ready email:", err));
+      const userPhone = await db.query.phoneNumbers.findFirst({
+        where: eq(phoneNumbers.userId, userId),
+      });
+      sendMachineReady(
+        userEmail,
+        agentmailInboxId,
+        user.firstName || undefined,
+        userPhone?.phoneNumber || null
+      ).catch((err) => console.error("[provision] Failed to send machine ready email:", err));
     }
 
     return NextResponse.json({

@@ -104,19 +104,49 @@ export async function sendSubscriptionStarted(
 export async function sendMachineReady(
   email: string,
   agentEmail: string,
-  firstName?: string
+  firstName?: string,
+  phoneNumber?: string | null
 ) {
   const name = firstName || 'there';
+  
+  // Format phone for display: +17254339890 → (725) 433-9890
+  const formatPhone = (phone: string) => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('1')) {
+      const area = digits.slice(1, 4);
+      const prefix = digits.slice(4, 7);
+      const line = digits.slice(7);
+      return `(${area}) ${prefix}-${line}`;
+    }
+    return phone;
+  };
+
+  const phoneSection = phoneNumber ? `
+        <div style="background: #f8f8f8; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 0 0 8px; font-weight: 600;">📞 Your agent's phone number</p>
+          <p style="margin: 0 0 12px; font-size: 20px; font-weight: 700;">${formatPhone(phoneNumber)}</p>
+          <p style="margin: 0 0 8px; color: #444; font-size: 14px;">Your agent can make and receive real phone calls. Try calling it right now — it'll pick up and talk to you.</p>
+          <p style="margin: 0 0 12px; color: #444; font-size: 14px;">Save this number to your contacts so you always have your AI on speed dial.</p>
+          <a href="https://automna.ai/api/user/vcard" style="display: inline-block; background: #000; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px;">Add to Contacts</a>
+        </div>
+        <p style="color: #444; font-size: 14px;">💡 <strong>Tip:</strong> Tell your agent how you want it to handle calls — its name, personality, what to say when someone calls. Just chat with it in the dashboard.</p>
+  ` : '';
+
   return sendEmail({
     to: email,
-    subject: 'Your AI agent is ready',
+    subject: phoneNumber ? 'Your AI agent is ready — with its own phone number' : 'Your AI agent is ready',
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a;">
         <h2 style="margin: 0 0 16px;">Your AI agent is ready</h2>
         <p>Hi ${name},</p>
-        <p>Your Automna agent is set up and ready to go.</p>
-        <p><strong>Your agent's email:</strong> ${agentEmail}</p>
-        <p>Your agent can receive emails at this address and act on them.</p>
+        <p>Your Automna agent is set up and ready to work for you.</p>
+        
+        <div style="background: #f8f8f8; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 0 0 8px; font-weight: 600;">✉️ Your agent's email</p>
+          <p style="margin: 0 0 4px; font-size: 16px; font-weight: 700;">${agentEmail}</p>
+          <p style="margin: 0; color: #444; font-size: 14px;">Your agent can send and receive emails. Forward things to this address and your agent will handle them.</p>
+        </div>
+        ${phoneSection}
         <a href="https://automna.ai/dashboard" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 16px 0;">Start Chatting</a>
         <p style="color: #666; font-size: 14px; margin-top: 32px;">— Automna</p>
       </div>
