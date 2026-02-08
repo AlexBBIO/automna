@@ -359,47 +359,23 @@ export default function DashboardPage() {
     }
   };
 
-  // Wait for gateway to be ready
   /**
-   * Test if a WebSocket can actually connect to the gateway.
-   * Returns true if connection opens successfully within timeout.
+   * Wait for a freshly provisioned gateway to be ready.
+   * Only used for NEW provisions — existing users skip this entirely.
+   * Polls HTTP health until the OpenClaw gateway is responding.
+   * Returns true if ready, false if timed out (caller should show error).
    */
-  const testWebSocketConnection = (wsUrl: string, timeoutMs = 8000): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        ws.close();
-        console.log('[warmup] WebSocket test timed out');
-        resolve(false);
-      }, timeoutMs);
-      
-      const ws = new WebSocket(wsUrl);
-      ws.onopen = () => {
-        clearTimeout(timer);
-        ws.close();
-        console.log('[warmup] WebSocket test connected successfully');
-        resolve(true);
-      };
-      ws.onerror = () => {
-        clearTimeout(timer);
-        ws.close();
-        console.log('[warmup] WebSocket test failed');
-        resolve(false);
-      };
-    });
-  };
-
-  const waitForGatewayReady = async (wsUrl?: string): Promise<boolean> => {
+  const waitForNewProvisionReady = async (): Promise<boolean> => {
     if (prewarmStarted.current) return true;
     prewarmStarted.current = true;
     
-    const MAX_WAIT_MS = 90000; // Extended to 90s for fresh provisions
-    const POLL_INTERVAL_MS = 1500;
-    const CONSECUTIVE_SUCCESS_NEEDED = 2; // Require 2 successful checks in a row
-    console.log('[warmup] Waiting for gateway to be ready...');
+    const MAX_WAIT_MS = 120000; // 2 minutes for fresh provisions
+    const POLL_INTERVAL_MS = 2000;
+    const CONSECUTIVE_SUCCESS_NEEDED = 2;
+    console.log('[warmup] Waiting for freshly provisioned gateway...');
     const startTime = Date.now();
     let consecutiveSuccesses = 0;
     
-    // Phase 1: Wait for HTTP health endpoint
     while (Date.now() - startTime < MAX_WAIT_MS) {
       try {
         const response = await fetch('/api/user/health', {
@@ -414,43 +390,23 @@ export default function DashboardPage() {
           console.log(`[warmup] Health check passed (${consecutiveSuccesses}/${CONSECUTIVE_SUCCESS_NEEDED})`);
           
           if (consecutiveSuccesses >= CONSECUTIVE_SUCCESS_NEEDED) {
-            console.log('[warmup] HTTP health checks passed, testing WebSocket...');
-            break;
+            console.log('[warmup] Gateway is ready!');
+            return true;
           }
         } else {
-          consecutiveSuccesses = 0; // Reset on failure
+          consecutiveSuccesses = 0;
           console.log(`[warmup] Gateway not ready yet: ${data.error || 'unknown'}`);
         }
       } catch (err) {
-        consecutiveSuccesses = 0; // Reset on error
+        consecutiveSuccesses = 0;
         console.log(`[warmup] Health check failed: ${err instanceof Error ? err.message : 'error'}`);
       }
       
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
     }
     
-    if (Date.now() - startTime >= MAX_WAIT_MS) {
-      console.warn('[warmup] HTTP health timeout after 90s - proceeding anyway');
-      return false;
-    }
-    
-    // Phase 2: Verify WebSocket actually connects
-    // HTTP API can be up before WebSocket handler is ready
-    if (wsUrl) {
-      const WS_MAX_RETRIES = 5;
-      for (let i = 0; i < WS_MAX_RETRIES; i++) {
-        const wsOk = await testWebSocketConnection(wsUrl);
-        if (wsOk) {
-          console.log('[warmup] Gateway is fully ready (HTTP + WebSocket)!');
-          return true;
-        }
-        console.log(`[warmup] WebSocket not ready yet, retry ${i + 1}/${WS_MAX_RETRIES}...`);
-        await new Promise(r => setTimeout(r, 2000));
-      }
-      console.warn('[warmup] WebSocket failed after retries, proceeding anyway');
-    }
-    
-    return true;
+    console.error('[warmup] Gateway failed to become ready after 2 minutes');
+    return false;
   };
 
   // Handle checkout for inline subscription card
@@ -515,12 +471,9 @@ export default function DashboardPage() {
           // If they DO have a gateway URL already, proceed normally
           // (subscription might have been set up before we tracked status)
           if (gatewayCheckData.gatewayUrl) {
+            // Existing user with a running machine — go straight to chat
+            console.log('[dashboard] Existing user, skipping warmup');
             setGatewayInfo(gatewayCheckData);
-            setLoadPhase('warming');
-            const isReady = await waitForGatewayReady(gatewayCheckData.gatewayUrl);
-            if (!isReady) {
-              console.warn('[dashboard] Gateway warmup timed out but proceeding anyway');
-            }
             setLoadPhase('ready');
             return;
           }
@@ -572,19 +525,17 @@ export default function DashboardPage() {
         if (gatewayData.gatewayUrl) {
           setGatewayInfo(gatewayData);
           
+          // Only poll health for fresh provisions (machine just created)
+          // Existing users already passed the gatewayUrl check above
           setLoadPhase('warming');
-          const warmupStart = Date.now();
-          const isReady = await waitForGatewayReady(gatewayData.gatewayUrl);
+          const isReady = await waitForNewProvisionReady();
           
           if (!isReady) {
-            console.warn('[dashboard] Gateway warmup timed out but proceeding anyway');
-          }
-          
-          // Ensure warmup phase shows for at least 3s so the UI doesn't flash
-          const warmupElapsed = Date.now() - warmupStart;
-          const MIN_WARMUP_MS = 3000;
-          if (warmupElapsed < MIN_WARMUP_MS) {
-            await new Promise(r => setTimeout(r, MIN_WARMUP_MS - warmupElapsed));
+            // Don't proceed — show an error so the user can retry
+            console.error('[dashboard] Fresh provision failed to become ready');
+            setLoadError('Your agent is taking longer than expected to start. Please try refreshing the page.');
+            setLoadPhase('error');
+            return;
           }
           
           setLoadPhase('ready');
@@ -799,7 +750,7 @@ export default function DashboardPage() {
       'syncing': 'connecting',
       'fetching-gateway': 'connecting',
       'provisioning': 'provisioning',
-      'warming': 'provisioning', // Keep tips + timer visible until fully ready
+      'warming': 'warming',
     };
     
     const skeletonPhase = skeletonPhaseMap[loadPhase] || 'connecting';

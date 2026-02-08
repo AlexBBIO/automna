@@ -41,7 +41,7 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
 
   // Cycle through provisioning steps
   useEffect(() => {
-    if (phase !== 'provisioning') {
+    if (phase !== 'provisioning' && phase !== 'warming') {
       setProvisionStep(0);
       return;
     }
@@ -67,7 +67,7 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
 
   // Smooth animated progress during provisioning
   useEffect(() => {
-    if (phase !== 'provisioning') {
+    if (phase !== 'provisioning' && phase !== 'warming') {
       setAnimatedProgress(0);
       return;
     }
@@ -94,9 +94,9 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
     return () => cancelAnimationFrame(animationId);
   }, [phase]);
 
-  // Elapsed time counter during provisioning
+  // Elapsed time counter during provisioning/warming
   useEffect(() => {
-    if (phase !== 'provisioning') {
+    if (phase !== 'provisioning' && phase !== 'warming') {
       setElapsedSeconds(0);
       return;
     }
@@ -108,9 +108,9 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
     return () => clearInterval(interval);
   }, [phase]);
 
-  // Cycle through tips during provisioning
+  // Cycle through tips during provisioning/warming
   useEffect(() => {
-    if (phase !== 'provisioning') {
+    if (phase !== 'provisioning' && phase !== 'warming') {
       setCurrentTip(0);
       return;
     }
@@ -125,7 +125,7 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
   const phases = {
     connecting: { progress: 25, text: 'Connecting to your agent...' },
     provisioning: { progress: animatedProgress, text: provisioningSteps[provisionStep].text },
-    warming: { progress: 85, text: 'Starting your agent...' },
+    warming: { progress: 90, text: 'Almost ready...' },
     'loading-history': { progress: 95, text: 'Loading conversation...' },
     ready: { progress: 100, text: 'Ready!' },
   };
@@ -136,8 +136,8 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
     <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 transition-colors">
       {/* Content area */}
       <div className="flex-1 p-4 overflow-hidden flex flex-col">
-        {/* Tip card during provisioning */}
-        {phase === 'provisioning' && (
+        {/* Tip card during provisioning and warming */}
+        {(phase === 'provisioning' || phase === 'warming') && (
           <div className="flex-1 flex items-center justify-center">
             <div className="max-w-sm w-full">
               <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl p-6 shadow-lg transition-all duration-300">
@@ -171,8 +171,8 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
           </div>
         )}
 
-        {/* Skeleton messages for non-provisioning phases */}
-        {phase !== 'provisioning' && (
+        {/* Skeleton messages for non-provisioning/warming phases */}
+        {phase !== 'provisioning' && phase !== 'warming' && (
           <div className="space-y-4">
             {/* User message skeleton */}
             <div className="flex justify-end">
@@ -229,7 +229,7 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
             </div>
             
             {/* Provisioning timer and estimate */}
-            {phase === 'provisioning' && (
+            {(phase === 'provisioning' || phase === 'warming') && (
               <div className="flex items-center gap-3 text-xs text-zinc-400 dark:text-zinc-500">
                 <span>This usually takes about 2 minutes</span>
                 <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
