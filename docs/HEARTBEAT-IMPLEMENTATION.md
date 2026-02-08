@@ -1,67 +1,88 @@
-# Heartbeat Implementation Plan
+# Heartbeat Implementation
 
-**Status:** ✅ Implemented  
+**Status:** ✅ Production  
 **Created:** 2026-02-03  
-**Goal:** Enable periodic agent check-ins for email monitoring and proactive awareness
+**Updated:** 2026-02-08  
+**Goal:** Enable periodic agent check-ins with Notifications channel for email monitoring and proactive awareness
 
 ---
 
 ## Overview
 
-Add heartbeat functionality to Automna user agents so they can:
-1. Periodically check email inbox for new messages
-2. Build awareness of user context between conversations
-3. Mention relevant updates when user next chats
-
-This leverages OpenClaw's built-in heartbeat system rather than custom polling code.
+Agents check in every 30 minutes during active hours (8am-11pm user timezone). Findings are routed to a **Notifications** conversation that appears in the user's sidebar.
 
 ---
 
-## Implementation (Completed 2026-02-03)
+## Architecture
 
-Heartbeat is now built into the Docker image. No provisioning changes needed.
+```
+Every 30 min (8am-11pm)
+    → Gateway sends heartbeat poll to agent
+    → Agent reads HEARTBEAT.md for instructions
+    → Agent checks email via Agentmail
+    → If new items: sends summary to "Notifications" conversation
+    → If nothing new: replies HEARTBEAT_OK
+    → Updates heartbeat-state.json
+```
 
-### Docker Image Updates
+### Notifications Channel
 
-**Files added to `/app/default-workspace/`:**
-- `HEARTBEAT.md` - Instructions for heartbeat tasks
-- `heartbeat-state.json` - State tracking file
+Instead of silently building awareness, agents now post findings to a dedicated **Notifications** conversation using:
+```
+sessions_send(label: "notifications", message: "📧 2 new emails: ...")
+```
 
-**Config in `entrypoint.sh`:**
+This creates a separate conversation in the user's sidebar where all periodic findings accumulate. The user can check it at their leisure.
+
+---
+
+## Config (in entrypoint.sh)
+
+Heartbeat is configured in `clawdbot.json`, written by the entrypoint on every boot:
+
 ```json
 {
-  "heartbeat": {
-    "enabled": true,
-    "intervalMs": 1800000,
-    "prompt": "Read HEARTBEAT.md and follow instructions. If nothing needs attention, reply HEARTBEAT_OK."
+  "agents": {
+    "defaults": {
+      "heartbeat": {
+        "every": "30m",
+        "activeHours": {
+          "start": "08:00",
+          "end": "23:00"
+        },
+        "target": "last"
+      }
+    }
   }
 }
 ```
 
-### How It Works
+### Workspace Files
 
-1. On first boot, Docker image copies default workspace files
-2. Config file is created with heartbeat enabled
-3. Every 30 min, gateway sends heartbeat poll to agent
-4. Agent checks HEARTBEAT.md, checks email, updates state
-5. Agent replies HEARTBEAT_OK or surfaces alerts
+- `HEARTBEAT.md` — Agent instructions (check email, post to Notifications)
+- `heartbeat-state.json` — State tracking (last check timestamps, counts)
 
-### Existing Users
+Both are in `/app/default-workspace/` in the Docker image and copied on first init.
 
-Existing users need their machines updated to get heartbeat:
+### Workspace Version
 
-**Option A: Delete and re-provision**
-- User logs out, we delete their machine, they log back in
-- Gets fresh image with all features
+Current workspace version: **6** (includes Notifications channel instructions).
 
-**Option B: Update machine image in-place**
+Migration v5→v6 patches existing users' HEARTBEAT.md on next boot.
+
+---
+
+## Existing Users
+
+Machine image update applies both config and workspace changes:
+
 ```bash
 fly machines update <machine-id> -a automna-u-xxx \
   --image registry.fly.io/automna-openclaw-image:latest --yes
 ```
 
-**Option C: Manual config**
-- User asks their agent to add heartbeat config via gateway tool
+- Config: Overwritten on every boot (heartbeat section included automatically)
+- HEARTBEAT.md: Patched by workspace migration v5→v6
 
 ---
 
@@ -74,58 +95,17 @@ Per heartbeat cycle (assuming email check):
 - State update: ~200 tokens
 - **Total: ~1,200 tokens per heartbeat**
 
-Per user per day (48 heartbeats at 30min intervals):
-- **~57,600 tokens/day** (~$0.17/day at Claude Sonnet rates)
-
-**Mitigation options:**
-- Increase interval to 1 hour (24 heartbeats, ~$0.09/day)
-- Use cheaper model for heartbeats (e.g., Haiku)
-- Make heartbeats opt-in rather than default
+Per user per day (30 heartbeats at 30min intervals, 8am-11pm):
+- **~36,000 tokens/day** (~$0.11/day at Claude Sonnet rates)
 
 ---
 
-## Testing Plan
+## Rollout History
 
-1. **Local test:** Enable heartbeat on a test OpenClaw instance
-2. **Verify cycle:** Confirm heartbeat fires at correct interval
-3. **Email check:** Verify agent can list emails during heartbeat
-4. **State persistence:** Confirm heartbeat-state.json updates correctly
-5. **User experience:** Test that agent mentions new emails in next chat
-
----
-
-## Rollout Plan
-
-1. **Phase 1:** Implement for new users only (default enabled)
-2. **Phase 2:** Create migration for existing users (opt-in)
-3. **Phase 3:** Monitor token usage and adjust interval if needed
-
----
-
-## Decisions (2026-02-03)
-
-1. **Interval:** 30 minutes ✓
-2. **Default state:** Enabled by default ✓
-3. **Model:** Opus 4.5 (same as default) ✓
-4. **Scope:** Email for now, expand later
-
----
-
-## Files to Modify
-
-| File | Change |
+| Date | Change |
 |------|--------|
-| `landing/src/app/api/user/provision/route.ts` | Add heartbeat config + workspace files |
-| `landing/src/lib/templates/config.yaml` | Add heartbeat section (if using template) |
-| `landing/src/lib/templates/HEARTBEAT.md` | Create template |
-| `landing/src/lib/templates/heartbeat-state.json` | Create template |
-| `docs/MVP-STEPS.md` | Document heartbeat feature |
-| `SPEC.md` | Update with heartbeat architecture |
-
----
-
-## Dependencies
-
-- OpenClaw heartbeat feature must be working (it is, we use it ourselves)
-- Agentmail integration must be complete (it is)
-- User must have email address assigned (they do, during provisioning)
+| 2026-02-03 | Initial HEARTBEAT.md + heartbeat-state.json added to Docker image |
+| 2026-02-08 | Heartbeat config added to clawdbot.json (was missing) |
+| 2026-02-08 | Notifications channel: agents post to "Notifications" conversation |
+| 2026-02-08 | Workspace migration v5→v6 for existing users |
+| 2026-02-08 | First rollout: grandathrawn@gmail.com (automna-u-1llgzf6t2spw) |

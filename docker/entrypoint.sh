@@ -106,7 +106,7 @@ if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initializ
     echo "[automna] Initializing workspace with defaults..."
     cp -rn /app/default-workspace/* "$OPENCLAW_DIR/workspace/" 2>/dev/null || true
     touch "$OPENCLAW_DIR/workspace/.initialized"
-    echo "4" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "6" > "$OPENCLAW_DIR/workspace/.workspace-version"
     echo "[automna] Workspace initialized"
 fi
 
