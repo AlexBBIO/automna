@@ -41,6 +41,11 @@ COPY file-server.cjs /app/file-server.cjs
 # We change it to: const BRAVE_SEARCH_ENDPOINT = process.env.BRAVE_API_URL ? `${process.env.BRAVE_API_URL}/res/v1/web/search` : "https://api.search.brave.com/res/v1/web/search";
 RUN sed -i 's|const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";|const BRAVE_SEARCH_ENDPOINT = process.env.BRAVE_API_URL ? `${process.env.BRAVE_API_URL}/res/v1/web/search` : "https://api.search.brave.com/res/v1/web/search";|g' /app/dist/agents/tools/web-search.js
 
+# Patch OpenClaw cron session to reuse existing sessionId (prevents transcript overwrite)
+# Without this, every hooks/agent call creates a new transcript file and orphans the old one,
+# making it look like chat history was "overwritten" when navigating back to the session.
+RUN sed -i 's/const sessionId = crypto.randomUUID();/const sessionId = entry?.sessionId || crypto.randomUUID();/' /app/dist/cron/isolated-agent/session.js
+
 # Copy default workspace files
 COPY workspace/ /app/default-workspace/
 
