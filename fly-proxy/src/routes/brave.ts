@@ -10,14 +10,16 @@ const REQUEST_TIMEOUT = 30_000;
 const app = new Hono();
 
 app.all("/*", async (c) => {
-  const token = extractToken(c);
+  const token = extractToken(c, "X-Subscription-Token");
   if (!token) return c.json({ error: "Missing authentication" }, 401);
   const auth = await lookupGatewayToken(token);
   if (!auth) return c.json({ error: "Invalid gateway token" }, 401);
 
-  const path = c.req.path;
+  // Strip the mount prefix (/api/brave) from the full request path
+  const fullPath = c.req.path;
+  const subPath = fullPath.replace(/^\/api\/brave/, "") || "/";
   const query = new URL(c.req.url).search;
-  const url = `${BRAVE_BASE_URL}${path}${query}`;
+  const url = `${BRAVE_BASE_URL}${subPath}${query}`;
 
   const headers = new Headers();
   headers.set("Accept", "application/json");
@@ -33,7 +35,7 @@ app.all("/*", async (c) => {
     logUsageEventBackground({
       userId: auth.userId, eventType: 'search',
       costMicrodollars: response.ok ? BRAVE_SEARCH_COST_MICRODOLLARS : 0,
-      metadata: { provider: 'brave', path, query: new URL(c.req.url).searchParams.get('q') ?? '' },
+      metadata: { provider: 'brave', path: subPath, query: new URL(c.req.url).searchParams.get('q') ?? '' },
       error: response.ok ? undefined : `upstream_${response.status}`,
     });
 

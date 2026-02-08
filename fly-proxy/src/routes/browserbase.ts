@@ -15,8 +15,8 @@ app.all("/*", async (c) => {
   const auth = await lookupGatewayToken(token);
   if (!auth) return c.json({ error: "Invalid gateway token" }, 401);
 
-  const path = c.req.path;
-  const url = `${BROWSERBASE_BASE_URL}${path}`;
+  const subPath = c.req.path.replace(/^\/api\/browserbase\/v1/, "") || "/";
+  const url = `${BROWSERBASE_BASE_URL}${subPath}`;
 
   const headers = new Headers();
   headers.set("Content-Type", c.req.header("Content-Type") || "application/json");
@@ -32,7 +32,7 @@ app.all("/*", async (c) => {
     clearTimeout(timeout);
 
     // Track session creation costs
-    if (method === "POST" && path.includes("/sessions") && response.ok) {
+    if (method === "POST" && subPath.includes("/sessions") && response.ok) {
       logUsageEventBackground({
         userId: auth.userId, eventType: 'browser',
         costMicrodollars: BROWSERBASE_SESSION_COST_MICRODOLLARS,

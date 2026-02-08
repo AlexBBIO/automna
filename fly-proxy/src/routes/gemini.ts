@@ -17,8 +17,8 @@ app.all("/*", async (c) => {
   const auth = await lookupGatewayToken(token);
   if (!auth) return c.json({ error: "Invalid gateway token" }, 401);
 
-  const path = c.req.path;
-  let url = `${GEMINI_BASE_URL}${path}`;
+  const subPath = c.req.path.replace(/^\/api\/gemini/, "") || "/";
+  let url = `${GEMINI_BASE_URL}${subPath}`;
   const rawQuery = new URL(c.req.url).searchParams;
   rawQuery.delete("key"); // remove user's "key" param
   rawQuery.set("key", GEMINI_API_KEY);
@@ -39,7 +39,7 @@ app.all("/*", async (c) => {
     logUsageEventBackground({
       userId: auth.userId, eventType: 'llm',
       costMicrodollars: response.ok ? GEMINI_COST_PER_REQUEST : 0,
-      metadata: { provider: 'gemini', path, status: response.status },
+      metadata: { provider: 'gemini', path: subPath, status: response.status },
       error: response.ok ? undefined : `upstream_${response.status}`,
     });
 
