@@ -101,6 +101,46 @@ mkdir -p "$OPENCLAW_DIR/workspace"
 mkdir -p "$OPENCLAW_DIR/workspace/memory"
 mkdir -p "$OPENCLAW_DIR/workspace/uploads"
 
+# Persist tool auth across restarts
+# These dirs live on the ephemeral root FS by default, so they get wiped on restart.
+# Symlinking them to the persistent volume means gh auth, git config, SSH keys, etc. survive.
+# Note: using POSIX sh (not bash), so no arrays or <<<.
+
+persist_link() {
+    vol_path="$1"
+    sys_path="$2"
+    mkdir -p "$vol_path"
+    # Remove existing dir/file if it's not already our symlink
+    if [ -e "$sys_path" ] && [ ! -L "$sys_path" ]; then
+        cp -rn "$sys_path/"* "$vol_path/" 2>/dev/null || true
+        rm -rf "$sys_path"
+    fi
+    mkdir -p "$(dirname "$sys_path")"
+    ln -sf "$vol_path" "$sys_path"
+}
+
+persist_link "$OPENCLAW_DIR/config/gh"  "/home/node/.config/gh"
+persist_link "$OPENCLAW_DIR/config/ssh" "/home/node/.ssh"
+persist_link "$OPENCLAW_DIR/config/npm" "/home/node/.config/npm"
+
+# Special case: .gitconfig is a file, not a dir
+mkdir -p "$OPENCLAW_DIR/config/git"
+if [ ! -f "$OPENCLAW_DIR/config/git/.gitconfig" ]; then
+    # Copy existing .gitconfig to volume if present
+    if [ -f /home/node/.gitconfig ] && [ ! -L /home/node/.gitconfig ]; then
+        cp /home/node/.gitconfig "$OPENCLAW_DIR/config/git/.gitconfig"
+    else
+        touch "$OPENCLAW_DIR/config/git/.gitconfig"
+    fi
+fi
+ln -sf "$OPENCLAW_DIR/config/git/.gitconfig" /home/node/.gitconfig
+
+# Fix SSH permissions (required by ssh client)
+chmod 700 "$OPENCLAW_DIR/config/ssh" 2>/dev/null || true
+chmod 600 "$OPENCLAW_DIR/config/ssh/"* 2>/dev/null || true
+
+echo "[automna] Tool auth persistence configured (gh, git, ssh, npm)"
+
 # Copy default workspace files on first run
 if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initialized" ]; then
     echo "[automna] Initializing workspace with defaults..."
