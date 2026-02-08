@@ -118,7 +118,7 @@ Make and receive phone calls through your dedicated phone number.
 
 **Make an outbound call:**
 ```bash
-curl -s -X POST "https://automna.ai/api/user/call" \
+curl -s -X POST "https://automna-proxy.fly.dev/api/user/call" \
   -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -156,7 +156,7 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 
 **If you need to manually check a call status (rare):**
 ```bash
-curl -s "https://automna.ai/api/user/call/status?call_id=<CALL_ID>" \
+curl -s "https://automna-proxy.fly.dev/api/user/call/status?call_id=<CALL_ID>" \
   -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" | jq '{completed, status, summary, duration_seconds}'
 ```
 
@@ -168,7 +168,7 @@ curl -s "https://automna.ai/api/user/call/status?call_id=<CALL_ID>" \
 
 **Check usage:**
 ```bash
-curl -s "https://automna.ai/api/user/call/usage" \
+curl -s "https://automna-proxy.fly.dev/api/user/call/usage" \
   -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
 ```
 

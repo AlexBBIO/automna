@@ -58,13 +58,13 @@ User Machine (Fly, sjc)       automna-proxy (Fly, sjc)     External APIs
 | Email (send) | `/api/user/email/send` | `api.agentmail.to` | ✅ Production |
 | Email (inbox) | `/api/user/email/inbox` | `api.agentmail.to` | ✅ Production |
 | Email (message) | `/api/user/email/inbox/:id` | `api.agentmail.to` | ✅ Production |
+| Voice call (initiate) | `/api/user/call` | `api.bland.ai` | ✅ Production |
+| Voice call (status) | `/api/user/call/status` | Turso DB | ✅ Production |
+| Voice call (usage) | `/api/user/call/usage` | Turso DB | ✅ Production |
+| Bland webhook | `/api/webhooks/bland/status` | (inbound) | ✅ Production |
 
 ### Not on Fly Proxy (stays on Vercel)
 
-- **Voice call initiate** (`POST /api/user/call`) — stays on Vercel for Clerk auth support
-- **Voice call status** (`GET /api/user/call/status`) — stays on Vercel
-- **Voice call usage** (`GET /api/user/call/usage`) — stays on Vercel
-- **Bland webhook** (`POST /api/webhooks/bland/status`) — needs stable public URL
 - **All dashboard/admin routes** — Clerk auth, user management, provisioning
 - **File API** (`/api/files/*`) — file uploads/downloads
 - **WebSocket proxy** (`/api/ws/*`)

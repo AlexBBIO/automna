@@ -28,11 +28,11 @@ The webhook calls `/api/v1/exec` to write transcript files to the user's machine
 2. Dashboard has a direct WebSocket to the Fly machine: `wss://<app>.fly.dev/ws?token=<token>&clientId=webchat`
 3. Browser sends `chat.send` with `sessionKey: "agent:main:research"` directly to the Fly machine
 4. OpenClaw runs the agent in session `agent:main:research`
-5. Agent executes `curl -X POST https://automna.ai/api/user/call` with the gateway token
+5. Agent executes `curl -X POST https://automna-proxy.fly.dev/api/user/call` with the gateway token
 6. `/api/user/call` (Vercel) authenticates via gateway token, calls Bland API, stores a `callUsage` record in Turso
 
 **Call Completion Flow (the bug):**
-7. Call completes. Bland sends webhook to `https://automna.ai/api/webhooks/bland/status`
+7. Call completes. Bland sends webhook to `https://automna-proxy.fly.dev/api/webhooks/bland/status`
 8. Webhook handler updates `callUsage` record with transcript, summary, duration, cost
 9. Webhook sends notification via `POST https://<app>.fly.dev/hooks/agent` **without sessionKey**
 10. OpenClaw's `normalizeAgentPayload()` generates `hook:<uuid>` as the session key

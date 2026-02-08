@@ -18,7 +18,7 @@ Add voice calling capabilities to Automna agents via Twilio + Bland.ai integrati
 User's OpenClaw Agent
         │
         ▼ call_phone tool
-automna.ai/api/user/call
+automna-proxy.fly.dev/api/user/call
         │ (validate gateway token, check limits, log)
         ▼
 Bland.ai API (POST /v1/calls)
@@ -27,7 +27,7 @@ Bland.ai API (POST /v1/calls)
 Phone Network → Recipient
         │
         ▼ (call ends)
-Bland webhook → automna.ai/api/webhooks/bland/status
+Bland webhook → automna-proxy.fly.dev/api/webhooks/bland/status
         │
         ▼ (parallel)
    ┌────┴────┐
@@ -51,7 +51,7 @@ Bland.ai handles call
 AI Conversation
              │
              ▼ (call ends)
-Bland webhook → automna.ai/api/webhooks/bland/status
+Bland webhook → automna-proxy.fly.dev/api/webhooks/bland/status
              │
              ▼ (parallel)
         ┌────┴────┐
@@ -284,7 +284,7 @@ export async function POST(req: NextRequest) {
       },
       
       // Webhook for call status updates
-      webhook: "https://automna.ai/api/webhooks/bland/status",
+      webhook: "https://automna-proxy.fly.dev/api/webhooks/bland/status",
       
       // Metadata for tracking
       metadata: {
@@ -609,7 +609,7 @@ export async function configureInboundNumber(
       voice: config.voiceId || "alexandra",
       model: "base",
       language: "en-US",
-      webhook: "https://automna.ai/api/webhooks/bland/status",
+      webhook: "https://automna-proxy.fly.dev/api/webhooks/bland/status",
       record: true,
       background_track: "office",
     }),
@@ -709,7 +709,7 @@ tools:
     
     type: http
     http:
-      url: https://automna.ai/api/user/call
+      url: https://automna-proxy.fly.dev/api/user/call
       method: POST
       headers:
         Authorization: "Bearer {{GATEWAY_TOKEN}}"

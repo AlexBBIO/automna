@@ -330,12 +330,12 @@ function HeroChat() {
       </div>
 
       {/* Messages area */}
-      <div ref={scrollContainerRef} className="space-y-3 min-h-[320px] max-h-[420px] overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+      <div ref={scrollContainerRef} className="space-y-3 min-h-[280px] md:min-h-[320px] max-h-[360px] md:max-h-[420px] overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
         {/* User message - types in */}
         {typedUser && (
           <div className="flex justify-end">
-            <div className="max-w-[85%] px-4 py-2.5 bg-purple-600 text-white rounded-2xl rounded-br-md shadow-sm">
-              <span className="text-sm">{typedUser}{step === 0 && <span className="animate-pulse">|</span>}</span>
+            <div className="max-w-[85%] px-3 md:px-4 py-2 md:py-2.5 bg-purple-600 text-white rounded-2xl rounded-br-md shadow-sm">
+              <span className="text-xs md:text-sm">{typedUser}{step === 0 && <span className="animate-pulse">|</span>}</span>
             </div>
           </div>
         )}
@@ -345,8 +345,8 @@ function HeroChat() {
           <div key={msgIdx} className={`flex items-start gap-2${msgIdx === justCompleted ? '' : ' animate-message-in'}`}>
             {i === 0 && <ChatAvatar />}
             {i !== 0 && <div className="w-7 shrink-0" />}
-            <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
-              <span className="text-zinc-700 dark:text-zinc-300 text-sm">{agentMessages[msgIdx]}</span>
+            <div className="px-3 md:px-4 py-2 md:py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
+              <span className="text-zinc-700 dark:text-zinc-300 text-xs md:text-sm">{agentMessages[msgIdx]}</span>
             </div>
           </div>
         ))}
@@ -356,8 +356,8 @@ function HeroChat() {
           <div className="flex items-start gap-2">
             {visibleMessages.length === 0 && <ChatAvatar />}
             {visibleMessages.length > 0 && <div className="w-7 shrink-0" />}
-            <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
-              <span className="text-zinc-700 dark:text-zinc-300 text-sm">{typedAgent}<span className="animate-pulse text-purple-500">|</span></span>
+            <div className="px-3 md:px-4 py-2 md:py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
+              <span className="text-zinc-700 dark:text-zinc-300 text-xs md:text-sm">{typedAgent}<span className="animate-pulse text-purple-500">|</span></span>
             </div>
           </div>
         )}
@@ -369,17 +369,17 @@ function HeroChat() {
         {showDeliverable && (
           <div className="flex items-start gap-2 animate-message-in">
             <div className="w-7 shrink-0" />
-            <div className="p-4 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm max-w-[90%]">
+            <div className="p-3 md:p-4 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm max-w-[90%]">
               <div className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1">RESERVATIONS FOUND</div>
-              <div className="text-zinc-800 dark:text-zinc-200 text-sm font-medium mb-1.5">3 tables available tonight for 6</div>
+              <div className="text-zinc-800 dark:text-zinc-200 text-xs md:text-sm font-medium mb-1.5">3 tables available tonight for 6</div>
               <div className="space-y-0.5 mb-2.5">
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">• Omakase House — 7:30 PM, bar seating</div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">• Sushi Zen — 8:00 PM, private booth</div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">• Kiyomi — 8:30 PM, patio table</div>
+                <div className="text-[11px] md:text-xs text-zinc-500 dark:text-zinc-400">• Omakase House — 7:30 PM, bar seating</div>
+                <div className="text-[11px] md:text-xs text-zinc-500 dark:text-zinc-400">• Sushi Zen — 8:00 PM, private booth</div>
+                <div className="text-[11px] md:text-xs text-zinc-500 dark:text-zinc-400">• Kiyomi — 8:30 PM, patio table</div>
               </div>
               <div className="flex gap-2">
-                <div className="px-3 py-1.5 bg-zinc-800 dark:bg-zinc-600 text-white text-xs rounded-lg font-medium">Book Sushi Zen</div>
-                <div className="px-3 py-1.5 border border-zinc-200 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 text-xs rounded-lg">See all options</div>
+                <div className="px-2.5 md:px-3 py-1.5 bg-zinc-800 dark:bg-zinc-600 text-white text-[11px] md:text-xs rounded-lg font-medium">Book Sushi Zen</div>
+                <div className="px-2.5 md:px-3 py-1.5 border border-zinc-200 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 text-[11px] md:text-xs rounded-lg">See all options</div>
               </div>
             </div>
           </div>
@@ -628,9 +628,9 @@ export default function Home() {
                 Automna runs tasks across the web and your tools, then delivers results where you already work.
               </p>
 
-              {/* Mobile: show compact terminal mock before bullets */}
+              {/* Mobile: show animated hero chat before bullets */}
               <div className="md:hidden mb-6">
-                <TerminalMock tab={demoTabs[0]} compact />
+                <HeroChat />
               </div>
 
               {/* Bullet list - 3 on mobile, 5 on desktop */}
