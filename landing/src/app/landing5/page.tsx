@@ -183,22 +183,76 @@ const faqItems = [
   { q: 'Can my team share an agent?', a: 'You can add agents to Slack channels, Discord servers, and Telegram groups—so they can collaborate with your team and even talk to each other.' },
 ];
 
+// Animated counter hook
+function useAnimatedCounter(target: number, duration: number = 2000) {
+  const [count, setCount] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  useEffect(() => {
+    if (!hasStarted) return;
+    const start = Date.now();
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(eased * target));
+      if (progress >= 1) clearInterval(timer);
+    }, 30);
+    return () => clearInterval(timer);
+  }, [hasStarted, target, duration]);
+
+  return { count, start: () => setHasStarted(true) };
+}
+
+// Sample activity feed lines (would be real data in production)
+const activityFeed = [
+  { agent: 'Agent', action: 'processed 47 emails, drafted 4 replies' },
+  { agent: 'Agent', action: 'researched 12 leads, compiled outreach list' },
+  { agent: 'Agent', action: 'summarized 8 Slack threads into digest' },
+  { agent: 'Agent', action: 'updated CRM with 23 new contacts' },
+  { agent: 'Agent', action: 'drafted weekly report from project notes' },
+  { agent: 'Agent', action: 'monitored 5 competitors, flagged 2 changes' },
+  { agent: 'Agent', action: 'triaged 31 support tickets by priority' },
+  { agent: 'Agent', action: 'scheduled 6 follow-ups from meeting notes' },
+];
+
 export default function Home() {
   const [isVisible, setIsVisible] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const demoCarouselRef = useRef<HTMLDivElement>(null);
+  const [activityIndex, setActivityIndex] = useState(0);
+
+  // Live counters (mocked - would fetch from API in production)
+  const tasksToday = useAnimatedCounter(2847, 2500);
+  const agentsWorking = useAnimatedCounter(38, 1800);
 
   useEffect(() => {
     setIsVisible(true);
+    // Start counters after a short delay
+    const counterTimer = setTimeout(() => {
+      tasksToday.start();
+      agentsWorking.start();
+    }, 500);
     
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 100);
     };
     
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    // Rotate activity feed
+    const feedTimer = setInterval(() => {
+      setActivityIndex(prev => (prev + 1) % activityFeed.length);
+    }, 4000);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(counterTimer);
+      clearInterval(feedTimer);
+    };
   }, []);
 
   const scrollTo = (id: string) => {
@@ -413,6 +467,42 @@ export default function Home() {
             {/* Right column - Hero chat (desktop only) */}
             <div className="hidden md:block">
               <TerminalMock tab={demoTabs[0]} />
+            </div>
+          </div>
+        </section>
+
+        {/* Live Stats Bar */}
+        <section className="container mx-auto px-6 py-4 md:py-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex flex-col md:flex-row items-center gap-3 md:gap-0 md:justify-between bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 md:px-6 py-3 md:py-4">
+              {/* Activity ticker */}
+              <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Live</span>
+                </div>
+                <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 shrink-0 hidden md:block"></div>
+                <div className="overflow-hidden min-w-0 flex-1">
+                  <div key={activityIndex} className="flex items-center gap-2 animate-fadeIn">
+                    <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 shrink-0">Agent</span>
+                    <span className="text-xs text-zinc-600 dark:text-zinc-400 truncate">{activityFeed[activityIndex].action}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats counters */}
+              <div className="flex items-center gap-4 md:gap-6 shrink-0">
+                <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg md:text-xl font-bold text-zinc-800 dark:text-white tabular-nums">{tasksToday.count.toLocaleString()}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">tasks today</span>
+                </div>
+                <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg md:text-xl font-bold text-zinc-800 dark:text-white tabular-nums">{agentsWorking.count}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">agents working</span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
