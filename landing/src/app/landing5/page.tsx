@@ -217,7 +217,7 @@ export default function Home() {
     const logLines = compact ? tab.logLines.slice(-3) : tab.logLines;
 
     return (
-      <div className={`bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 ${compact ? 'p-3' : 'p-4 md:p-5'} shadow-lg`}>
+      <div className={`bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 ${compact ? 'p-3' : 'p-4 md:p-5'} shadow-lg h-full flex flex-col`}>
         {/* Chat header */}
         <div className={`flex items-center justify-between ${compact ? 'mb-3 pb-2' : 'mb-4 pb-3'} border-b border-zinc-200 dark:border-zinc-700/50`}>
           <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export default function Home() {
         </div>
 
         {/* Chat messages */}
-        <div className={`space-y-3 ${compact ? '' : 'md:space-y-4'}`}>
+        <div className={`space-y-3 ${compact ? '' : 'md:space-y-4'} flex-1 flex flex-col justify-end`}>
           {/* User message - task instruction */}
           <div className="flex justify-end">
             <div className={`${compact ? 'max-w-[85%] px-3 py-2' : 'max-w-[80%] px-4 py-2.5'} bg-purple-600 text-white rounded-2xl rounded-br-md shadow-sm`}>
@@ -410,8 +410,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right column - Hero terminal (desktop only) */}
-            <div className="hidden md:block">
+            {/* Right column - Hero chat (desktop only) */}
+            <div className="hidden md:block max-h-[480px] overflow-hidden rounded-2xl">
               <TerminalMock tab={demoTabs[0]} />
             </div>
           </div>
@@ -588,9 +588,9 @@ export default function Home() {
               </div>
 
               {/* Tab content */}
-              <div className="grid md:grid-cols-2 gap-8 items-start">
+              <div className="grid md:grid-cols-2 gap-8 items-stretch">
                 {/* Left - steps */}
-                <div className="space-y-6">
+                <div className="flex flex-col justify-between space-y-6">
                   <div>
                     <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2 flex items-center gap-3 flex-wrap">
                       {demoTabs[activeTab].title}
@@ -631,8 +631,10 @@ export default function Home() {
                   </Link>
                 </div>
 
-                {/* Right - terminal mock */}
-                <TerminalMock tab={demoTabs[activeTab]} />
+                {/* Right - chat mock (matches left column height) */}
+                <div className="overflow-hidden rounded-2xl">
+                  <TerminalMock tab={demoTabs[activeTab]} />
+                </div>
               </div>
             </div>
           </div>
