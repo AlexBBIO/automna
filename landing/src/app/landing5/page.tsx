@@ -183,6 +183,197 @@ const faqItems = [
   { q: 'Can my team share an agent?', a: 'You can add agents to Slack channels, Discord servers, and Telegram groups—so they can collaborate with your team and even talk to each other.' },
 ];
 
+// Animated Hero Chat component
+function HeroChat() {
+  const [step, setStep] = useState(-1); // -1 = not started
+  const [typedUser, setTypedUser] = useState('');
+  const [typedAgent, setTypedAgent] = useState('');
+  const [showTypingDots, setShowTypingDots] = useState(false);
+  const [visibleMessages, setVisibleMessages] = useState<number[]>([]);
+  const [showDeliverable, setShowDeliverable] = useState(false);
+  const [cycle, setCycle] = useState(0);
+
+  const userMessage = "Research the top sushi restaurants in town, email the list to me and my friends who RSVP'd to dinner tonight, then call around to see who has a table for 6";
+
+  const agentMessages = [
+    "Searching for top-rated sushi restaurants nearby...",
+    "Found 8 restaurants. Comparing reviews and availability...",
+    "Pulling your dinner RSVP list from calendar — 4 friends confirmed.",
+    "Emailing top 5 picks to you, Sarah, Mike, Jen, and David...",
+    "Emails sent ✓ Now calling restaurants for tonight...",
+    "Called 5 restaurants — 3 have tables for 6.",
+  ];
+
+  // Reset and replay loop
+  useEffect(() => {
+    const startDelay = setTimeout(() => setStep(0), 800);
+    return () => clearTimeout(startDelay);
+  }, [cycle]);
+
+  // Step machine
+  useEffect(() => {
+    if (step < 0) return;
+
+    // Step 0: Type user message
+    if (step === 0) {
+      setTypedUser('');
+      setVisibleMessages([]);
+      setShowDeliverable(false);
+      setShowTypingDots(false);
+      setTypedAgent('');
+      let i = 0;
+      const interval = setInterval(() => {
+        i++;
+        setTypedUser(userMessage.slice(0, i));
+        if (i >= userMessage.length) {
+          clearInterval(interval);
+          setTimeout(() => setStep(1), 600);
+        }
+      }, 18);
+      return () => clearInterval(interval);
+    }
+
+    // Steps 1-6: Agent messages (typing dots → typewriter)
+    if (step >= 1 && step <= agentMessages.length) {
+      const msgIndex = step - 1;
+      setShowTypingDots(true);
+      setTypedAgent('');
+
+      const dotsDelay = setTimeout(() => {
+        setShowTypingDots(false);
+        let i = 0;
+        const text = agentMessages[msgIndex];
+        const interval = setInterval(() => {
+          i++;
+          setTypedAgent(text.slice(0, i));
+          if (i >= text.length) {
+            clearInterval(interval);
+            setVisibleMessages(prev => [...prev, msgIndex]);
+            setTypedAgent('');
+            setTimeout(() => setStep(step + 1), 400);
+          }
+        }, 22);
+        return () => clearInterval(interval);
+      }, 800 + Math.random() * 400);
+
+      return () => clearTimeout(dotsDelay);
+    }
+
+    // Step 7: Show deliverable card
+    if (step === agentMessages.length + 1) {
+      setShowTypingDots(true);
+      const timer = setTimeout(() => {
+        setShowTypingDots(false);
+        setShowDeliverable(true);
+        // Restart after pause
+        setTimeout(() => {
+          setStep(-1);
+          setTypedUser('');
+          setVisibleMessages([]);
+          setShowDeliverable(false);
+          setShowTypingDots(false);
+          setCycle(c => c + 1);
+        }, 6000);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [step]);
+
+  const Avatar = () => (
+    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md">
+      <span className="text-white text-[10px] font-bold">A</span>
+    </div>
+  );
+
+  const TypingDots = () => (
+    <div className="flex items-start gap-2">
+      <Avatar />
+      <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl rounded-tl-md border border-zinc-200 dark:border-zinc-700">
+        <div className="flex items-center gap-1 h-5">
+          <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 md:p-5 shadow-lg">
+      {/* Chat header */}
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-200 dark:border-zinc-700/50">
+        <div className="flex items-center gap-2">
+          <Avatar />
+          <div>
+            <span className="text-zinc-800 dark:text-zinc-200 text-sm font-medium">Automna</span>
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+              <span className="text-zinc-400 dark:text-zinc-500 text-[10px]">Online</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages area */}
+      <div className="space-y-3 min-h-[320px] max-h-[420px] overflow-hidden">
+        {/* User message - types in */}
+        {typedUser && (
+          <div className="flex justify-end animate-fadeIn">
+            <div className="max-w-[85%] px-4 py-2.5 bg-purple-600 text-white rounded-2xl rounded-br-md shadow-sm">
+              <span className="text-sm">{typedUser}{step === 0 && <span className="animate-pulse">|</span>}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Completed agent messages */}
+        {visibleMessages.map((msgIdx, i) => (
+          <div key={msgIdx} className="flex items-start gap-2 animate-fadeIn">
+            {i === 0 && <Avatar />}
+            {i !== 0 && <div className="w-7 shrink-0" />}
+            <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
+              <span className="text-zinc-700 dark:text-zinc-300 text-sm">{agentMessages[msgIdx]}</span>
+            </div>
+          </div>
+        ))}
+
+        {/* Currently typing agent message */}
+        {typedAgent && !showTypingDots && (
+          <div className="flex items-start gap-2">
+            {visibleMessages.length === 0 && <Avatar />}
+            {visibleMessages.length > 0 && <div className="w-7 shrink-0" />}
+            <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
+              <span className="text-zinc-700 dark:text-zinc-300 text-sm">{typedAgent}<span className="animate-pulse text-purple-500">|</span></span>
+            </div>
+          </div>
+        )}
+
+        {/* Typing indicator */}
+        {showTypingDots && <TypingDots />}
+
+        {/* Deliverable card */}
+        {showDeliverable && (
+          <div className="flex items-start gap-2 animate-fadeIn">
+            <div className="w-7 shrink-0" />
+            <div className="p-4 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm max-w-[90%]">
+              <div className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1">RESERVATIONS FOUND</div>
+              <div className="text-zinc-800 dark:text-zinc-200 text-sm font-medium mb-1.5">3 tables available tonight for 6</div>
+              <div className="space-y-0.5 mb-2.5">
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">• Omakase House — 7:30 PM, bar seating</div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">• Sushi Zen — 8:00 PM, private booth</div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">• Kiyomi — 8:30 PM, patio table</div>
+              </div>
+              <div className="flex gap-2">
+                <div className="px-3 py-1.5 bg-zinc-800 dark:bg-zinc-600 text-white text-xs rounded-lg font-medium">Book Sushi Zen</div>
+                <div className="px-3 py-1.5 border border-zinc-200 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 text-xs rounded-lg">See all options</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Animated counter hook
 function useAnimatedCounter(target: number, duration: number = 2000) {
   const [count, setCount] = useState(0);
@@ -464,9 +655,9 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right column - Hero chat (desktop only) */}
+            {/* Right column - Animated hero chat (desktop only) */}
             <div className="hidden md:block">
-              <TerminalMock tab={demoTabs[0]} />
+              <HeroChat />
             </div>
           </div>
         </section>

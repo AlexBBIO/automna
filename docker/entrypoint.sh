@@ -570,7 +570,8 @@ fi
 # Write config with custom 'automna' provider that routes through our proxy
 # The built-in 'anthropic' provider ignores ANTHROPIC_BASE_URL, so we must
 # configure a custom provider with explicit baseUrl
-echo "[automna] Writing config with automna proxy provider..."
+AUTOMNA_PROXY_URL="${AUTOMNA_PROXY_URL:-https://automna.ai}"
+echo "[automna] Writing config with automna proxy provider (proxy: $AUTOMNA_PROXY_URL)..."
 cat > "$CONFIG_FILE" << EOFCONFIG
 {
   "gateway": {
@@ -579,7 +580,7 @@ cat > "$CONFIG_FILE" << EOFCONFIG
   "models": {
     "providers": {
       "automna": {
-        "baseUrl": "https://automna.ai/api/llm",
+        "baseUrl": "$AUTOMNA_PROXY_URL/api/llm",
         "apiKey": "$GATEWAY_TOKEN",
         "api": "anthropic-messages",
         "models": [
@@ -633,7 +634,7 @@ cat > "$CONFIG_FILE" << EOFCONFIG
   }
 }
 EOFCONFIG
-echo "[automna] Config created with automna provider (baseUrl: https://automna.ai/api/llm)"
+echo "[automna] Config created with automna provider (baseUrl: $AUTOMNA_PROXY_URL/api/llm)"
 
 # Migration: Add trustedProxies if missing
 if [ -f "$CONFIG_FILE" ] && ! grep -q '"trustedProxies"' "$CONFIG_FILE" 2>/dev/null; then
@@ -703,7 +704,7 @@ echo "[automna] Starting OpenClaw gateway on port $GATEWAY_INTERNAL_PORT (intern
 
 # Route LLM calls through Automna proxy
 # The config uses automna provider, but we also set this as fallback for built-in anthropic provider
-export ANTHROPIC_BASE_URL="https://automna.ai/api/llm"
+export ANTHROPIC_BASE_URL="$AUTOMNA_PROXY_URL/api/llm"
 
 # Cap Node.js heap to 1536MB (out of 2048MB total)
 # Leaves ~512MB for Caddy, file server, fixer, and OS overhead
