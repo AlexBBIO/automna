@@ -11,7 +11,7 @@
  * fly.dev URL with no shared state.
  */
 
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines, machineEvents } from "@/lib/db/schema";
@@ -667,7 +667,55 @@ export async function POST() {
     }
 
     // Determine user's plan for resource allocation
-    const userPlan = (user.publicMetadata?.plan as string) || "starter";
+    // Check Clerk metadata first, but also verify with Stripe to handle the race
+    // condition where the user just completed checkout but the webhook hasn't
+    // updated Clerk yet. This prevented Bobby (and would prevent future Pro users)
+    // from being provisioned with the wrong plan.
+    let userPlan = (user.publicMetadata?.plan as string) || "starter";
+    
+    if (userPlan === "starter" && stripeCustomerId) {
+      // User has a Stripe customer ID but shows as starter — check Stripe directly
+      // in case the webhook hasn't updated Clerk metadata yet
+      try {
+        const subscriptions = await stripe.subscriptions.list({
+          customer: stripeCustomerId,
+          status: "active",
+          limit: 1,
+          expand: ["data.items.data.price"],
+        });
+        
+        if (subscriptions.data.length > 0) {
+          const sub = subscriptions.data[0];
+          const priceId = sub.items.data[0]?.price?.id;
+          
+          // Map Stripe price ID to plan name
+          const priceIdToPlan: Record<string, string> = {};
+          if (process.env.STRIPE_PRICE_STARTER) priceIdToPlan[process.env.STRIPE_PRICE_STARTER] = "starter";
+          if (process.env.STRIPE_PRICE_PRO) priceIdToPlan[process.env.STRIPE_PRICE_PRO] = "pro";
+          if (process.env.STRIPE_PRICE_BUSINESS) priceIdToPlan[process.env.STRIPE_PRICE_BUSINESS] = "business";
+          
+          const stripePlan = priceId ? priceIdToPlan[priceId] : null;
+          
+          if (stripePlan && stripePlan !== "starter") {
+            console.log(`[provision] Clerk shows '${userPlan}' but Stripe shows '${stripePlan}' — using Stripe (webhook race condition)`);
+            userPlan = stripePlan;
+            
+            // Also fix Clerk metadata so it's correct going forward
+            const client = await clerkClient();
+            await client.users.updateUserMetadata(userId, {
+              publicMetadata: {
+                plan: stripePlan,
+                stripeCustomerId,
+                stripeSubscriptionId: sub.id,
+                subscriptionStatus: "active",
+              },
+            }).catch((err: Error) => console.warn(`[provision] Failed to fix Clerk metadata:`, err));
+          }
+        }
+      } catch (err) {
+        console.warn(`[provision] Stripe plan check failed, using Clerk value '${userPlan}':`, err);
+      }
+    }
 
     // Create new app + machine for user
     const shortId = shortUserId(userId);
@@ -722,6 +770,7 @@ export async function POST() {
       gatewayToken,
       browserbaseContextId,
       agentmailInboxId,
+      plan: userPlan,
       lastActiveAt: new Date(),
     });
 
