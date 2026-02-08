@@ -28,16 +28,30 @@ export const maxDuration = 300; // 5 minutes
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  const traceId = Math.random().toString(36).slice(2, 10);
+  const log = (msg: string, data?: Record<string, unknown>) => {
+    const elapsed = Date.now() - startTime;
+    console.log(`[LLM Proxy][${traceId}][${elapsed}ms] ${msg}`, data ? JSON.stringify(data) : '');
+  };
+
+  log('request received', { 
+    method: request.method,
+    url: request.url,
+    userAgent: request.headers.get('user-agent')?.slice(0, 80),
+  });
 
   // Authenticate
   const auth = await authenticateGatewayToken(request);
   if (!auth) {
+    log('auth failed - no valid token');
     return anthropicError(
       401,
       "authentication_error",
       "Invalid or missing gateway token"
     );
   }
+
+  log('auth ok', { userId: auth.userId });
 
   // Check API key
   if (!ANTHROPIC_API_KEY) {
@@ -52,7 +66,7 @@ export async function POST(request: NextRequest) {
   // Check rate limits
   const rateLimitResult = await checkRateLimits(auth);
   if (!rateLimitResult.allowed) {
-    console.log(`[LLM Proxy] Rate limited user ${auth.userId}: ${rateLimitResult.reason}`);
+    log('rate limited', { reason: rateLimitResult.reason });
     return rateLimited(rateLimitResult);
   }
 
@@ -66,6 +80,10 @@ export async function POST(request: NextRequest) {
 
   const model = String(body.model ?? "claude-sonnet-4-20250514");
   const isStreaming = body.stream === true;
+  const messageCount = Array.isArray(body.messages) ? body.messages.length : 0;
+  const bodySize = JSON.stringify(body).length;
+
+  log('parsed request', { model, streaming: isStreaming, messageCount, bodySize });
 
   // Forward headers (filter out auth, add our API key)
   const forwardHeaders = new Headers();
@@ -105,15 +123,20 @@ export async function POST(request: NextRequest) {
       async start(streamController) {
         // Send initial keepalive immediately so Cloudflare sees data flowing
         streamController.enqueue(keepaliveComment);
+        log('keepalive sent (initial)');
 
         // Set up periodic keepalives until real data arrives
         let realDataStarted = false;
+        let keepaliveCount = 1;
         const keepaliveTimer = setInterval(() => {
           if (!realDataStarted) {
             try {
+              keepaliveCount++;
               streamController.enqueue(keepaliveComment);
+              log(`keepalive sent (#${keepaliveCount})`, { elapsed: Date.now() - startTime });
             } catch {
               // Stream may have been closed
+              log('keepalive failed - stream closed');
               clearInterval(keepaliveTimer);
             }
           } else {
@@ -125,6 +148,9 @@ export async function POST(request: NextRequest) {
         const abortController = new AbortController();
         const requestTimeout = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT);
 
+        log('fetching Anthropic API...');
+        const fetchStart = Date.now();
+
         try {
           const response = await fetch(ANTHROPIC_API_URL, {
             method: "POST",
@@ -133,11 +159,26 @@ export async function POST(request: NextRequest) {
             signal: abortController.signal,
           });
 
+          const fetchDuration = Date.now() - fetchStart;
           clearTimeout(requestTimeout);
           realDataStarted = true;
           clearInterval(keepaliveTimer);
 
+          // Log detailed response info
+          const respHeaders: Record<string, string> = {};
+          response.headers.forEach((v, k) => { respHeaders[k] = v; });
+          log('Anthropic responded', {
+            status: response.status,
+            statusText: response.statusText,
+            fetchDurationMs: fetchDuration,
+            contentType: response.headers.get('content-type'),
+            cfRay: response.headers.get('cf-ray'),
+            requestId: response.headers.get('request-id'),
+            retryAfter: response.headers.get('retry-after'),
+          });
+
           if (!response.body) {
+            log('ERROR: no response body from Anthropic');
             const errPayload = JSON.stringify({
               type: "error",
               error: { type: "api_error", message: "No response body from upstream" },
@@ -147,10 +188,55 @@ export async function POST(request: NextRequest) {
             return;
           }
 
-          // If Anthropic returned an error status (non-streaming error response)
+          // If Anthropic returned an error status
+          if (!response.ok) {
+            const contentType = response.headers.get("content-type") || "";
+            log('Anthropic error response', { 
+              status: response.status,
+              contentType,
+              isJson: contentType.includes("application/json"),
+              isHtml: contentType.includes("text/html"),
+            });
+
+            // If it's HTML (likely Cloudflare error page), capture a snippet
+            if (contentType.includes("text/html")) {
+              const htmlBody = await response.text();
+              const snippet = htmlBody.slice(0, 500);
+              log('Anthropic returned HTML error (likely CF)', {
+                status: response.status,
+                bodySnippet: snippet,
+                bodyLength: htmlBody.length,
+              });
+              // Pass through as SSE error
+              const errPayload = JSON.stringify({
+                type: "error",
+                error: { type: "api_error", message: `Upstream ${response.status}: ${snippet.slice(0, 200)}` },
+              });
+              errorMessage = `upstream_html_${response.status}`;
+              streamController.enqueue(encoder.encode(`event: error\ndata: ${errPayload}\n\n`));
+              
+              const durationMs = Date.now() - startTime;
+              logUsageBackground({
+                userId: auth.userId, provider: "anthropic", model, endpoint: "chat",
+                inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0,
+                requestId, durationMs, error: errorMessage,
+              });
+              logUsageEventBackground({
+                userId: auth.userId, eventType: 'llm', costMicrodollars: 0,
+                metadata: { model, provider: 'anthropic', inputTokens: 0, outputTokens: 0,
+                  cacheCreationTokens: 0, cacheReadTokens: 0, requestId, durationMs },
+                error: errorMessage,
+              });
+              streamController.close();
+              return;
+            }
+          }
+
+          // If Anthropic returned a JSON error (non-streaming error response)
           if (!response.ok && response.headers.get("content-type")?.includes("application/json")) {
             const errData = await response.json();
             errorMessage = JSON.stringify(errData.error ?? errData);
+            log('Anthropic JSON error', { status: response.status, error: errorMessage });
             const errPayload = JSON.stringify(errData);
             streamController.enqueue(encoder.encode(`event: error\ndata: ${errPayload}\n\n`));
 
@@ -173,10 +259,23 @@ export async function POST(request: NextRequest) {
 
           // Pipe the response body through, extracting usage as we go
           const reader = response.body.getReader();
+          let chunkCount = 0;
+          let totalBytes = 0;
+          let firstChunkTime: number | null = null;
 
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
+
+            chunkCount++;
+            totalBytes += value.length;
+            if (!firstChunkTime) {
+              firstChunkTime = Date.now();
+              log('first data chunk from Anthropic', { 
+                ttfb: firstChunkTime - fetchStart,
+                chunkSize: value.length,
+              });
+            }
 
             // Pass through immediately
             streamController.enqueue(value);
@@ -240,8 +339,20 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Log usage
+          // Log completion
           const durationMs = Date.now() - startTime;
+          log('stream completed', {
+            durationMs,
+            chunkCount,
+            totalBytes,
+            inputTokens,
+            outputTokens,
+            cacheCreationTokens,
+            cacheReadTokens,
+            requestId,
+            error: errorMessage,
+          });
+
           logUsageBackground({
             userId: auth.userId, provider: "anthropic", model, endpoint: "chat",
             inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens,
@@ -265,6 +376,17 @@ export async function POST(request: NextRequest) {
           clearInterval(keepaliveTimer);
 
           const isTimeout = error instanceof Error && error.name === "AbortError";
+          const errorName = error instanceof Error ? error.name : 'unknown';
+          const errorMsg = error instanceof Error ? error.message : String(error);
+
+          log('STREAM ERROR', {
+            isTimeout,
+            errorName,
+            errorMessage: errorMsg.slice(0, 500),
+            fetchDurationMs: Date.now() - fetchStart,
+            keepalivesSent: keepaliveCount,
+          });
+
           const errPayload = JSON.stringify({
             type: "error",
             error: {
@@ -277,7 +399,7 @@ export async function POST(request: NextRequest) {
             streamController.enqueue(encoder.encode(`event: error\ndata: ${errPayload}\n\n`));
             streamController.close();
           } catch {
-            // Stream may already be closed
+            log('could not enqueue error - stream already closed');
           }
         }
       },
@@ -294,10 +416,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Handle non-streaming response
+  log('non-streaming path');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
+    const fetchStart = Date.now();
     const response = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: forwardHeaders,
@@ -306,6 +430,11 @@ export async function POST(request: NextRequest) {
     });
 
     clearTimeout(timeout);
+    log('non-streaming Anthropic responded', {
+      status: response.status,
+      fetchDurationMs: Date.now() - fetchStart,
+      contentType: response.headers.get('content-type'),
+    });
 
     const data = await response.json();
     const durationMs = Date.now() - startTime;
