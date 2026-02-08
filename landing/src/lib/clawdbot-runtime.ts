@@ -787,12 +787,24 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
   // ─── Connection Effect ───────────────────────────────────────────────────
 
+  // Track previous connection params to avoid redundant reconnects
+  const prevConnectionRef = useRef<{ gatewayUrl: string; sessionKey: string } | null>(null);
+
   useEffect(() => {
     if (!config.gatewayUrl) {
       setError('No gateway URL configured');
       setLoadingPhase('error');
       return;
     }
+
+    // Skip reconnect if the connection params haven't actually changed
+    // (prevents churn from React re-renders that don't change props)
+    const prev = prevConnectionRef.current;
+    if (prev && prev.gatewayUrl === config.gatewayUrl && prev.sessionKey === sessionKey) {
+      log('Connection params unchanged, skipping reconnect');
+      return;
+    }
+    prevConnectionRef.current = { gatewayUrl: config.gatewayUrl, sessionKey };
 
     // Reset state for new connection
     mountedRef.current = true;
@@ -990,6 +1002,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
 
     return () => {
       mountedRef.current = false;
+      // Reset connection tracking so remount (e.g. React key change) reconnects properly
+      prevConnectionRef.current = null;
       if (connectionDelayTimer) clearTimeout(connectionDelayTimer);
       httpHistoryAbortRef.current?.abort();
       clearTimeout(safetyTimeout);

@@ -1,7 +1,7 @@
 # Automna Chat Streaming Spec
 
-> Last updated: 2026-02-07
-> Status: Phase 2F complete ✅ (sessionKey-based event routing for webhooks)
+> Last updated: 2026-02-08
+> Status: Phase 2G complete ✅ (webchat connection churn fix)
 
 ## Overview
 
@@ -1287,6 +1287,28 @@ pendingRefetchRef.current = { messageId: finalId, streamedText: streamedText };
 This way:
 - The displayed message uses `finalText` as fallback (good for commands)
 - The re-fetch comparison uses raw `streamedText` (preserves old behavior where empty streaming → always update)
+
+---
+
+## Phase 2G: WebSocket Connection Churn Fix (2026-02-08)
+
+**Problem:** Users reported frequent timeouts and missed messages. Investigation of Bobby's instance (`automna-u-bdbrxn9aig9r`) revealed rapid WebSocket connect/disconnect cycles - 5-6 connections in under 1 second, each lasting <1s. This caused the gateway to log excessive "webchat connected/disconnected" entries and disrupted active streaming sessions.
+
+**Root Cause:** Two factors combined:
+
+1. **React key-based remounting:** `<div key={currentConversation}>` forces full unmount/remount of the chat component when conversations change, closing and reopening the WebSocket.
+
+2. **Unnecessary useEffect re-runs:** The connection `useEffect` in `clawdbot-runtime.ts` had `[config.gatewayUrl, config.authToken, sessionKey, wsSend]` dependencies. Parent re-renders that didn't change these values could still trigger cleanup + reconnect.
+
+**Fix (two-layer defense):**
+
+1. **Dashboard guard (page.tsx):** Only render `<AutomnaChat>` when `loadPhase === 'ready' && gatewayInfo?.gatewayUrl` is truthy. Shows `<ChatSkeleton phase="connecting">` otherwise. This prevents the chat from mounting during loading transitions.
+
+2. **Connection dedup (clawdbot-runtime.ts):** Added `prevConnectionRef` to track previous `gatewayUrl` + `sessionKey`. The connection `useEffect` skips reconnecting if these haven't actually changed. The ref resets on cleanup (unmount) so intentional key-based remounts still work.
+
+**Files Changed:**
+- `landing/src/app/dashboard/page.tsx` - Guard AutomnaChat rendering
+- `landing/src/lib/clawdbot-runtime.ts` - Connection dedup via ref
 
 ---
 
