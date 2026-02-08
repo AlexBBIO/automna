@@ -365,16 +365,17 @@ function cleanEnvValue(value: string | undefined): string {
 }
 
 /**
- * Get memory allocation based on plan tier
- * Starter: 2GB, Pro/Business: 4GB
+ * Get machine specs based on plan tier.
+ * Fly.io shared-cpu-1x maxes at 2048MB, so 4GB requires 2 shared CPUs.
+ * Starter: 1 shared CPU + 2GB, Pro/Business: 2 shared CPUs + 4GB
  */
-function getMemoryForPlan(plan: string): number {
+function getMachineSpecsForPlan(plan: string): { cpus: number; memory_mb: number } {
   switch (plan) {
     case "pro":
     case "business":
-      return 4096;
+      return { cpus: 2, memory_mb: 4096 };
     default:
-      return 2048;
+      return { cpus: 1, memory_mb: 2048 };
   }
 }
 
@@ -442,12 +443,13 @@ async function createMachine(
     // Note: AGENTMAIL_API_KEY intentionally NOT passed to enforce rate limits via our proxy
   }
 
+  const specs = getMachineSpecsForPlan(plan);
   const config = {
     image: OPENCLAW_IMAGE,
     guest: {
       cpu_kind: "shared",
-      cpus: 1,
-      memory_mb: getMemoryForPlan(plan),
+      cpus: specs.cpus,
+      memory_mb: specs.memory_mb,
     },
     // Initialize session structure with canonical key, then start gateway
     // This fixes the session key mismatch bug where "main" != "agent:main:main"
@@ -671,7 +673,8 @@ export async function POST() {
     const shortId = shortUserId(userId);
     const appName = `automna-u-${shortId}`;
     
-    console.log(`[provision] Creating new app ${appName} for user ${userId} (plan: ${userPlan}, memory: ${getMemoryForPlan(userPlan)}MB)`);
+    const planSpecs = getMachineSpecsForPlan(userPlan);
+    console.log(`[provision] Creating new app ${appName} for user ${userId} (plan: ${userPlan}, cpus: ${planSpecs.cpus}, memory: ${planSpecs.memory_mb}MB)`);
 
     // Get org ID for app creation
     const orgId = await getPersonalOrgId();

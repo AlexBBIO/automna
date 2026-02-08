@@ -16,17 +16,18 @@ const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
 const FLY_API_BASE = "https://api.machines.dev/v1";
 
 /**
- * Get memory allocation based on plan tier
- * Must match the logic in provision/route.ts
- * Starter: 2GB, Pro/Business: 4GB
+ * Get machine specs based on plan tier.
+ * Must match the logic in provision/route.ts.
+ * Fly.io shared-cpu-1x maxes at 2048MB, so 4GB requires 2 shared CPUs.
+ * Starter: 1 shared CPU + 2GB, Pro/Business: 2 shared CPUs + 4GB
  */
-function getMemoryForPlan(plan: string): number {
+function getMachineSpecsForPlan(plan: string): { cpus: number; memory_mb: number } {
   switch (plan) {
     case "pro":
     case "business":
-      return 4096;
+      return { cpus: 2, memory_mb: 4096 };
     default:
-      return 2048;
+      return { cpus: 1, memory_mb: 2048 };
   }
 }
 
@@ -53,7 +54,7 @@ async function updateMachinePlan(userId: string, plan: string): Promise<void> {
  * Non-fatal: logs errors but doesn't fail the webhook.
  */
 async function scaleMachineForPlan(userId: string, plan: string): Promise<void> {
-  const targetMemory = getMemoryForPlan(plan);
+  const targetSpecs = getMachineSpecsForPlan(plan);
   
   try {
     // Find user's machine
@@ -62,7 +63,7 @@ async function scaleMachineForPlan(userId: string, plan: string): Promise<void> 
     });
 
     if (!machine || !machine.appName) {
-      console.log(`[stripe] No machine found for ${userId}, skipping memory scale`);
+      console.log(`[stripe] No machine found for ${userId}, skipping scale`);
       return;
     }
 
@@ -79,7 +80,7 @@ async function scaleMachineForPlan(userId: string, plan: string): Promise<void> 
         details: JSON.stringify({
           action: "get_status",
           plan,
-          targetMemory,
+          targetSpecs,
           error: `HTTP ${statusRes.status}`,
         }),
       });
@@ -88,26 +89,28 @@ async function scaleMachineForPlan(userId: string, plan: string): Promise<void> 
 
     const flyMachine = await statusRes.json();
     const currentMemory = flyMachine.config?.guest?.memory_mb || 2048;
+    const currentCpus = flyMachine.config?.guest?.cpus || 1;
 
-    if (currentMemory === targetMemory) {
-      console.log(`[stripe] Machine ${machine.id} already at ${targetMemory}MB, no scale needed`);
+    if (currentMemory === targetSpecs.memory_mb && currentCpus === targetSpecs.cpus) {
+      console.log(`[stripe] Machine ${machine.id} already at ${targetSpecs.cpus} CPUs / ${targetSpecs.memory_mb}MB, no scale needed`);
       return;
     }
 
-    console.log(`[stripe] Scaling machine ${machine.id} (${machine.appName}): ${currentMemory}MB → ${targetMemory}MB (plan: ${plan})`);
+    console.log(`[stripe] Scaling machine ${machine.id} (${machine.appName}): ${currentCpus} CPUs/${currentMemory}MB → ${targetSpecs.cpus} CPUs/${targetSpecs.memory_mb}MB (plan: ${plan})`);
 
-    // Update the machine config with new memory
-    // We need to send the full config with only memory changed
+    // Update the machine config with new CPU + memory
+    // Fly shared-cpu-1x maxes at 2048MB, need 2 CPUs for 4GB
     const updatedConfig = {
       ...flyMachine.config,
       guest: {
         ...flyMachine.config.guest,
-        memory_mb: targetMemory,
+        cpus: targetSpecs.cpus,
+        memory_mb: targetSpecs.memory_mb,
       },
     };
 
     const updateRes = await fetch(`${FLY_API_BASE}/apps/${machine.appName}/machines/${machine.id}`, {
-      method: "PATCH",
+      method: "POST",
       headers: {
         Authorization: `Bearer ${FLY_API_TOKEN}`,
         "Content-Type": "application/json",
@@ -122,17 +125,18 @@ async function scaleMachineForPlan(userId: string, plan: string): Promise<void> 
         machineId: machine.id,
         eventType: "scale_error",
         details: JSON.stringify({
-          action: "update_memory",
+          action: "update_specs",
           plan,
+          fromCpus: currentCpus,
           fromMemory: currentMemory,
-          targetMemory,
+          targetSpecs,
           error: `HTTP ${updateRes.status}: ${errorText.slice(0, 500)}`,
         }),
       });
       return;
     }
 
-    console.log(`[stripe] Successfully scaled machine ${machine.id} to ${targetMemory}MB`);
+    console.log(`[stripe] Successfully scaled machine ${machine.id} to ${targetSpecs.cpus} CPUs / ${targetSpecs.memory_mb}MB`);
 
     // Log success
     await db.insert(machineEvents).values({
@@ -140,8 +144,10 @@ async function scaleMachineForPlan(userId: string, plan: string): Promise<void> 
       eventType: "scaled",
       details: JSON.stringify({
         plan,
+        fromCpus: currentCpus,
         fromMemory: currentMemory,
-        toMemory: targetMemory,
+        toCpus: targetSpecs.cpus,
+        toMemory: targetSpecs.memory_mb,
         triggeredBy: "stripe-webhook",
       }),
     });
@@ -158,7 +164,7 @@ async function scaleMachineForPlan(userId: string, plan: string): Promise<void> 
           eventType: "scale_error",
           details: JSON.stringify({
             plan,
-            targetMemory,
+            targetSpecs,
             error: error instanceof Error ? error.message : String(error),
           }),
         });
