@@ -62,17 +62,16 @@ const demoTabs = [
   },
   {
     id: 'phone-agent',
-    tabLabel: 'Phone Calls (soon)',
+    tabLabel: 'Phone Calls',
     title: 'AI phone agent',
     oneLiner: 'Answer, qualify, and follow up—while you approve what gets sent.',
     trigger: 'Inbound call or outbound call list.',
     actions: 'Qualify → capture notes → summarize → draft follow-up → create next steps.',
     deliverable: 'Call summary + follow-up email draft, ready for approval.',
-    buttonText: 'Get notified',
-    buttonAction: 'waitlist',
-    comingSoon: true,
-    comingSoonBadge: 'Coming soon · Pro & Business',
-    statusBadge: 'preview',
+    buttonText: 'Try this example',
+    buttonAction: 'prefill',
+    comingSoon: false,
+    statusBadge: 'running',
     headerLine: 'task: Handle inbound calls',
     logLines: [
       'agent: Incoming call…',
@@ -90,7 +89,7 @@ const demoTabs = [
       ],
       primaryBtn: 'Approve & send follow-up',
       secondaryBtn: 'See details',
-      footer: 'Phone agents coming soon · Pro & Business plans.',
+      footer: 'Inbound & outbound calls · Pro & Business plans.',
     },
   },
   {
@@ -597,9 +596,9 @@ export default function Home() {
                   <div>
                     <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2 flex items-center gap-3 flex-wrap">
                       {demoTabs[activeTab].title}
-                      {demoTabs[activeTab].comingSoon && (
+                      {demoTabs[activeTab].comingSoon && 'comingSoonBadge' in demoTabs[activeTab] && (
                         <span className="text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 px-3 py-1 rounded-full font-medium">
-                          {demoTabs[activeTab].comingSoonBadge}
+                          {(demoTabs[activeTab] as any).comingSoonBadge}
                         </span>
                       )}
                     </h3>
@@ -912,6 +911,10 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
+                    Inbound & outbound phone calls
+                  </li>
+                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
+                    <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
                     2M tokens/month
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
@@ -942,6 +945,10 @@ export default function Home() {
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
                     Everything in Pro
+                  </li>
+                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
+                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
+                    Inbound & outbound phone calls
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>

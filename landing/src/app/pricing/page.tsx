@@ -28,6 +28,7 @@ const plans = [
     features: [
       'Everything in Starter',
       'All integrations',
+      'Inbound & outbound phone calls',
       '2M tokens/month',
       'Unlimited memory',
       'Custom skills',
@@ -43,6 +44,7 @@ const plans = [
     description: 'For teams',
     features: [
       'Everything in Pro',
+      'Inbound & outbound phone calls',
       'Team workspace',
       '10M tokens/month',
       'API access',
