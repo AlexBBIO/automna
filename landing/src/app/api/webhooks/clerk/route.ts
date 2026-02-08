@@ -3,6 +3,9 @@ import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema';
+import { eq, ne, and } from 'drizzle-orm';
 import { sendWelcomeEmail, upsertContact } from '@/lib/email';
 
 export async function POST(req: Request) {
@@ -49,6 +52,34 @@ export async function POST(req: Request) {
     const primaryEmail = email_addresses?.[0]?.email_address;
 
     if (primaryEmail) {
+      // Check for duplicate email - another Clerk ID with the same email
+      // This happens when users sign in with different auth methods (Google vs email/password)
+      try {
+        const existingWithEmail = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(
+            and(
+              eq(users.email, primaryEmail),
+              ne(users.id, id)
+            )
+          )
+          .limit(1);
+
+        if (existingWithEmail.length > 0) {
+          console.warn(
+            `[clerk-webhook] DUPLICATE EMAIL: ${primaryEmail} already exists as ${existingWithEmail[0].id}. ` +
+            `New Clerk ID ${id} is a duplicate account. Skipping user creation. ` +
+            `User should sign in with their original auth method.`
+          );
+          // Still return 200 so Clerk doesn't retry, but skip all side effects
+          return NextResponse.json({ success: true, skipped: 'duplicate_email' });
+        }
+      } catch (err) {
+        console.error('[clerk-webhook] Error checking for duplicate email:', err);
+        // Continue with creation if check fails - better to have a duplicate than block a real new user
+      }
+
       // Create user in database
       try {
         await prisma.user.upsert({

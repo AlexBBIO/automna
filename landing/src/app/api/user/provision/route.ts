@@ -14,12 +14,12 @@
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { machines, machineEvents, phoneNumbers } from "@/lib/db/schema";
+import { machines, machineEvents, phoneNumbers, users } from "@/lib/db/schema";
 import Stripe from "stripe";
 import { sendMachineReady } from "@/lib/email";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-import { eq } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 
 const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
 const FLY_ORG_ID = process.env.FLY_ORG_ID; // Must be the actual org ID, not slug
@@ -666,6 +666,48 @@ export async function POST() {
           region: flyMachine.region,
           created: false,
         });
+      }
+    }
+
+    // ========================================
+    // DUPLICATE EMAIL GUARD
+    // ========================================
+    // Prevent creating a second machine for the same email address.
+    // This happens when Clerk creates a new user ID for an existing email
+    // (e.g., user signs in with a different auth method like Google vs email/password).
+    // Without this check, each Clerk ID gets its own machine, wasting resources.
+    const primaryEmail = user.emailAddresses?.[0]?.emailAddress;
+    if (primaryEmail) {
+      const existingUserWithEmail = await db
+        .select({
+          userId: users.id,
+          machineId: machines.id,
+          appName: machines.appName,
+        })
+        .from(users)
+        .innerJoin(machines, eq(machines.userId, users.id))
+        .where(
+          and(
+            eq(users.email, primaryEmail),
+            ne(users.id, userId) // Different Clerk ID, same email
+          )
+        )
+        .limit(1);
+
+      if (existingUserWithEmail.length > 0) {
+        const existing = existingUserWithEmail[0];
+        console.error(
+          `[provision] DUPLICATE EMAIL BLOCKED: ${primaryEmail} already has machine ${existing.appName} ` +
+          `under user ${existing.userId}. Current Clerk ID: ${userId}. ` +
+          `User likely signed in with a different auth method creating a second Clerk account.`
+        );
+        return NextResponse.json(
+          {
+            error: "duplicate_account",
+            message: "An account with this email already exists. Please sign in with your original method, or contact support.",
+          },
+          { status: 409 }
+        );
       }
     }
 

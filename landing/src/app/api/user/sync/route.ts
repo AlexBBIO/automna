@@ -2,7 +2,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 
 /**
  * POST /api/user/sync
@@ -53,6 +53,35 @@ export async function POST() {
       });
     }
     
+    // Check for duplicate email before creating
+    // Prevents duplicate accounts when Clerk assigns a new ID for the same email
+    if (email) {
+      const existingWithEmail = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(
+            eq(users.email, email),
+            ne(users.id, clerkId)
+          )
+        )
+        .limit(1);
+
+      if (existingWithEmail.length > 0) {
+        console.warn(
+          `[api/user/sync] DUPLICATE EMAIL: ${email} already exists as ${existingWithEmail[0].id}. ` +
+          `Clerk ID ${clerkId} appears to be a duplicate account. Skipping creation.`
+        );
+        return NextResponse.json({
+          id: clerkId,
+          email,
+          name,
+          created: false,
+          duplicate: true,
+        });
+      }
+    }
+
     // Create new user
     await db.insert(users).values({
       id: clerkId,
