@@ -697,12 +697,140 @@ if [ -f "$CONFIG_FILE" ] && grep -q '"heartbeat"' "$CONFIG_FILE" 2>/dev/null; th
     " 2>/dev/null || echo "[automna] Warning: Config migration failed"
 fi
 
-# Write config with custom 'automna' provider that routes through our proxy
-# The built-in 'anthropic' provider ignores ANTHROPIC_BASE_URL, so we must
-# configure a custom provider with explicit baseUrl
+# Merge config: update Automna-managed keys, preserve user changes (channels, plugins, etc.)
+# On first boot: write full default config
+# On subsequent boots: deep-merge managed keys into existing config
 AUTOMNA_PROXY_URL="${AUTOMNA_PROXY_URL:-https://automna.ai}"
-echo "[automna] Writing config with automna proxy provider (proxy: $AUTOMNA_PROXY_URL)..."
-cat > "$CONFIG_FILE" << EOFCONFIG
+echo "[automna] Merging config (proxy: $AUTOMNA_PROXY_URL)..."
+
+node -e "
+const fs = require('fs');
+const configFile = '$CONFIG_FILE';
+const proxyUrl = '$AUTOMNA_PROXY_URL';
+const gatewayToken = '$GATEWAY_TOKEN';
+
+// Managed keys - these get overwritten on every boot
+const managed = {
+  gateway: {
+    trustedProxies: ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fd00::/8']
+  },
+  models: {
+    providers: {
+      automna: {
+        baseUrl: proxyUrl + '/api/llm',
+        apiKey: gatewayToken,
+        api: 'anthropic-messages',
+        models: [
+          { id: 'claude-opus-4-5', name: 'Claude Opus 4.5' },
+          { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }
+        ]
+      }
+    }
+  },
+  hooks: {
+    enabled: true,
+    token: gatewayToken,
+    path: '/hooks'
+  }
+};
+
+// Defaults - only set if not already present in existing config
+const defaults = {
+  plugins: {
+    entries: {
+      'voice-call': { enabled: false }
+    }
+  },
+  agents: {
+    defaults: {
+      workspace: '/home/node/.openclaw/workspace',
+      model: { primary: 'automna/claude-opus-4-5' },
+      verboseDefault: 'on',
+      userTimezone: 'America/Los_Angeles',
+      heartbeat: {
+        every: '30m',
+        activeHours: { start: '08:00', end: '23:00' },
+        target: 'last'
+      },
+      contextPruning: { mode: 'cache-ttl', ttl: '1h' },
+      compaction: {
+        mode: 'safeguard',
+        memoryFlush: { enabled: true, softThresholdTokens: 80000 }
+      }
+    }
+  }
+};
+
+function deepMerge(target, source) {
+  for (const key of Object.keys(source)) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      if (!target[key] || typeof target[key] !== 'object') target[key] = {};
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+
+// Set defaults only if key doesn't exist
+function setDefaults(target, source) {
+  for (const key of Object.keys(source)) {
+    if (!(key in target)) {
+      target[key] = source[key];
+    } else if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])
+               && target[key] && typeof target[key] === 'object' && !Array.isArray(target[key])) {
+      setDefaults(target[key], source[key]);
+    }
+  }
+  return target;
+}
+
+let config = {};
+
+// Load existing config if present
+if (fs.existsSync(configFile)) {
+  try {
+    config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+    console.log('[automna] Existing config loaded, merging managed keys...');
+    console.log('[automna] Preserved user keys: channels=' + JSON.stringify(Object.keys(config.channels || {})) +
+                ' plugins=' + JSON.stringify(Object.keys((config.plugins || {}).entries || {})));
+  } catch (e) {
+    console.log('[automna] Existing config corrupt, starting fresh');
+    config = {};
+  }
+} else {
+  console.log('[automna] First boot, creating config...');
+}
+
+// Always overwrite managed keys
+deepMerge(config, managed);
+
+// Set defaults (won't overwrite existing user values)
+setDefaults(config, defaults);
+
+// Ensure voice-call is always disabled (managed)
+if (!config.plugins) config.plugins = {};
+if (!config.plugins.entries) config.plugins.entries = {};
+config.plugins.entries['voice-call'] = { enabled: false };
+
+// Fix any stale model references
+const configStr = JSON.stringify(config);
+const fixed = configStr
+  .replace(/\"anthropic\/claude-opus-4-5\"/g, '\"automna/claude-opus-4-5\"')
+  .replace(/\"anthropic\/claude-sonnet-4\"/g, '\"automna/claude-opus-4-5\"')
+  .replace(/\"claude-3-5-sonnet-[0-9]+\"/g, '\"claude-opus-4-5\"');
+
+// Remove unsupported top-level 'heartbeat' key (moved to agents.defaults.heartbeat)
+const finalConfig = JSON.parse(fixed);
+delete finalConfig.heartbeat;
+delete finalConfig.meta;
+
+fs.writeFileSync(configFile, JSON.stringify(finalConfig, null, 2));
+console.log('[automna] Config written (baseUrl: ' + proxyUrl + '/api/llm)');
+" 2>/dev/null || {
+  echo "[automna] WARNING: Config merge failed, writing minimal config..."
+  cat > "$CONFIG_FILE" << EOFCONFIG
 {
   "gateway": {
     "trustedProxies": ["127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fd00::/8"]
@@ -720,88 +848,12 @@ cat > "$CONFIG_FILE" << EOFCONFIG
       }
     }
   },
-  "hooks": {
-    "enabled": true,
-    "token": "$GATEWAY_TOKEN",
-    "path": "/hooks"
-  },
-  "plugins": {
-    "entries": {
-      "voice-call": {
-        "enabled": false
-      }
-    }
-  },
-  "agents": {
-    "defaults": {
-      "workspace": "/home/node/.openclaw/workspace",
-      "model": {
-        "primary": "automna/claude-opus-4-5"
-      },
-      "verboseDefault": "on",
-      "userTimezone": "America/Los_Angeles",
-      "heartbeat": {
-        "every": "30m",
-        "activeHours": {
-          "start": "08:00",
-          "end": "23:00"
-        },
-        "target": "last"
-      },
-      "contextPruning": {
-        "mode": "cache-ttl",
-        "ttl": "1h"
-      },
-      "compaction": {
-        "mode": "safeguard",
-        "memoryFlush": {
-          "enabled": true,
-          "softThresholdTokens": 80000
-        }
-      }
-    }
-  }
+  "hooks": {"enabled": true, "token": "$GATEWAY_TOKEN", "path": "/hooks"},
+  "plugins": {"entries": {"voice-call": {"enabled": false}}},
+  "agents": {"defaults": {"workspace": "/home/node/.openclaw/workspace", "model": {"primary": "automna/claude-opus-4-5"}, "verboseDefault": "on"}}
 }
 EOFCONFIG
-echo "[automna] Config created with automna provider (baseUrl: $AUTOMNA_PROXY_URL/api/llm)"
-
-# Migration: Add trustedProxies if missing
-if [ -f "$CONFIG_FILE" ] && ! grep -q '"trustedProxies"' "$CONFIG_FILE" 2>/dev/null; then
-    echo "[automna] Migrating config: adding trustedProxies..."
-    node -e "
-        const fs = require('fs');
-        const config = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf8'));
-        if (!config.gateway) config.gateway = {};
-        if (!config.gateway.trustedProxies) {
-            config.gateway.trustedProxies = ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fd00::/8'];
-        }
-        fs.writeFileSync('$CONFIG_FILE', JSON.stringify(config, null, 2));
-        console.log('[automna] trustedProxies added');
-    " 2>/dev/null || echo "[automna] Warning: trustedProxies migration failed"
-fi
-
-# Migration: Disable built-in voice-call plugin (we use Automna proxy instead)
-if [ -f "$CONFIG_FILE" ] && ! grep -q '"voice-call"' "$CONFIG_FILE" 2>/dev/null; then
-    echo "[automna] Migrating config: disabling built-in voice-call plugin..."
-    node -e "
-        const fs = require('fs');
-        const config = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf8'));
-        if (!config.plugins) config.plugins = {};
-        if (!config.plugins.entries) config.plugins.entries = {};
-        if (!config.plugins.entries['voice-call']) {
-            config.plugins.entries['voice-call'] = { enabled: false };
-        }
-        fs.writeFileSync('$CONFIG_FILE', JSON.stringify(config, null, 2));
-        console.log('[automna] voice-call plugin disabled');
-    " 2>/dev/null || echo "[automna] Warning: voice-call migration failed"
-fi
-
-# Migration: Fix model name to use automna provider with Opus 4.5
-if [ -f "$CONFIG_FILE" ] && grep -qE 'anthropic/claude|claude-sonnet-4|claude-3-5-sonnet' "$CONFIG_FILE" 2>/dev/null; then
-    echo "[automna] Migrating config: switching to automna provider..."
-    sed -i 's|anthropic/claude-opus-4-5|automna/claude-opus-4-5|g; s|anthropic/claude-sonnet-4|automna/claude-opus-4-5|g; s/claude-sonnet-4/claude-opus-4-5/g; s/claude-3-5-sonnet-[0-9]*/claude-opus-4-5/g' "$CONFIG_FILE"
-    echo "[automna] Model set to automna/claude-opus-4-5"
-fi
+}
 
 # Initial session key fix
 echo "[automna] Initial session key check..."
