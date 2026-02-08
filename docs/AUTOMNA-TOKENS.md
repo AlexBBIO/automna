@@ -69,9 +69,9 @@ The token budget = cost cap ÷ $0.0001. If cost caps change, token budgets chang
 | **Claude 3.5 Sonnet** | $3.00 | $15.00 | $3.75 (1.25×) | $0.30 (0.1×) |
 | **Claude 3.5 Haiku** | $1.00 | $5.00 | $1.25 (1.25×) | $0.10 (0.1×) |
 
-> **⚠️ CRITICAL:** Our `pricing.ts` currently uses OLD Opus pricing ($15/$75) for
-> `claude-opus-4-5`. The correct rate is $5/$25. This means we've been overcharging
-> cost calculations by ~3x for Opus 4.5 users. MUST FIX.
+> **✅ RESOLVED (2026-02-06):** `pricing.ts` now uses the correct Opus 4.5 pricing
+> ($5/$25 input/output). The old $15/$75 rate was fixed. Historical cost data prior
+> to the fix may be ~3x too high for Opus 4.5 users.
 
 **How LLM Automna Tokens are calculated:**
 
@@ -313,9 +313,8 @@ Users never see dollars, microdollars, or raw API token counts. Just Automna Tok
 
 ## Pricing Bugs Found (2026-02-06)
 
-1. **Opus 4.5 priced as Opus 4**: `pricing.ts` has `claude-opus-4-5` at $15/$75 input/output.
-   Correct price is $5/$25. This means ALL historical cost data for Opus 4.5 users is
-   ~3x too high. Affects: cost tracking, rate limiting, usage display.
+1. **~~Opus 4.5 priced as Opus 4~~ ✅ FIXED**: `pricing.ts` now correctly uses $5/$25 for
+   `claude-opus-4-5`. Historical cost data prior to the fix may be ~3x too high.
 
 2. **Cache tokens counted toward token limit**: The rate limiter and usage endpoint sum
    `input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens` for the

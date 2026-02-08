@@ -873,7 +873,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    500K tokens/month
+                    200K tokens/month
                   </li>
                 </ul>
                 <Link
@@ -907,7 +907,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
-                    2M tokens/month
+                    1M tokens/month
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
@@ -948,7 +948,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    10M tokens/month
+                    5M tokens/month
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
                     <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>

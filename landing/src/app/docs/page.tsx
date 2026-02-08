@@ -799,7 +799,7 @@ function Billing() {
               'Web chat + 1 integration',
               'Browser access',
               'Personal email inbox',
-              '500K tokens/month',
+              '200K tokens/month',
             ],
           },
           {
@@ -809,7 +809,7 @@ function Billing() {
             features: [
               'Everything in Starter',
               'All integrations',
-              '2M tokens/month',
+              '1M tokens/month',
               'Phone number + 60 min calls',
               'Unlimited memory',
               'Custom skills',
@@ -821,7 +821,7 @@ function Billing() {
             features: [
               'Everything in Pro',
               'Team workspace',
-              '10M tokens/month',
+              '5M tokens/month',
               'Phone: 300 min calls',
               'API access',
               'Dedicated support',

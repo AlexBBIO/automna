@@ -1,8 +1,8 @@
 # Voice Calling Feature Spec
 
 **Status:** Implemented ✅ (deployed 2026-02-07)  
-**Available Tiers:** Pro ($49/mo), Business ($99/mo)  
-**Not included:** Starter (free tier)
+**Available Tiers:** Pro ($149/mo), Business ($299/mo)  
+**Not included:** Starter ($79/mo)
 
 ## Overview
 
@@ -747,9 +747,9 @@ TWILIO_BLAND_ENCRYPTED_KEY=xxxxxxxx  # Generated in Bland BYOT setup
 
 | Plan | Monthly Minutes | Overage |
 |------|-----------------|---------|
-| Starter | 0 (no calling) | N/A |
-| Pro ($49/mo) | 60 min | Blocked |
-| Business ($99/mo) | 300 min | Blocked |
+| Starter ($79/mo) | 0 (no calling) | N/A |
+| Pro ($149/mo) | 60 min | Blocked |
+| Business ($299/mo) | 300 min | Blocked |
 
 **v2 (future):** Allow overage at $0.15/min
 
@@ -760,12 +760,12 @@ TWILIO_BLAND_ENCRYPTED_KEY=xxxxxxxx  # Generated in Bland BYOT setup
 **Per User (Pro tier, worst case - 60 min used):**
 - Twilio number: $1/mo
 - Bland usage: 60 min × $0.12 = $7.20/mo
-- **Total: ~$8.20/mo** (at $49 price point = good margin)
+- **Total: ~$8.20/mo** (at $149 price point = good margin)
 
 **Per User (Business tier, worst case - 300 min used):**
 - Twilio number: $1/mo
 - Bland usage: 300 min × $0.12 = $36/mo
-- **Total: ~$37/mo** (at $99 price point = still profitable)
+- **Total: ~$37/mo** (at $299 price point = very profitable)
 
 Most users won't max out minutes, so average cost will be lower.
 

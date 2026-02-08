@@ -13,7 +13,7 @@ User's Agent
     │ Authorization: Bearer <gateway_token>
     │
     ▼
-Automna API (Vercel)
+automna-proxy.fly.dev (Fly.io)
     │
     │ 1. Authenticate via gateway token
     │ 2. Check rate limit (50/day)

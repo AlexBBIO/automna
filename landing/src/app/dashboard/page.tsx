@@ -625,7 +625,7 @@ export default function DashboardPage() {
           'Web chat + 1 integration',
           'Browser access',
           'Personal email inbox',
-          '500K tokens/month',
+          '200K tokens/month',
         ],
         cta: 'Start with Starter',
       },
@@ -637,7 +637,7 @@ export default function DashboardPage() {
         features: [
           'Everything in Starter',
           'All integrations',
-          '2M tokens/month',
+          '1M tokens/month',
           'Unlimited memory',
           'Custom skills',
           'Email support',
@@ -653,7 +653,7 @@ export default function DashboardPage() {
         features: [
           'Everything in Pro',
           'Team workspace',
-          '10M tokens/month',
+          '5M tokens/month',
           'API access',
           'Analytics dashboard',
           'Dedicated support',

@@ -73,8 +73,8 @@ Added AI-powered phone calling via Twilio + Bland.ai:
 4. **Transcript delivery:** Dual approach - (a) direct file write to `calls/` directory on user's Fly volume, (b) message injected into agent session for follow-up actions
 5. **Auto-provisioning:** Stripe webhook provisions a phone number when user upgrades to Pro/Business
 6. **Default voice:** Alexandra (young chirpy American female, ID: `6277266e-01eb-44c6-b965-438566ef7076`)
-7. **Security:** No Twilio/Bland credentials on user machines. All calls proxied through `automna.ai/api/user/call`. Gateway token is the only auth needed.
-8. **Cost:** Twilio $1.15/mo per number + Bland $0.12/min. Pro tier (60 min cap) worst case ~$8.20/mo at $49 price.
+7. **Security:** No Twilio/Bland credentials on user machines. All calls proxied through `automna-proxy.fly.dev/api/user/call`. Gateway token is the only auth needed.
+8. **Cost:** Twilio $1.15/mo per number + Bland $0.12/min. Pro tier (60 min cap) worst case ~$8.20/mo at $149 price.
 9. **Plan limits:** Free/Starter: 0 min, Pro: 60 min/mo, Business: 300 min/mo
 
 **DB tables:** `phone_numbers` (user → number mapping, voice/identity config), `call_usage` (call tracking, transcripts, cost)
@@ -96,7 +96,7 @@ Final deployment completed with full security hardening:
 
 1. **No API Keys on User Machines**
    - `ANTHROPIC_API_KEY` is NEVER passed to Fly machines
-   - All LLM traffic routed through `ANTHROPIC_BASE_URL=https://automna.ai/api/llm`
+   - All LLM traffic routed through `ANTHROPIC_BASE_URL=https://automna-proxy.fly.dev/api/llm`
    - Proxy authenticates via gateway token
    - Prevents users from bypassing rate limits or direct API access
 
@@ -117,7 +117,7 @@ Final deployment completed with full security hardening:
 
 **🤖 LLM Proxy (05:17 UTC):**
 
-Implemented centralized LLM API proxy at `https://automna.ai/api/llm/*`:
+Implemented centralized LLM API proxy (now at `https://automna-proxy.fly.dev/api/llm/*`):
 
 1. **Endpoints**
    - `POST /api/llm/chat` - Anthropic Messages API proxy
@@ -131,12 +131,13 @@ Implemented centralized LLM API proxy at `https://automna.ai/api/llm/*`:
    - **Streaming support** - Full SSE passthrough with token counting
    - **Cost calculation** - Microdollar precision, per-model pricing
 
-3. **Plan Limits**
-   | Plan | Monthly Tokens | Monthly Cap | RPM |
-   |------|----------------|-------------|-----|
-   | Free | 100K | $1 | 5 |
-   | Starter | 500K | $5 | 20 |
-   | Pro | 5M | $50 | 60 |
+3. **Plan Limits** (see `fly-proxy/src/lib/schema.ts` PLAN_LIMITS for current values)
+   | Plan | Monthly AT Budget | RPM |
+   |------|------------------|-----|
+   | Free | 10K | 5 |
+   | Starter | 200K | 20 |
+   | Pro | 1M | 60 |
+   | Business | 5M | 120 |
 
 4. **Database Tables**
    - `llm_usage` - Request logs with tokens, cost, duration
@@ -739,11 +740,11 @@ if (currentSessionRef.current !== sessionKey) {
 
 **Products & Pricing:**
 
-| Plan | Price | Price ID | Features |
-|------|-------|----------|----------|
-| Starter | $79/mo | `price_1Sukg0LgmKPRkIsH6PMVR7BR` | 1 agent, web chat, 1 integration, 30-day memory |
-| Pro | $149/mo | `price_1SukgALgmKPRkIsHmfwtzyl6` | All integrations, browser, email inbox, unlimited memory |
-| Business | $299/mo | `price_1SukgBLgmKPRkIsHBcNE7azu` | 3 agents, team workspace, API access, analytics |
+| Plan | Price | Price ID | Token Budget | Features |
+|------|-------|----------|-------------|----------|
+| Starter | $79/mo | `price_1Sukg0LgmKPRkIsH6PMVR7BR` | 200K AT | Web chat + 1 integration, browser, email |
+| Pro | $149/mo | `price_1SukgALgmKPRkIsHmfwtzyl6` | 1M AT | All integrations, phone calls (60 min), unlimited memory |
+| Business | $299/mo | `price_1SukgBLgmKPRkIsHBcNE7azu` | 5M AT | Team workspace, phone calls (300 min), API access, dedicated support |
 
 **Webhook Events Handled:**
 - `checkout.session.completed` → Creates/updates user subscription
@@ -1271,7 +1272,7 @@ Future tasks → Load contextId, already authenticated
 User agents **cannot** access Anthropic directly:
 
 1. `ANTHROPIC_API_KEY` is NOT passed to Fly machines
-2. `ANTHROPIC_BASE_URL` routes all traffic through `https://automna.ai/api/llm`
+2. `ANTHROPIC_BASE_URL` routes all traffic through `https://automna-proxy.fly.dev/api/llm`
 3. Proxy authenticates via gateway token (per-user)
 4. All usage logged to Turso for billing
 
@@ -1585,76 +1586,60 @@ We build a custom chat interface using **assistant-ui** (open source, MIT) inste
 
 ### Pricing Tiers
 
-| Tier | Price | Resources | API Model | Credits |
-|------|-------|-----------|-----------|---------|
-| **Starter** | $29/mo | 2.5GB shared | BYOK | 500/mo* |
-| **Pro** | $79/mo | 4GB shared | BYOK | 2,000/mo* |
-| **Business** | $129/mo | 8GB dedicated VM | Credits | 15,000/mo |
-| **Max** | $249/mo | 16GB dedicated VM | Credits | 40,000/mo |
-| **Enterprise** | Contact us | Custom | Custom | Custom |
+| Tier | Price | Token Budget | Features |
+|------|-------|-------------|----------|
+| **Starter** | $79/mo | 200K Automna Tokens | Web chat + 1 integration, browser, email |
+| **Pro** | $149/mo | 1M Automna Tokens | All integrations, phone calls (60 min), unlimited memory |
+| **Business** | $299/mo | 5M Automna Tokens | Team workspace, phone calls (300 min), API access, dedicated support |
+| **Enterprise** | Contact us | Custom | Custom |
 
-*BYOK tiers: Credits cover browser automation, storage, extras only. AI usage is on user's Anthropic key.
+All plans include Claude AI (no API key required). Each user gets a dedicated Fly.io instance.
 
-**Shared vs Dedicated:**
-- **Shared (Starter/Pro):** Container on multi-tenant server. Cost-efficient, still isolated.
-- **Dedicated VM (Business/Max):** Own Hetzner VM. Full isolation, guaranteed resources.
+See [AUTOMNA-TOKENS.md](docs/AUTOMNA-TOKENS.md) for how tokens map to real costs.
 
 **Comparison to alternatives:**
 - Human VA: $15-25/hr = $2,400-4,000/mo
 - ChatGPT/Claude Pro: $20/mo but chat-only, no execution
-- Automna: $29-249/mo for full agentic capabilities
+- Automna: $79-299/mo for full agentic capabilities
 
-### Automna Credits System
+### Automna Token System
 
-Credits are a universal resource covering all platform usage:
+> **Note:** The old "credits" system has been replaced by **Automna Tokens** — a unified
+> virtual currency that maps directly to real costs. See [AUTOMNA-TOKENS.md](docs/AUTOMNA-TOKENS.md)
+> for the full specification.
 
-| Resource | Credits |
-|----------|---------|
-| 1 AI message (Sonnet) | 1 |
-| 1 AI message (Opus / extended thinking) | 5 |
-| 1 minute browser automation | 2 |
-| 100MB storage (monthly) | 10 |
-| 1 scheduled task run | 1 |
-| 1 email sent | 1 |
-
-**Overage pricing:** $10 per 1,000 credits ($0.01/credit)
-
-**Why credits:**
-- Simple UX: "You have 8,432 credits remaining"
-- Covers multiple cost centers (API, browser, storage) in one number
-- Decouples from Anthropic pricing changes
-- Enables promos, bonuses, add-on packs
+**Key points:**
+- 1 Automna Token = $0.0001 (100 microdollars)
+- LLM costs are metered from exact Anthropic token counts (variable per request)
+- Non-LLM services have fixed per-unit rates (search: 30 AT, email: 20 AT, calls: 900 AT/min)
+- Users see "tokens used / budget" — never raw dollars
 
 ### Cost Structure (Per User)
 
-| Tier | Price | Infra Cost | Credit Cost* | Total Cost | Margin |
-|------|-------|------------|--------------|------------|--------|
-| Starter $29 | $29 | ~$5 | — (BYOK) | ~$5 | 83% |
-| Pro $79 | $79 | ~$9 | — (BYOK) | ~$9 | 89% |
-| Business $129 | $129 | ~$14 | ~$15 | ~$29 | 78% |
-| Max $249 | $249 | ~$27 | ~$40 | ~$67 | 73% |
+| Tier | Price | Infra Cost | LLM Budget | Total Cost (avg) | Margin |
+|------|-------|------------|------------|------------------|--------|
+| Starter $79 | $79 | ~$9 | $20 cap | ~$15 | ~81% |
+| Pro $149 | $149 | ~$9 | $100 cap | ~$40 | ~73% |
+| Business $299 | $299 | ~$9 | $500 cap | ~$80 | ~73% |
 
-*Credit cost assumes average usage. Heavy users generate overage revenue.
+*LLM budget = Automna Token cap converted to dollars. Most users won't hit the cap.
 
-**Infrastructure costs:**
-- Shared (Starter/Pro): Containers on CX52 (32GB) — €49/mo ÷ users
-- Business 8GB VM: CX32 — €13/mo
-- Max 16GB VM: CX42 — €25/mo
+**Infrastructure costs (Fly.io):**
+- Per-user: 2GB RAM, 1 shared vCPU, 1GB volume (~$9/mo)
+- Proxy: 2 machines HA on Fly.io (shared across all users)
 
 ### Revenue Projections
 
 | Month | Users | Avg Price | MRR | Costs | Profit |
 |-------|-------|-----------|-----|-------|--------|
-| 3 | 50 | $80 | $4,000 | $500 | $3,500 |
-| 6 | 150 | $90 | $13,500 | $1,500 | $12,000 |
-| 12 | 400 | $100 | $40,000 | $5,000 | $35,000 |
+| 3 | 50 | $130 | $6,500 | $750 | $5,750 |
+| 6 | 150 | $140 | $21,000 | $2,500 | $18,500 |
+| 12 | 400 | $150 | $60,000 | $8,000 | $52,000 |
 
-At $100 average (mix of tiers):
-- 100 users = $10,000 MRR
-- 500 users = $50,000 MRR
-- 1,000 users = $100,000 MRR
-
-**Overage upside:** Business/Max users who exceed credits add incremental revenue at high margin.
+At $150 average (mix of Starter/Pro/Business):
+- 100 users = $15,000 MRR
+- 500 users = $75,000 MRR
+- 1,000 users = $150,000 MRR
 
 ### API Key Model (BYOK)
 
@@ -1818,7 +1803,7 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 | **Poe** | $20/mo | Multi-model chat | Many models | Chat only, no agent capabilities |
 | **Character.ai** | Free/Premium | Chat personas | Fun, engaging | Entertainment only, no productivity |
 | **Self-hosted Clawdbot** | DIY | Full agent | Full control, free | Requires technical skills, maintenance burden |
-| **Automna** | $79-299/mo | Full managed agent | Always-on, integrations, app hosting, zero setup | Newer, smaller |
+| **Automna** | $79-299/mo | Full managed agent | Always-on, integrations, phone calls, zero setup | Newer, smaller |
 
 **Our Differentiators:**
 1. **Full execution** — Not chat, actual task completion
@@ -2112,7 +2097,7 @@ Authentication Method:
 - Claude Max: $100-200/mo (Claude Code on YOUR machine, no integrations)
 - Human VA: $2,400-4,000/mo
 
-**Our positioning:** Premium tier ($79-299/mo) but fraction of human VA cost, more capable than Claude Max (fully managed + integrations + app hosting).
+**Our positioning:** Premium tier ($79-299/mo) but fraction of human VA cost, more capable than Claude Max (fully managed + integrations + phone calls).
 
 ### C. Clawdbot License
 
@@ -2120,4 +2105,4 @@ MIT License — allows commercial use, modification, distribution. Requires copy
 
 ---
 
-*Document maintained by Nova. Last updated: 2026-01-28*
+*Last updated: 2026-02-09*
