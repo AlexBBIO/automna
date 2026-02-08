@@ -145,6 +145,8 @@ interface MessageContentProps {
 
 // File attachment component for user and agent-shared files
 function FileAttachment({ path, isUser }: { path: string; isUser?: boolean }) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const filename = path.split('/').pop() || 'file';
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext);
@@ -154,7 +156,16 @@ function FileAttachment({ path, isUser }: { path: string; isUser?: boolean }) {
   if (isImage) {
     return (
       <div className="my-2">
-        <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="block">
+        {/* Loading placeholder */}
+        {!imageLoaded && !imageError && (
+          <div className={`flex items-center gap-3 p-4 rounded-lg animate-pulse ${
+            isUser ? 'bg-purple-500/20' : 'bg-zinc-100 dark:bg-zinc-800'
+          }`}>
+            <span className="text-2xl">📷</span>
+            <span className={`text-sm ${isUser ? 'text-purple-200' : 'text-zinc-500'}`}>Loading image...</span>
+          </div>
+        )}
+        <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className={`block ${!imageLoaded ? 'hidden' : ''}`}>
           <img 
             src={downloadUrl} 
             alt={filename}
@@ -163,20 +174,19 @@ function FileAttachment({ path, isUser }: { path: string; isUser?: boolean }) {
                 ? 'border border-purple-400/50 hover:border-purple-300' 
                 : 'border border-zinc-300 hover:border-purple-500'
             }`}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              target.nextElementSibling?.classList.remove('hidden');
-            }}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageError(true)}
           />
-          <div className={`hidden flex items-center gap-2 p-3 rounded-lg mt-1 ${
+        </a>
+        {imageError && (
+          <div className={`flex items-center gap-2 p-3 rounded-lg ${
             isUser ? 'bg-purple-500/20' : 'bg-zinc-100'
           }`}>
             <span>🖼️</span>
             <span className={`text-sm ${isUser ? 'text-purple-100' : 'text-zinc-700'}`}>{filename}</span>
             <span className={`text-xs ${isUser ? 'text-purple-200' : 'text-zinc-500'}`}>(failed to load)</span>
           </div>
-        </a>
+        )}
       </div>
     );
   }
