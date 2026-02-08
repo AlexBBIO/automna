@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useUser, SignInButton } from '@clerk/nextjs';
+import { track } from '@vercel/analytics';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -59,6 +60,12 @@ function SubscriptionBanner() {
   const searchParams = useSearchParams();
   const needsSubscription = searchParams.get('subscribe') === 'true';
   const wasCanceled = searchParams.get('canceled') === 'true';
+
+  useEffect(() => {
+    if (wasCanceled) {
+      track('pricing_checkout_canceled');
+    }
+  }, [wasCanceled]);
   
   if (wasCanceled) {
     return (
@@ -88,11 +95,48 @@ function SubscriptionBanner() {
 export default function PricingPage() {
   const { isSignedIn, user } = useUser();
   const [loading, setLoading] = useState<string | null>(null);
+  const pageLoadTime = useRef(Date.now());
+  const hasTrackedView = useRef(false);
+
+  // Track pricing page view with context
+  useEffect(() => {
+    if (hasTrackedView.current) return;
+    hasTrackedView.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    track('pricing_viewed', {
+      source: params.get('subscribe') === 'true' ? 'dashboard_redirect' : 'direct',
+      signed_in: !!isSignedIn,
+      referrer: document.referrer || 'none',
+    });
+  }, [isSignedIn]);
+
+  // Track time on page when user leaves
+  useEffect(() => {
+    const handleLeave = () => {
+      const timeOnPage = Math.round((Date.now() - pageLoadTime.current) / 1000);
+      track('pricing_exit', {
+        time_on_page_seconds: timeOnPage,
+        signed_in: !!isSignedIn,
+      });
+    };
+
+    window.addEventListener('beforeunload', handleLeave);
+    return () => window.removeEventListener('beforeunload', handleLeave);
+  }, [isSignedIn]);
 
   const handleCheckout = async (plan: typeof plans[0]) => {
     if (!isSignedIn) return;
     
     setLoading(plan.name);
+
+    // Track checkout initiation
+    const timeToClick = Math.round((Date.now() - pageLoadTime.current) / 1000);
+    track('pricing_checkout_started', {
+      plan: plan.name.toLowerCase(),
+      price: plan.price,
+      time_to_click_seconds: timeToClick,
+    });
     
     try {
       const response = await fetch('/api/checkout', {
@@ -110,9 +154,11 @@ export default function PricingPage() {
         window.location.href = data.url;
       } else {
         console.error('No checkout URL returned');
+        track('pricing_checkout_error', { plan: plan.name.toLowerCase(), error: 'no_url' });
       }
     } catch (error) {
       console.error('Checkout error:', error);
+      track('pricing_checkout_error', { plan: plan.name.toLowerCase(), error: 'fetch_failed' });
     }
     
     setLoading(null);
