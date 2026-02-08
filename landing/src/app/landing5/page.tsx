@@ -192,6 +192,8 @@ function HeroChat() {
   const [visibleMessages, setVisibleMessages] = useState<number[]>([]);
   const [showDeliverable, setShowDeliverable] = useState(false);
   const [cycle, setCycle] = useState(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const userMessage = "Research the top sushi restaurants in town, email the list to me and my friends who RSVP'd to dinner tonight, then call around to see who has a table for 6";
 
@@ -203,6 +205,16 @@ function HeroChat() {
     "Emails sent ✓ Now calling restaurants for tonight...",
     "Called 5 restaurants — 3 have tables for 6.",
   ];
+
+  // Auto-scroll to bottom on any content change
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [typedUser, typedAgent, visibleMessages, showTypingDots, showDeliverable]);
 
   // Reset and replay loop
   useEffect(() => {
@@ -227,9 +239,9 @@ function HeroChat() {
         setTypedUser(userMessage.slice(0, i));
         if (i >= userMessage.length) {
           clearInterval(interval);
-          setTimeout(() => setStep(1), 600);
+          setTimeout(() => setStep(1), 800);
         }
-      }, 18);
+      }, 28);
       return () => clearInterval(interval);
     }
 
@@ -250,11 +262,11 @@ function HeroChat() {
             clearInterval(interval);
             setVisibleMessages(prev => [...prev, msgIndex]);
             setTypedAgent('');
-            setTimeout(() => setStep(step + 1), 400);
+            setTimeout(() => setStep(step + 1), 600);
           }
-        }, 22);
+        }, 32);
         return () => clearInterval(interval);
-      }, 800 + Math.random() * 400);
+      }, 1000 + Math.random() * 500);
 
       return () => clearTimeout(dotsDelay);
     }
@@ -315,7 +327,7 @@ function HeroChat() {
       </div>
 
       {/* Messages area */}
-      <div className="space-y-3 min-h-[320px] max-h-[420px] overflow-hidden">
+      <div ref={scrollContainerRef} className="space-y-3 min-h-[320px] max-h-[420px] overflow-y-auto scroll-smooth" style={{ scrollbarWidth: 'none' }}>
         {/* User message - types in */}
         {typedUser && (
           <div className="flex justify-end animate-fadeIn">
@@ -369,6 +381,7 @@ function HeroChat() {
             </div>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
     </div>
   );
