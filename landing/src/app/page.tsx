@@ -1042,7 +1042,7 @@ export default function Home() {
               <div className="text-xl font-semibold tracking-tight mb-2 md:mb-4">
                 <span className="text-purple-600 dark:text-purple-400">Auto</span>mna
               </div>
-              <p className="text-zinc-400 dark:text-zinc-600 text-sm">© 2026 Automna</p>
+              <p className="text-zinc-400 dark:text-zinc-600 text-sm">© 2026 Automna · Powered by <a href="https://openclaw.ai" target="_blank" rel="noopener noreferrer" className="text-purple-500 dark:text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 transition-colors">OpenClaw</a></p>
             </div>
             <div className="flex flex-wrap gap-x-6 md:gap-x-8 gap-y-3 md:gap-y-4 text-zinc-500 dark:text-zinc-500 text-sm">
               <Link href="/privacy" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Privacy</Link>
