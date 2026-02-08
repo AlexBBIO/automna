@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendWelcomeEmail } from '@/lib/email';
+import { sendWelcomeEmail, upsertContact } from '@/lib/email';
 
 export async function POST(req: Request) {
   // Get the Svix headers for verification
@@ -76,6 +76,15 @@ export async function POST(req: Request) {
 
       // Send welcome email
       await sendWelcomeEmail(primaryEmail, first_name || undefined);
+
+      // Add to Resend audience
+      await upsertContact({
+        email: primaryEmail,
+        firstName: first_name || undefined,
+        lastName: last_name || undefined,
+        clerkId: id,
+        plan: 'free',
+      });
     }
   }
 

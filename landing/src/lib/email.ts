@@ -3,6 +3,10 @@
  * 
  * All templates are defined inline — no dashboard needed.
  * Emails fail gracefully (log + continue) so they never block user flows.
+ * 
+ * Two API keys:
+ * - RESEND_API_KEY: send-only (for transactional emails)
+ * - RESEND_FULL_API_KEY: full access (for contacts/audience management)
  */
 
 import { Resend } from 'resend';
@@ -14,6 +18,9 @@ function getResend(): Resend | null {
   if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
   return _resend;
 }
+
+// Contact management uses fetch directly (SDK types don't support custom properties)
+// Requires RESEND_FULL_API_KEY env var (full access, not send-only)
 
 // Sender address — update once domain is verified in Resend
 const FROM = process.env.RESEND_FROM || 'Automna <onboarding@resend.dev>';
@@ -208,4 +215,96 @@ export async function sendUsageWarning(
       </div>
     `,
   });
+}
+
+// ─── Audience / Contact Management ─────────────────────────────────
+
+interface ContactData {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  clerkId?: string;
+  plan?: string;
+  agentEmail?: string;
+  phoneNumber?: string;
+}
+
+/**
+ * Add or update a contact in Resend audience.
+ * Called on signup and plan changes.
+ */
+export async function upsertContact(data: ContactData): Promise<boolean> {
+  if (!process.env.RESEND_FULL_API_KEY) {
+    console.log(`[Email] No RESEND_FULL_API_KEY, skipping contact upsert for ${data.email}`);
+    return false;
+  }
+
+  try {
+    // Use fetch directly for contact creation since SDK types don't support custom properties
+    const body: Record<string, unknown> = {
+      email: data.email,
+      unsubscribed: false,
+    };
+
+    if (data.firstName) body.first_name = data.firstName;
+    if (data.lastName) body.last_name = data.lastName;
+    if (data.clerkId) body.clerk_id = data.clerkId;
+    if (data.plan) body.plan = data.plan;
+    if (data.agentEmail) body.agent_email = data.agentEmail;
+    if (data.phoneNumber) body.phone_number = data.phoneNumber;
+
+    const response = await fetch('https://api.resend.com/contacts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_FULL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[Email] Failed to upsert contact ${data.email}:`, error);
+      return false;
+    }
+
+    console.log(`[Email] Upserted contact ${data.email} (plan: ${data.plan || 'free'})`);
+    return true;
+  } catch (err) {
+    console.error(`[Email] Error upserting contact ${data.email}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Update just the plan label for a contact.
+ */
+export async function updateContactPlan(email: string, plan: string): Promise<boolean> {
+  if (!process.env.RESEND_FULL_API_KEY) {
+    console.log(`[Email] No RESEND_FULL_API_KEY, skipping plan update for ${email}`);
+    return false;
+  }
+
+  try {
+    const response = await fetch('https://api.resend.com/contacts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_FULL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, plan }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[Email] Failed to update contact plan ${email}:`, error);
+      return false;
+    }
+
+    console.log(`[Email] Updated contact ${email} plan to ${plan}`);
+    return true;
+  } catch (err) {
+    console.error(`[Email] Error updating contact plan ${email}:`, err);
+    return false;
+  }
 }

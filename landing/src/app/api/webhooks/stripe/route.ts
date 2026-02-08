@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { clerkClient } from '@clerk/nextjs/server';
-import { sendSubscriptionStarted, sendSubscriptionCanceled, sendPaymentFailed } from '@/lib/email';
+import { sendSubscriptionStarted, sendSubscriptionCanceled, sendPaymentFailed, updateContactPlan } from '@/lib/email';
 import { db } from '@/lib/db';
 import { machines, machineEvents, phoneNumbers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -298,9 +298,10 @@ export async function POST(request: Request) {
           
           console.log(`[stripe] Upgraded user ${clerkUserId} to ${plan}`);
 
-          // Send subscription started email
+          // Send subscription started email + update audience
           if (session.customer_email) {
             await sendSubscriptionStarted(session.customer_email, plan);
+            await updateContactPlan(session.customer_email, plan);
           }
         }
         break;
@@ -353,10 +354,11 @@ export async function POST(request: Request) {
           
           console.log(`[stripe] Canceled subscription for user ${clerkUserId}`);
 
-          // Send cancellation email
+          // Send cancellation email + update audience
           const customerEmail = (customer as Stripe.Customer).email;
           if (customerEmail) {
             await sendSubscriptionCanceled(customerEmail);
+            await updateContactPlan(customerEmail, 'free');
           }
         }
         break;
