@@ -11,7 +11,7 @@ export default function Terms() {
         </nav>
 
         <h1 className="text-4xl font-bold mb-8">Terms of Service</h1>
-        <p className="text-gray-400 mb-8">Last updated: February 4, 2026</p>
+        <p className="text-gray-400 mb-8">Last updated: February 8, 2026</p>
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8">
           <section>
@@ -32,13 +32,19 @@ export default function Terms() {
 
           <section>
             <h2 className="text-2xl font-semibold mb-4">3. Your Responsibilities</h2>
+            <p className="text-gray-300 leading-relaxed mb-4">
+              You are solely responsible for your use of the Service and any actions taken by your AI agent. 
+              By using Automna, you agree to the following:
+            </p>
             <ul className="list-disc list-inside text-gray-300 space-y-2">
               <li>You are responsible for maintaining the security of your account credentials</li>
+              <li>You must comply with all applicable local, state, federal, and international laws and regulations in connection with your use of the Service</li>
               <li>You must comply with the terms of service of any third-party services you connect</li>
-              <li>You must not use the Service for illegal activities</li>
+              <li>You must not use the Service for any unlawful purpose or to facilitate illegal activities of any kind</li>
               <li>You must not attempt to access other users&apos; data or systems</li>
               <li>You must use the Service within reasonable usage limits for your plan</li>
-              <li>You are responsible for the actions your AI agent takes on your behalf</li>
+              <li>You are solely responsible for the actions your AI agent takes on your behalf, including any consequences resulting from those actions</li>
+              <li>You accept full liability for any harm, damages, or legal consequences arising from your use of the Service or your agent&apos;s actions</li>
             </ul>
           </section>
 
@@ -48,14 +54,20 @@ export default function Terms() {
               You agree not to use the Service to:
             </p>
             <ul className="list-disc list-inside text-gray-300 space-y-2">
+              <li>Engage in, facilitate, or promote any illegal activity under applicable local, state, federal, or international law</li>
               <li>Generate spam, malware, or harmful content</li>
-              <li>Harass, abuse, or harm others</li>
-              <li>Violate any applicable laws or regulations</li>
+              <li>Harass, abuse, threaten, or harm others</li>
               <li>Infringe on intellectual property rights</li>
               <li>Attempt to circumvent security measures</li>
               <li>Abuse compute resources (e.g., cryptocurrency mining, excessive automated requests)</li>
+              <li>Conduct fraud, money laundering, or other financial crimes</li>
               <li>Resell or redistribute the Service without authorization</li>
             </ul>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              We reserve the right to suspend or terminate accounts that violate these terms without notice. 
+              You agree to indemnify and hold Automna harmless from any claims, damages, or expenses arising 
+              from your violation of these terms or misuse of the Service.
+            </p>
           </section>
 
           <section>
