@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -183,6 +183,26 @@ const faqItems = [
   { q: 'Can my team share an agent?', a: 'You can add agents to Slack channels, Discord servers, and Telegram groups—so they can collaborate with your team and even talk to each other.' },
 ];
 
+// Avatar - defined outside HeroChat to avoid remount flicker
+const ChatAvatar = () => (
+  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md">
+    <span className="text-white text-[10px] font-bold">A</span>
+  </div>
+);
+
+const TypingDots = ({ showAvatar = true }: { showAvatar?: boolean }) => (
+  <div className="flex items-start gap-2">
+    {showAvatar ? <ChatAvatar /> : <div className="w-7 shrink-0" />}
+    <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl rounded-tl-md border border-zinc-200 dark:border-zinc-700">
+      <div className="flex items-center gap-1 h-5">
+        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      </div>
+    </div>
+  </div>
+);
+
 // Animated Hero Chat component
 function HeroChat() {
   const [step, setStep] = useState(-1); // -1 = not started
@@ -192,6 +212,7 @@ function HeroChat() {
   const [visibleMessages, setVisibleMessages] = useState<number[]>([]);
   const [showDeliverable, setShowDeliverable] = useState(false);
   const [cycle, setCycle] = useState(0);
+  const [justCompleted, setJustCompleted] = useState<number | null>(null); // track which msg just finished typing (skip animation)
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -206,15 +227,17 @@ function HeroChat() {
     "Called 5 restaurants — 3 have tables for 6.",
   ];
 
-  // Auto-scroll to bottom on any content change
-  useEffect(() => {
+  // Auto-scroll to bottom on any content change — use instant scroll to avoid fighting with animations
+  const scrollToBottom = useCallback(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({
-        top: scrollContainerRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
-  }, [typedUser, typedAgent, visibleMessages, showTypingDots, showDeliverable]);
+  }, []);
+
+  useEffect(() => {
+    // Use rAF to scroll after DOM paint, keeps it smooth
+    requestAnimationFrame(scrollToBottom);
+  }, [typedUser, typedAgent, visibleMessages, showTypingDots, showDeliverable, scrollToBottom]);
 
   // Reset and replay loop
   useEffect(() => {
@@ -233,6 +256,7 @@ function HeroChat() {
       setShowDeliverable(false);
       setShowTypingDots(false);
       setTypedAgent('');
+      setJustCompleted(null);
       let i = 0;
       const interval = setInterval(() => {
         i++;
@@ -250,6 +274,7 @@ function HeroChat() {
       const msgIndex = step - 1;
       setShowTypingDots(true);
       setTypedAgent('');
+      setJustCompleted(null);
 
       const dotsDelay = setTimeout(() => {
         setShowTypingDots(false);
@@ -260,6 +285,8 @@ function HeroChat() {
           setTypedAgent(text.slice(0, i));
           if (i >= text.length) {
             clearInterval(interval);
+            // Mark as just-completed so it doesn't re-animate
+            setJustCompleted(msgIndex);
             setVisibleMessages(prev => [...prev, msgIndex]);
             setTypedAgent('');
             setTimeout(() => setStep(step + 1), 600);
@@ -291,31 +318,14 @@ function HeroChat() {
     }
   }, [step]);
 
-  const Avatar = () => (
-    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md">
-      <span className="text-white text-[10px] font-bold">A</span>
-    </div>
-  );
-
-  const TypingDots = () => (
-    <div className="flex items-start gap-2">
-      <Avatar />
-      <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl rounded-tl-md border border-zinc-200 dark:border-zinc-700">
-        <div className="flex items-center gap-1 h-5">
-          <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-          <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-          <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-        </div>
-      </div>
-    </div>
-  );
+  // TypingDots uses a stable ref to avoid remounting
 
   return (
     <div className="bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 md:p-5 shadow-lg">
       {/* Chat header */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-200 dark:border-zinc-700/50">
         <div className="flex items-center gap-2">
-          <Avatar />
+          <ChatAvatar />
           <div>
             <span className="text-zinc-800 dark:text-zinc-200 text-sm font-medium">Automna</span>
             <div className="flex items-center gap-1">
@@ -327,10 +337,10 @@ function HeroChat() {
       </div>
 
       {/* Messages area */}
-      <div ref={scrollContainerRef} className="space-y-3 min-h-[320px] max-h-[420px] overflow-y-auto scroll-smooth" style={{ scrollbarWidth: 'none' }}>
+      <div ref={scrollContainerRef} className="space-y-3 min-h-[320px] max-h-[420px] overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
         {/* User message - types in */}
         {typedUser && (
-          <div className="flex justify-end animate-fadeIn">
+          <div className="flex justify-end">
             <div className="max-w-[85%] px-4 py-2.5 bg-purple-600 text-white rounded-2xl rounded-br-md shadow-sm">
               <span className="text-sm">{typedUser}{step === 0 && <span className="animate-pulse">|</span>}</span>
             </div>
@@ -339,8 +349,8 @@ function HeroChat() {
 
         {/* Completed agent messages */}
         {visibleMessages.map((msgIdx, i) => (
-          <div key={msgIdx} className="flex items-start gap-2 animate-fadeIn">
-            {i === 0 && <Avatar />}
+          <div key={msgIdx} className={`flex items-start gap-2${msgIdx === justCompleted ? '' : ' animate-message-in'}`}>
+            {i === 0 && <ChatAvatar />}
             {i !== 0 && <div className="w-7 shrink-0" />}
             <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
               <span className="text-zinc-700 dark:text-zinc-300 text-sm">{agentMessages[msgIdx]}</span>
@@ -351,7 +361,7 @@ function HeroChat() {
         {/* Currently typing agent message */}
         {typedAgent && !showTypingDots && (
           <div className="flex items-start gap-2">
-            {visibleMessages.length === 0 && <Avatar />}
+            {visibleMessages.length === 0 && <ChatAvatar />}
             {visibleMessages.length > 0 && <div className="w-7 shrink-0" />}
             <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
               <span className="text-zinc-700 dark:text-zinc-300 text-sm">{typedAgent}<span className="animate-pulse text-purple-500">|</span></span>
@@ -360,11 +370,11 @@ function HeroChat() {
         )}
 
         {/* Typing indicator */}
-        {showTypingDots && <TypingDots />}
+        {showTypingDots && <TypingDots showAvatar={visibleMessages.length === 0} />}
 
         {/* Deliverable card */}
         {showDeliverable && (
-          <div className="flex items-start gap-2 animate-fadeIn">
+          <div className="flex items-start gap-2 animate-message-in">
             <div className="w-7 shrink-0" />
             <div className="p-4 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm max-w-[90%]">
               <div className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1">RESERVATIONS FOUND</div>
@@ -479,7 +489,7 @@ export default function Home() {
         {/* Chat header */}
         <div className={`flex items-center justify-between ${compact ? 'mb-3 pb-2' : 'mb-4 pb-3'} border-b border-zinc-200 dark:border-zinc-700/50`}>
           <div className="flex items-center gap-2">
-            <Avatar />
+            <ChatAvatar />
             <div>
               <span className="text-zinc-800 dark:text-zinc-200 text-xs md:text-sm font-medium">Automna</span>
               <div className="flex items-center gap-1">
@@ -502,7 +512,7 @@ export default function Home() {
           {/* Assistant progress messages */}
           {logLines.map((line, i) => (
             <div key={i} className="flex items-start gap-2">
-              {i === 0 && <Avatar />}
+              {i === 0 && <ChatAvatar />}
               {i !== 0 && <div className="w-7 md:w-8 shrink-0" />}
               <div className={`${compact ? 'px-3 py-2' : 'px-4 py-2.5'} bg-white dark:bg-zinc-800 rounded-2xl ${i === 0 ? 'rounded-tl-md' : ''} border border-zinc-200 dark:border-zinc-700 shadow-sm`}>
                 <span className="text-zinc-700 dark:text-zinc-300 text-xs md:text-sm">{line.replace('agent: ', '')}</span>

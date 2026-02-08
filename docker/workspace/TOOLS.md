@@ -67,14 +67,34 @@ See `BROWSERBASE.md` for full documentation and examples.
 See `AGENTMAIL.md` for full documentation.
 
 **Quick send:**
-```python
-import os, requests
-requests.post(
-    "https://automna.ai/api/user/email/send",
-    headers={"Authorization": f"Bearer {os.environ['OPENCLAW_GATEWAY_TOKEN']}"},
-    json={"to": "user@example.com", "subject": "Hello", "text": "Message body"}
-)
+```bash
+curl -s -X POST "https://automna.ai/api/user/email/send" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "user@example.com", "subject": "Hello", "text": "Message body"}'
 ```
+
+**Send with attachments:**
+```bash
+# First base64-encode the file
+FILE_B64=$(base64 -w0 /path/to/file.png)
+
+curl -s -X POST "https://automna.ai/api/user/email/send" \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"to\": \"user@example.com\",
+    \"subject\": \"Photo attached\",
+    \"text\": \"See the attached image.\",
+    \"attachments\": [{
+      \"filename\": \"photo.png\",
+      \"content_type\": \"image/png\",
+      \"content\": \"$FILE_B64\"
+    }]
+  }"
+```
+
+**Attachment format:** Each attachment needs `filename`, `content_type`, and either `content` (base64) or `url`.
 
 ### LLM (Anthropic Claude)
 

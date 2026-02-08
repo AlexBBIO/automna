@@ -80,6 +80,8 @@ ${callRecord.transcript || "No transcript available."}`;
     const targetSessionKey = callRecord.sessionKey || lastSessionKey || 'main';
 
     // Send via hooks/agent - runs an agent turn that delivers the response to the user
+    // IMPORTANT: The message must explicitly instruct the agent to relay the info.
+    // Without this, the agent may treat it as a system event and reply NO_REPLY.
     const agentResponse = await fetch(`${machineUrl}/hooks/agent`, {
       method: "POST",
       headers: {
@@ -87,7 +89,7 @@ ${callRecord.transcript || "No transcript available."}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        message: `A phone call just completed. Here are the results:\n\n${message}`,
+        message: `IMPORTANT: A phone call just completed. You MUST relay this information to the user immediately. Do NOT reply with NO_REPLY. Send the following summary to the user:\n\n${message}\n\nRelay this to the user now. Include the summary and key details from the transcript.`,
         name: "PhoneCall",
         deliver: true,
         channel: "last",

@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { to, subject, text, html, cc, bcc } = body;
+    const { to, subject, text, html, cc, bcc, attachments } = body;
 
     if (!to || !subject) {
       return NextResponse.json(
@@ -106,8 +106,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Build request body
+    const emailBody: Record<string, unknown> = {
+      to: Array.isArray(to) ? to.join(", ") : to,
+      subject,
+      text,
+      html,
+      cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc) : undefined,
+      bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc) : undefined,
+    };
+
+    // Pass through attachments if provided
+    // Format: [{filename, content_type, content (base64), url}]
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      emailBody.attachments = attachments;
+      console.log(`[email/send] Sending with ${attachments.length} attachment(s)`);
+    }
+
     // Send via Agentmail
-    // Note: Agentmail API uses /messages/send endpoint with simple string recipients
     const agentmailResponse = await fetch(
       `https://api.agentmail.to/v0/inboxes/${encodeURIComponent(userMachine.agentmailInboxId!)}/messages/send`,
       {
@@ -116,14 +132,7 @@ export async function POST(request: NextRequest) {
           "Authorization": `Bearer ${AGENTMAIL_API_KEY}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          to: Array.isArray(to) ? to.join(", ") : to,
-          subject,
-          text,
-          html,
-          cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc) : undefined,
-          bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc) : undefined,
-        }),
+        body: JSON.stringify(emailBody),
       }
     );
 
