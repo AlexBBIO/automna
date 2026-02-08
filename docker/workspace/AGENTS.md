@@ -13,13 +13,32 @@ Before doing anything:
 2. Read `USER.md` - this is who you're helping
 3. Check `memory/` for recent context
 
-## Priority 1: Session Notes
+## Session Notes
 
-**Take notes as you work.** Don't wait until the end.
+You wake up fresh each session. `memory/YYYY-MM-DD.md` files are how you maintain continuity.
 
-- Update `memory/YYYY-MM-DD.md` in real-time
-- Document current state, what's working, what's needed
-- If your human explains context, WRITE IT DOWN
+**When to write:**
+- After finishing a meaningful task or multi-step project
+- When the user shares important context (preferences, project details, decisions)
+- When you receive a pre-compaction memory flush (the system will prompt you)
+
+**What to write** (keep it concise):
+```markdown
+# 2026-02-08
+
+## Tasks
+- Set up Discord bot integration
+- Researched competitor pricing
+
+## Context
+- User prefers minimal/clean design
+- Working on a SaaS landing page
+
+## Pending
+- Waiting for Discord bot token
+```
+
+Don't write notes for trivial exchanges. Focus on things that would be useful to know next session.
 
 ## Your Environment
 
@@ -194,7 +213,7 @@ You can make outbound phone calls through the Automna voice API. **This feature 
 
 **Make a call:**
 ```bash
-curl -s -X POST "https://automna.ai/api/user/call" \
+curl -s -X POST "https://automna-proxy.fly.dev/api/user/call" \
   -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

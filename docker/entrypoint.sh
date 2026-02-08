@@ -106,7 +106,7 @@ if [ -d "/app/default-workspace" ] && [ ! -f "$OPENCLAW_DIR/workspace/.initializ
     echo "[automna] Initializing workspace with defaults..."
     cp -rn /app/default-workspace/* "$OPENCLAW_DIR/workspace/" 2>/dev/null || true
     touch "$OPENCLAW_DIR/workspace/.initialized"
-    echo "6" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "8" > "$OPENCLAW_DIR/workspace/.workspace-version"
     echo "[automna] Workspace initialized"
 fi
 
@@ -131,7 +131,7 @@ Make and receive phone calls through your dedicated phone number.
 
 **Make an outbound call using exec + curl:**
 ```bash
-curl -s -X POST "https://automna.ai/api/user/call" \
+curl -s -X POST "https://automna-proxy.fly.dev/api/user/call" \
   -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -168,7 +168,7 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 CALL_ID="<the call_id from the response>"
 for i in $(seq 1 12); do
   sleep 30
-  RESULT=$(curl -s "https://automna.ai/api/user/call/status?call_id=$CALL_ID" -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN")
+  RESULT=$(curl -s "https://automna-proxy.fly.dev/api/user/call/status?call_id=$CALL_ID" -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN")
   COMPLETED=$(echo "$RESULT" | jq -r '.completed')
   if [ "$COMPLETED" = "true" ]; then
     echo "$RESULT" | jq .
@@ -183,7 +183,7 @@ Run this right after making the call. Do NOT wait for the user to ask. Report th
 
 **Check usage:**
 ```bash
-curl -s "https://automna.ai/api/user/call/usage" \
+curl -s "https://automna-proxy.fly.dev/api/user/call/usage" \
   -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN"
 ```
 
@@ -208,7 +208,7 @@ You can make outbound phone calls through the Automna voice API. **This feature 
 
 **Make a call:**
 ```bash
-curl -s -X POST "https://automna.ai/api/user/call" \
+curl -s -X POST "https://automna-proxy.fly.dev/api/user/call" \
   -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -224,7 +224,7 @@ curl -s -X POST "https://automna.ai/api/user/call" \
 CALL_ID="<call_id from response>"
 for i in $(seq 1 12); do
   sleep 30
-  RESULT=$(curl -s "https://automna.ai/api/user/call/status?call_id=$CALL_ID" -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN")
+  RESULT=$(curl -s "https://automna-proxy.fly.dev/api/user/call/status?call_id=$CALL_ID" -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN")
   if [ "$(echo "$RESULT" | jq -r '.completed')" = "true" ]; then
     echo "$RESULT" | jq .
     break
@@ -264,7 +264,7 @@ if [ "$WORKSPACE_VERSION" -lt 3 ] 2>/dev/null; then
 CALL_ID=\"<the call_id from the make-call response>\"
 for i in \\\$(seq 1 12); do
   sleep 30
-  RESULT=\\\$(curl -s \"https://automna.ai/api/user/call/status?call_id=\\\$CALL_ID\" \\\\
+  RESULT=\\\$(curl -s \"https://automna-proxy.fly.dev/api/user/call/status?call_id=\\\$CALL_ID\" \\\\
     -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\")
   COMPLETED=\\\$(echo \"\\\$RESULT\" | jq -r '.completed')
   if [ \"\\\$COMPLETED\" = \"true\" ]; then
@@ -307,7 +307,7 @@ Run this **immediately** after making the call. Do not wait for the user to ask.
 CALL_ID=\"<call_id from response>\"
 for i in \\\$(seq 1 12); do
   sleep 30
-  RESULT=\\\$(curl -s \"https://automna.ai/api/user/call/status?call_id=\\\$CALL_ID\" -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\")
+  RESULT=\\\$(curl -s \"https://automna-proxy.fly.dev/api/user/call/status?call_id=\\\$CALL_ID\" -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\")
   if [ \"\\\$(echo \"\\\$RESULT\" | jq -r '.completed')\" = \"true\" ]; then
     echo \"\\\$RESULT\" | jq .
     break
@@ -414,7 +414,7 @@ if [ "$WORKSPACE_VERSION" -lt 4 ] 2>/dev/null; then
 
 **If you need to manually check a call status (rare):**
 \\\`\\\`\\\`bash
-curl -s \"https://automna.ai/api/user/call/status?call_id=<CALL_ID>\" \\\\
+curl -s \"https://automna-proxy.fly.dev/api/user/call/status?call_id=<CALL_ID>\" \\\\
   -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\" | jq '{completed, status, summary, duration_seconds}'
 \\\`\\\`\\\`
 
@@ -538,9 +538,75 @@ HEARTBEATEOF
     echo "[automna] Workspace migrated to version 6"
 fi
 
-# Migration 6→7: Add email attachment docs to TOOLS.md
+# Migration 6→7: Strengthen AGENTS.md memory instructions + reset HEARTBEAT.md
 if [ "$WORKSPACE_VERSION" -lt 7 ] 2>/dev/null; then
-    echo "[automna] Workspace migration v7: adding email attachment docs..."
+    echo "[automna] Workspace migration v7: strengthening memory instructions..."
+
+    # Reset HEARTBEAT.md to empty (heartbeats disabled by default to save tokens)
+    cat > "$OPENCLAW_DIR/workspace/HEARTBEAT.md" << 'HEARTBEATEOF'
+# Heartbeat Tasks
+
+# Keep this file empty to skip heartbeat work.
+# Add tasks below when you want the agent to check something periodically.
+HEARTBEATEOF
+
+    # Patch AGENTS.md memory section - replace passive wording with stronger instructions
+    if [ -f "$OPENCLAW_DIR/workspace/AGENTS.md" ] && grep -q "Take notes as you work" "$OPENCLAW_DIR/workspace/AGENTS.md" 2>/dev/null; then
+        node -e "
+            const fs = require('fs');
+            const file = '$OPENCLAW_DIR/workspace/AGENTS.md';
+            let content = fs.readFileSync(file, 'utf8');
+
+            const oldSection = \`## Priority 1: Session Notes
+
+**Take notes as you work.** Don't wait until the end.
+
+- Update \\\`memory/YYYY-MM-DD.md\\\` in real-time
+- Document current state, what's working, what's needed
+- If your human explains context, WRITE IT DOWN\`;
+
+            const newSection = \`## Session Notes
+
+You wake up fresh each session. \\\`memory/YYYY-MM-DD.md\\\` files are how you maintain continuity.
+
+**When to write:**
+- After finishing a meaningful task or multi-step project
+- When the user shares important context (preferences, project details, decisions)
+- When you receive a pre-compaction memory flush (the system will prompt you)
+
+**What to write** (keep it concise):
+\\\`\\\`\\\`markdown
+# 2026-02-08
+
+## Tasks
+- Set up Discord bot integration
+- Researched competitor pricing
+
+## Context
+- User prefers minimal/clean design
+- Working on a SaaS landing page
+
+## Pending
+- Waiting for Discord bot token
+\\\`\\\`\\\`
+
+Don't write notes for trivial exchanges. Focus on things that would be useful to know next session.\`;
+
+            if (content.includes('Take notes as you work')) {
+                content = content.replace(oldSection, newSection);
+                fs.writeFileSync(file, content);
+                console.log('[automna] AGENTS.md memory section updated');
+            }
+        " 2>/dev/null || echo "[automna] Warning: AGENTS.md patch failed (non-critical)"
+    fi
+
+    echo "7" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "[automna] Workspace migrated to version 7"
+fi
+
+# Migration 7→8: Add email attachment docs to TOOLS.md
+if [ "$WORKSPACE_VERSION" -lt 8 ] 2>/dev/null; then
+    echo "[automna] Workspace migration v8: adding email attachment docs..."
 
     if [ -f "$OPENCLAW_DIR/workspace/TOOLS.md" ] && ! grep -q "attachments" "$OPENCLAW_DIR/workspace/TOOLS.md" 2>/dev/null; then
         node -e "
@@ -598,8 +664,8 @@ curl -s -X POST \"https://automna-proxy.fly.dev/api/user/email/send\" \\\\
         " 2>/dev/null || echo "[automna] Warning: email attachment patch failed"
     fi
 
-    echo "7" > "$OPENCLAW_DIR/workspace/.workspace-version"
-    echo "[automna] Workspace migrated to version 7"
+    echo "8" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "[automna] Workspace migrated to version 8"
 fi
 
 # Extract gateway token from args first (needed for config)
@@ -690,8 +756,7 @@ cat > "$CONFIG_FILE" << EOFCONFIG
         "mode": "safeguard",
         "memoryFlush": {
           "enabled": true,
-          "softThresholdTokens": 80000,
-          "prompt": "Summarize this conversation for continuity: current project state, key decisions made, user preferences, and any pending tasks or next steps."
+          "softThresholdTokens": 80000
         }
       }
     }
