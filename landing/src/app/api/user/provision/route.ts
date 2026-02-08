@@ -411,22 +411,25 @@ async function createMachine(
     // Gateway auth
     OPENCLAW_GATEWAY_TOKEN: gatewayToken,
     
+    // Proxy URL (entrypoint reads this to configure clawdbot.json)
+    AUTOMNA_PROXY_URL: "https://automna-proxy.fly.dev",
+
     // Anthropic proxy (OpenClaw's anthropic provider uses these)
     ANTHROPIC_API_KEY: gatewayToken,
-    // ANTHROPIC_BASE_URL set in entrypoint.sh
+    // ANTHROPIC_BASE_URL set in entrypoint.sh from AUTOMNA_PROXY_URL
     
     // Gemini proxy
     GEMINI_API_KEY: gatewayToken,
     GOOGLE_API_KEY: gatewayToken,  // Some SDKs use this
-    GOOGLE_API_BASE_URL: "https://automna.ai/api/gemini",
+    GOOGLE_API_BASE_URL: "https://automna-proxy.fly.dev/api/gemini",
     
     // Browserbase proxy
     BROWSERBASE_API_KEY: gatewayToken,
-    BROWSERBASE_API_URL: "https://automna.ai/api/browserbase",
+    BROWSERBASE_API_URL: "https://automna-proxy.fly.dev/api/browserbase",
     
     // Brave Search proxy
     BRAVE_API_KEY: gatewayToken,
-    BRAVE_API_URL: "https://automna.ai/api/brave",
+    BRAVE_API_URL: "https://automna-proxy.fly.dev/api/brave",
   };
   
   // Add Browserbase context if available (for persistent browser sessions)
