@@ -1,3 +1,5 @@
+> **⚠️ OUTDATED:** This document describes the legacy Vercel proxy. The current proxy runs on Fly.io. See [API-PROXIES.md](API-PROXIES.md) for the current architecture.
+
 # API Proxy Implementation
 
 ## Status: ✅ All Proxies Complete (2026-02-04)
@@ -41,8 +43,8 @@ GOOGLE_API_KEY=<gateway-token>
 BROWSERBASE_API_KEY=<gateway-token>
 
 # Base URLs point to our proxies
-GOOGLE_API_BASE_URL=https://automna.ai/api/gemini
-BROWSERBASE_API_URL=https://automna.ai/api/browserbase
+GOOGLE_API_BASE_URL=https://automna-proxy.fly.dev/api/gemini
+BROWSERBASE_API_URL=https://automna-proxy.fly.dev/api/browserbase
 # ANTHROPIC_BASE_URL set in entrypoint.sh
 ```
 

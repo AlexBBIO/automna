@@ -87,7 +87,7 @@ print(response.text)
 |----------|-------|
 | `GEMINI_API_KEY` | Your gateway token (auto-configured) |
 | `GOOGLE_API_KEY` | Same as above (SDK alias) |
-| `GOOGLE_API_BASE_URL` | `https://automna.ai/api/gemini` |
+| `GOOGLE_API_BASE_URL` | `https://automna-proxy.fly.dev/api/gemini` |
 
 ## Notes
 

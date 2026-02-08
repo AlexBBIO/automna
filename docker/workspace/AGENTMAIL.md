@@ -16,7 +16,7 @@ import requests
 
 # Your gateway token is in OPENCLAW_GATEWAY_TOKEN
 GATEWAY_TOKEN = os.environ["OPENCLAW_GATEWAY_TOKEN"]
-API_BASE = "https://automna.ai/api/user/email"
+API_BASE = "https://automna-proxy.fly.dev/api/user/email"
 
 response = requests.post(
     f"{API_BASE}/send",
@@ -75,7 +75,7 @@ import os
 import requests
 
 GATEWAY_TOKEN = os.environ["OPENCLAW_GATEWAY_TOKEN"]
-API_BASE = "https://automna.ai/api/user/email"
+API_BASE = "https://automna-proxy.fly.dev/api/user/email"
 
 # List messages
 response = requests.get(

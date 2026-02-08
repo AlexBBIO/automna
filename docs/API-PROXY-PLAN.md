@@ -148,7 +148,7 @@ OpenClaw needs to be configured to use our proxy instead of Anthropic directly.
 **Option A: Environment Variable Override (Try First)**
 ```bash
 # Set in Fly machine env
-ANTHROPIC_BASE_URL=https://automna.ai/api/llm/anthropic
+ANTHROPIC_BASE_URL=https://automna-proxy.fly.dev/api/llm
 ANTHROPIC_API_KEY=${GATEWAY_TOKEN}  # Used as auth token
 ```
 

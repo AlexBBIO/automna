@@ -1,3 +1,5 @@
+> **⚠️ OUTDATED:** This document describes the legacy Vercel proxy. The current proxy runs on Fly.io. See [API-PROXIES.md](API-PROXIES.md) for the current architecture.
+
 # LLM Proxy
 
 All LLM calls from user machines route through our proxy at `automna.ai/api/llm`. 

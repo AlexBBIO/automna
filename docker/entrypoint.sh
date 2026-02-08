@@ -553,7 +553,7 @@ if [ "$WORKSPACE_VERSION" -lt 7 ] 2>/dev/null; then
 
 **Quick send:**
 \\\`\\\`\\\`bash
-curl -s -X POST \"https://automna.ai/api/user/email/send\" \\\\
+curl -s -X POST \"https://automna-proxy.fly.dev/api/user/email/send\" \\\\
   -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\" \\\\
   -H \"Content-Type: application/json\" \\\\
   -d '{\"to\": \"user@example.com\", \"subject\": \"Hello\", \"text\": \"Message body\"}'
@@ -564,7 +564,7 @@ curl -s -X POST \"https://automna.ai/api/user/email/send\" \\\\
 # First base64-encode the file
 FILE_B64=\\\$(base64 -w0 /path/to/file.png)
 
-curl -s -X POST \"https://automna.ai/api/user/email/send\" \\\\
+curl -s -X POST \"https://automna-proxy.fly.dev/api/user/email/send\" \\\\
   -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\" \\\\
   -H \"Content-Type: application/json\" \\\\
   -d \"{

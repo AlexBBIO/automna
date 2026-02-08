@@ -248,10 +248,10 @@ BROWSERBASE_API_URL=https://automna.ai/api/browserbase
 BRAVE_API_URL=https://automna.ai/api/brave
 
 # After (Fly proxy)
-ANTHROPIC_BASE_URL=https://automna-proxy.fly.dev/llm
-GOOGLE_API_BASE_URL=https://automna-proxy.fly.dev/gemini
-BROWSERBASE_API_URL=https://automna-proxy.fly.dev/browserbase
-BRAVE_API_URL=https://automna-proxy.fly.dev/brave
+ANTHROPIC_BASE_URL=https://automna-proxy.fly.dev/api/llm
+GOOGLE_API_BASE_URL=https://automna-proxy.fly.dev/api/gemini
+BROWSERBASE_API_URL=https://automna-proxy.fly.dev/api/browserbase
+BRAVE_API_URL=https://automna-proxy.fly.dev/api/brave
 ```
 
 Email and call routes are called from the agent via gateway token auth — the base URL for those is set in the OpenClaw config or AGENTS.md instructions, not env vars. These will need to be updated in the workspace templates.

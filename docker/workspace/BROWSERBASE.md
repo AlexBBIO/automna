@@ -124,7 +124,7 @@ With `persist: True`, any logins you do will be saved. Next time you create a se
 
 | Variable | Purpose |
 |----------|---------|
-| `BROWSERBASE_API_URL` | `https://automna.ai/api/browserbase` (proxy) |
+| `BROWSERBASE_API_URL` | `https://automna-proxy.fly.dev/api/browserbase` (proxy) |
 | `BROWSERBASE_API_KEY` | Your gateway token |
 | `BROWSERBASE_PROJECT_ID` | Browserbase project ID |
 | `BROWSERBASE_CONTEXT_ID` | Your persistent context (optional) |
