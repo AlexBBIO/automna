@@ -217,7 +217,7 @@ export default function Home() {
     const logLines = compact ? tab.logLines.slice(-2) : tab.logLines.slice(-3);
 
     return (
-      <div className={`bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 ${compact ? 'p-3' : 'p-4 md:p-5'} shadow-lg h-full flex flex-col`}>
+      <div className={`bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 ${compact ? 'p-3' : 'p-4 md:p-5'} shadow-lg`}>
         {/* Chat header */}
         <div className={`flex items-center justify-between ${compact ? 'mb-3 pb-2' : 'mb-4 pb-3'} border-b border-zinc-200 dark:border-zinc-700/50`}>
           <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export default function Home() {
         </div>
 
         {/* Chat messages */}
-        <div className={`space-y-3 ${compact ? '' : 'md:space-y-4'} flex-1 flex flex-col justify-end`}>
+        <div className={`space-y-3 ${compact ? '' : 'md:space-y-4'}`}>
           {/* User message - task instruction */}
           <div className="flex justify-end">
             <div className={`${compact ? 'max-w-[85%] px-3 py-2' : 'max-w-[80%] px-4 py-2.5'} bg-purple-600 text-white rounded-2xl rounded-br-md shadow-sm`}>
@@ -588,9 +588,9 @@ export default function Home() {
               </div>
 
               {/* Tab content */}
-              <div className="grid md:grid-cols-2 gap-8 items-stretch">
+              <div className="grid md:grid-cols-2 gap-8 items-start">
                 {/* Left - steps */}
-                <div className="flex flex-col justify-between space-y-6">
+                <div className="space-y-6">
                   <div>
                     <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2 flex items-center gap-3 flex-wrap">
                       {demoTabs[activeTab].title}
@@ -631,10 +631,8 @@ export default function Home() {
                   </Link>
                 </div>
 
-                {/* Right - chat mock (matches left column height) */}
-                <div className="overflow-hidden rounded-2xl">
-                  <TerminalMock tab={demoTabs[activeTab]} />
-                </div>
+                {/* Right - chat mock */}
+                <TerminalMock tab={demoTabs[activeTab]} />
               </div>
             </div>
           </div>
