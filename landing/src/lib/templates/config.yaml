@@ -10,6 +10,17 @@ heartbeat:
 # Default model for all interactions
 model: anthropic/claude-opus-4-5
 
+# Agent defaults
+agents:
+  defaults:
+    verboseDefault: "on"  # Show tool call events to webchat (required for tool status indicator)
+
+# Message queue: steer mode injects new messages into the running turn
+# instead of waiting for the current run to finish before processing them
+messages:
+  queue:
+    mode: "steer"
+
 # Gateway settings (inherited from CLI, listed for reference)
 # bind: lan
 # auth: token
