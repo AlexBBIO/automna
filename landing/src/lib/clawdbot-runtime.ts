@@ -204,14 +204,37 @@ function parseContent(raw: unknown): ContentPart[] {
   return [];
 }
 
+/** Extract text from a raw message for content inspection */
+function getMessageText(m: RawMessage): string {
+  if (typeof m.content === 'string') return m.content;
+  if (Array.isArray(m.content)) {
+    return m.content.filter((p: ContentPart) => p.type === 'text').map((p: ContentPart) => p.text || '').join(' ');
+  }
+  return '';
+}
+
+/** Detect webhook-injected "user" messages that shouldn't display as user messages.
+ *  These come from hooks/agent (phone call webhooks, etc.) and appear as user messages
+ *  in history, confusing the UI. Filter them out so only the assistant's relay shows. */
+function isWebhookInjectedMessage(m: RawMessage): boolean {
+  if (m.role !== 'user') return false;
+  const text = getMessageText(m).trim();
+  // Phone call webhook payloads
+  if (text.includes('A phone call just completed') && text.includes('MUST relay')) return true;
+  if (text.includes('phone call just completed') && text.includes('Transcript')) return true;
+  return false;
+}
+
+/** Detect NO_REPLY assistant messages that shouldn't be shown to the user */
+function isNoReplyMessage(m: RawMessage): boolean {
+  if (m.role !== 'assistant') return false;
+  const text = getMessageText(m).trim();
+  return text === 'NO_REPLY';
+}
+
 /** Detect heartbeat messages (both prompts and HEARTBEAT_OK responses) */
 function isHeartbeatMessage(m: RawMessage): boolean {
-  const text = typeof m.content === 'string'
-    ? m.content
-    : Array.isArray(m.content)
-      ? m.content.filter((p: ContentPart) => p.type === 'text').map((p: ContentPart) => p.text || '').join(' ')
-      : '';
-  const trimmed = text.trim();
+  const trimmed = getMessageText(m).trim();
   // Match heartbeat prompts (contain "HEARTBEAT_OK" instruction or "Read HEARTBEAT.md")
   if (m.role === 'user' && (
     trimmed.includes('HEARTBEAT_OK') ||
@@ -226,11 +249,13 @@ function isHeartbeatMessage(m: RawMessage): boolean {
   return false;
 }
 
-/** Convert raw API messages to ThreadMessage[], filtering out system/tool/heartbeat messages */
+/** Convert raw API messages to ThreadMessage[], filtering out system/tool/heartbeat/webhook/NO_REPLY messages */
 function parseMessages(messages: RawMessage[], prefix: string): ThreadMessage[] {
   return messages
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .filter((m) => !isHeartbeatMessage(m))
+    .filter((m) => !isWebhookInjectedMessage(m))
+    .filter((m) => !isNoReplyMessage(m))
     .map((m, idx) => ({
       id: `${prefix}-${idx}`,
       role: m.role as 'user' | 'assistant',
@@ -531,6 +556,9 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     if (wsMessages.length > 0) {
       const history = wsMessages
         .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .filter((m) => !isHeartbeatMessage(m))
+        .filter((m) => !isWebhookInjectedMessage(m))
+        .filter((m) => !isNoReplyMessage(m))
         .map((m) => ({
           id: m.id || genId(),
           role: m.role as 'user' | 'assistant',

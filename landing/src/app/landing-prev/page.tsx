@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -39,21 +39,23 @@ const demoTabs = [
     buttonAction: 'prefill',
     comingSoon: false,
     statusBadge: 'running',
-    headerLine: 'Add a "billing portal" link to the settings page. Users should be able to manage their subscription from there.',
+    headerLine: 'task: Ship feature from spec',
     logLines: [
-      'On it. Reading through your repo to understand the settings page structure…',
-      'Found it. I\'ll add a new section below "Account" with a link to Stripe\'s billing portal.',
-      'Implementation done. Created the API route, added the UI link, and updated the tests.',
+      'agent: Reading requirements…',
+      'agent: Scanning repo structure…',
+      'agent: Implementing changes on branch automna/feature-billing-link…',
+      'agent: Updating tests and docs…',
+      'agent: PR draft ready for review.',
     ],
     deliverableCard: {
       label: 'PULL REQUEST READY',
       title: 'Add Billing Portal link to Settings',
       bullets: [
-        'Changed 3 files · +47 lines',
-        'All tests passing (12/12)',
-        'Branch: automna/billing-portal-link',
+        'Files: settings.tsx, billing.ts, README.md',
+        'Tests: billing.test.ts updated',
+        'How to test: npm test (or repo command)',
       ],
-      primaryBtn: 'Approve & merge',
+      primaryBtn: 'Approve & open PR',
       secondaryBtn: 'View diff',
       footer: 'Approval required before pushing to GitHub.',
     },
@@ -62,7 +64,7 @@ const demoTabs = [
     id: 'phone-agent',
     tabLabel: 'Phone Calls',
     title: 'AI phone agent',
-    oneLiner: 'Answer, qualify, and follow up — while you approve what gets sent.',
+    oneLiner: 'Answer, qualify, and follow up—while you approve what gets sent.',
     trigger: 'Inbound call or outbound call list.',
     actions: 'Qualify → capture notes → summarize → draft follow-up → create next steps.',
     deliverable: 'Call summary + follow-up email draft, ready for approval.',
@@ -70,23 +72,24 @@ const demoTabs = [
     buttonAction: 'prefill',
     comingSoon: false,
     statusBadge: 'running',
-    headerLine: 'Answer calls from my business line. Qualify leads, take notes, and draft a follow-up email for me to review.',
+    headerLine: 'task: Handle inbound calls',
     logLines: [
-      'Inbound call from (415) 555-0142. Answered and introduced myself as your assistant.',
-      'Caller is Sarah from Meridian Design. She\'s looking for pricing on the Pro plan for a team of 12.',
-      'Call complete (4 min). I\'ve drafted a follow-up email with pricing and proposed 3 demo times.',
+      'agent: Incoming call…',
+      'agent: Asking qualification questions…',
+      'agent: Capturing requirements and next steps…',
+      'agent: Drafting follow-up email…',
     ],
     deliverableCard: {
-      label: 'CALL COMPLETE · 4 MIN',
-      title: 'Sarah Chen — Meridian Design · Qualified lead',
+      label: 'CALL SUMMARY READY',
+      title: 'Qualified lead · Next step: schedule demo',
       bullets: [
-        'Needs: Pro plan, 12 seats, Q2 start',
-        'Budget: approved, wants proposal by Friday',
-        'Follow-up email drafted with pricing attached',
+        'Summary: caller wants pricing + timeline',
+        'Next steps: propose 3 time slots',
+        'Follow-up email draft ready',
       ],
-      primaryBtn: 'Approve & send email',
-      secondaryBtn: 'Edit draft',
-      footer: 'You review every outgoing email before it sends.',
+      primaryBtn: 'Approve & send follow-up',
+      secondaryBtn: 'See details',
+      footer: 'Inbound & outbound calls · Pro & Business plans.',
     },
   },
   {
@@ -101,19 +104,21 @@ const demoTabs = [
     buttonAction: 'prefill',
     comingSoon: false,
     statusBadge: 'running',
-    headerLine: 'Find 100 fashion influencers on TikTok and Instagram who\'d be a good fit for our skincare line. Focus on 50K-500K followers.',
+    headerLine: 'task: Find 100 fashion influencers (parallel)',
     logLines: [
-      'Launching 8 parallel research workers across TikTok and Instagram…',
-      'Found 247 candidates so far. Scoring each on niche fit, engagement rate, and brand safety.',
-      'Done. Narrowed it to your top 100, ranked by fit score. Outreach DM and email drafts are ready.',
+      'agent: Launching 8 parallel research workers…',
+      'agent: Worker 2: collecting TikTok candidates…',
+      'agent: Worker 6: collecting Instagram candidates…',
+      'agent: Deduplicating and scoring…',
+      'agent: List ready (100 entries).',
     ],
     deliverableCard: {
-      label: 'RESEARCH COMPLETE',
-      title: '100 influencers · ranked by fit · outreach ready',
+      label: 'DATABASE READY',
+      title: 'Influencers · 100 found · ranked by fit',
       bullets: [
-        'Avg engagement: 4.2% · Avg followers: 186K',
-        'Top pick: @glowwithsara (312K, 6.1% engagement)',
-        'Personalized DM + email draft for each',
+        'Fields: handle, platform, followers, fit score, contact path',
+        'Sources included for each entry',
+        'Outreach drafts included (email + DM)',
       ],
       primaryBtn: 'Download CSV',
       secondaryBtn: 'Open in Notion',
@@ -124,7 +129,7 @@ const demoTabs = [
     id: 'inbox-to-done',
     tabLabel: 'Email → Done',
     title: 'Never drop a follow-up',
-    oneLiner: 'Turn email threads into drafted replies and a prioritized task list — automatically.',
+    oneLiner: 'Turn email threads into drafted replies and a prioritized task list—automatically.',
     trigger: 'Monitor a label/folder like "Follow Up" or "Important".',
     actions: 'Summarize → extract action items → draft replies → create tasks.',
     deliverable: 'Reply drafts + task list + digest, ready for approval.',
@@ -132,23 +137,25 @@ const demoTabs = [
     buttonAction: 'prefill',
     comingSoon: false,
     statusBadge: 'running',
-    headerLine: 'Go through my inbox every morning. Draft replies for anything that needs a response and flag anything urgent.',
+    headerLine: 'task: Inbox → done',
     logLines: [
-      'Morning scan done. 34 new emails overnight — 12 need a response, 2 are urgent.',
-      '🔴 Urgent: Contract from Apex Corp expires tomorrow. I\'ve drafted a renewal reply.',
-      'All 12 reply drafts are ready. I also created 5 follow-up tasks with due dates.',
+      'agent: Scanning inbox filter "Follow Up"…',
+      'agent: Found 12 threads…',
+      'agent: Drafted 7 replies…',
+      'agent: Created 5 tasks in Automna Follow-ups…',
+      'agent: Daily digest ready for review.',
     ],
     deliverableCard: {
-      label: 'MORNING DIGEST',
-      title: '12 replies drafted · 2 urgent · 5 tasks created',
+      label: 'DRAFTS READY',
+      title: '7 replies + 5 tasks prepared',
       bullets: [
-        '🔴 Apex Corp contract — reply + renewal draft',
-        '🔴 Server alert from AWS — forwarded to your DevOps channel',
-        '7 more replies queued for your review',
+        'Replies: concise drafts with context',
+        'Tasks: priority + due date suggestions',
+        'Digest: ready to post/send',
       ],
-      primaryBtn: 'Review & send all',
-      secondaryBtn: 'See full digest',
-      footer: 'Every reply waits for your approval before sending.',
+      primaryBtn: 'Approve & send digest',
+      secondaryBtn: 'Review drafts',
+      footer: 'Approval required before sending emails or posting digests.',
     },
   },
 ];
@@ -176,368 +183,94 @@ const faqItems = [
   { q: 'Can my team share an agent?', a: 'You can add agents to Slack channels, Discord servers, and Telegram groups—so they can collaborate with your team and even talk to each other.' },
 ];
 
-// Avatar - defined outside HeroChat to avoid remount flicker
-const ChatAvatar = () => (
-  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md">
-    <span className="text-white text-[10px] font-bold">A</span>
-  </div>
-);
-
-const TypingDots = ({ showAvatar = true }: { showAvatar?: boolean }) => (
-  <div className="flex items-start gap-2">
-    {showAvatar ? <ChatAvatar /> : <div className="w-7 shrink-0" />}
-    <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl rounded-tl-md border border-zinc-200 dark:border-zinc-700">
-      <div className="flex items-center gap-1 h-5">
-        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-      </div>
-    </div>
-  </div>
-);
-
-// Animated Hero Chat component
-function HeroChat() {
-  const [step, setStep] = useState(-1); // -1 = not started
-  const [typedUser, setTypedUser] = useState('');
-  const [typedAgent, setTypedAgent] = useState('');
-  const [showTypingDots, setShowTypingDots] = useState(false);
-  const [visibleMessages, setVisibleMessages] = useState<number[]>([]);
-  const [showDeliverable, setShowDeliverable] = useState(false);
-  const [cycle, setCycle] = useState(0);
-  const [justCompleted, setJustCompleted] = useState<number | null>(null); // track which msg just finished typing (skip animation)
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  const userMessage = "Research the top sushi restaurants in town, email the list to me and my friends who RSVP'd to dinner tonight, then call around to see who has a table for 6";
-
-  const agentMessages = [
-    "Searching for top-rated sushi restaurants nearby...",
-    "Found 8 restaurants. Comparing reviews and availability...",
-    "Pulling your dinner RSVP list from calendar — 4 friends confirmed.",
-    "Emailing top 5 picks to you, Sarah, Mike, Jen, and David...",
-    "Emails sent ✓ Now calling restaurants for tonight...",
-    "Called 5 restaurants — 3 have tables for 6.",
-  ];
-
-  // Auto-scroll to bottom on any content change — use instant scroll to avoid fighting with animations
-  const scrollToBottom = useCallback(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
-    }
-  }, []);
-
-  useEffect(() => {
-    // Use rAF to scroll after DOM paint, keeps it smooth
-    requestAnimationFrame(scrollToBottom);
-  }, [typedUser, typedAgent, visibleMessages, showTypingDots, showDeliverable, scrollToBottom]);
-
-  // Reset and replay loop
-  useEffect(() => {
-    const startDelay = setTimeout(() => setStep(0), 800);
-    return () => clearTimeout(startDelay);
-  }, [cycle]);
-
-  // Step machine
-  useEffect(() => {
-    if (step < 0) return;
-
-    // Step 0: Type user message
-    if (step === 0) {
-      setTypedUser('');
-      setVisibleMessages([]);
-      setShowDeliverable(false);
-      setShowTypingDots(false);
-      setTypedAgent('');
-      setJustCompleted(null);
-      let i = 0;
-      const interval = setInterval(() => {
-        i++;
-        setTypedUser(userMessage.slice(0, i));
-        if (i >= userMessage.length) {
-          clearInterval(interval);
-          setTimeout(() => setStep(1), 800);
-        }
-      }, 28);
-      return () => clearInterval(interval);
-    }
-
-    // Steps 1-6: Agent messages (typing dots → typewriter)
-    if (step >= 1 && step <= agentMessages.length) {
-      const msgIndex = step - 1;
-      setShowTypingDots(true);
-      setTypedAgent('');
-      setJustCompleted(null);
-
-      const dotsDelay = setTimeout(() => {
-        setShowTypingDots(false);
-        let i = 0;
-        const text = agentMessages[msgIndex];
-        const interval = setInterval(() => {
-          i++;
-          setTypedAgent(text.slice(0, i));
-          if (i >= text.length) {
-            clearInterval(interval);
-            // Mark as just-completed so it doesn't re-animate
-            setJustCompleted(msgIndex);
-            setVisibleMessages(prev => [...prev, msgIndex]);
-            setTypedAgent('');
-            setTimeout(() => setStep(step + 1), 600);
-          }
-        }, 32);
-        return () => clearInterval(interval);
-      }, 1000 + Math.random() * 500);
-
-      return () => clearTimeout(dotsDelay);
-    }
-
-    // Step 7: Show deliverable card
-    if (step === agentMessages.length + 1) {
-      setShowTypingDots(true);
-      const timer = setTimeout(() => {
-        setShowTypingDots(false);
-        setShowDeliverable(true);
-        // Restart after pause
-        setTimeout(() => {
-          setStep(-1);
-          setTypedUser('');
-          setVisibleMessages([]);
-          setShowDeliverable(false);
-          setShowTypingDots(false);
-          setCycle(c => c + 1);
-        }, 6000);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [step]);
-
-  // TypingDots uses a stable ref to avoid remounting
-
-  return (
-    <div className="bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 md:p-5 shadow-lg">
-      {/* Chat header */}
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-200 dark:border-zinc-700/50">
-        <div className="flex items-center gap-2">
-          <ChatAvatar />
-          <div>
-            <span className="text-zinc-800 dark:text-zinc-200 text-sm font-medium">Automna</span>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-              <span className="text-zinc-400 dark:text-zinc-500 text-[10px]">Online</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Messages area */}
-      <div ref={scrollContainerRef} className="space-y-3 min-h-[320px] max-h-[420px] overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-        {/* User message - types in */}
-        {typedUser && (
-          <div className="flex justify-end">
-            <div className="max-w-[85%] px-4 py-2.5 bg-purple-600 text-white rounded-2xl rounded-br-md shadow-sm">
-              <span className="text-sm">{typedUser}{step === 0 && <span className="animate-pulse">|</span>}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Completed agent messages */}
-        {visibleMessages.map((msgIdx, i) => (
-          <div key={msgIdx} className={`flex items-start gap-2${msgIdx === justCompleted ? '' : ' animate-message-in'}`}>
-            {i === 0 && <ChatAvatar />}
-            {i !== 0 && <div className="w-7 shrink-0" />}
-            <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
-              <span className="text-zinc-700 dark:text-zinc-300 text-sm">{agentMessages[msgIdx]}</span>
-            </div>
-          </div>
-        ))}
-
-        {/* Currently typing agent message */}
-        {typedAgent && !showTypingDots && (
-          <div className="flex items-start gap-2">
-            {visibleMessages.length === 0 && <ChatAvatar />}
-            {visibleMessages.length > 0 && <div className="w-7 shrink-0" />}
-            <div className="px-4 py-2.5 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
-              <span className="text-zinc-700 dark:text-zinc-300 text-sm">{typedAgent}<span className="animate-pulse text-purple-500">|</span></span>
-            </div>
-          </div>
-        )}
-
-        {/* Typing indicator */}
-        {showTypingDots && <TypingDots showAvatar={visibleMessages.length === 0} />}
-
-        {/* Deliverable card */}
-        {showDeliverable && (
-          <div className="flex items-start gap-2 animate-message-in">
-            <div className="w-7 shrink-0" />
-            <div className="p-4 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm max-w-[90%]">
-              <div className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1">RESERVATIONS FOUND</div>
-              <div className="text-zinc-800 dark:text-zinc-200 text-sm font-medium mb-1.5">3 tables available tonight for 6</div>
-              <div className="space-y-0.5 mb-2.5">
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">• Omakase House — 7:30 PM, bar seating</div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">• Sushi Zen — 8:00 PM, private booth</div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">• Kiyomi — 8:30 PM, patio table</div>
-              </div>
-              <div className="flex gap-2">
-                <div className="px-3 py-1.5 bg-zinc-800 dark:bg-zinc-600 text-white text-xs rounded-lg font-medium">Book Sushi Zen</div>
-                <div className="px-3 py-1.5 border border-zinc-200 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 text-xs rounded-lg">See all options</div>
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-    </div>
-  );
-}
-
-// Animated counter hook
-function useAnimatedCounter(target: number, duration: number = 2000) {
-  const [count, setCount] = useState(0);
-  const [hasStarted, setHasStarted] = useState(false);
-
-  useEffect(() => {
-    if (!hasStarted) return;
-    const start = Date.now();
-    const timer = setInterval(() => {
-      const elapsed = Date.now() - start;
-      const progress = Math.min(elapsed / duration, 1);
-      // Ease out
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(eased * target));
-      if (progress >= 1) clearInterval(timer);
-    }, 30);
-    return () => clearInterval(timer);
-  }, [hasStarted, target, duration]);
-
-  return { count, start: () => setHasStarted(true) };
-}
-
-// Sample activity feed lines (would be real data in production)
-const activityFeed = [
-  { agent: 'Agent', action: 'processed 47 emails, drafted 4 replies' },
-  { agent: 'Agent', action: 'researched 12 leads, compiled outreach list' },
-  { agent: 'Agent', action: 'summarized 8 Slack threads into digest' },
-  { agent: 'Agent', action: 'updated CRM with 23 new contacts' },
-  { agent: 'Agent', action: 'drafted weekly report from project notes' },
-  { agent: 'Agent', action: 'monitored 5 competitors, flagged 2 changes' },
-  { agent: 'Agent', action: 'triaged 31 support tickets by priority' },
-  { agent: 'Agent', action: 'scheduled 6 follow-ups from meeting notes' },
-];
-
 export default function Home() {
   const [isVisible, setIsVisible] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const demoCarouselRef = useRef<HTMLDivElement>(null);
-  const [activityIndex, setActivityIndex] = useState(0);
-
-  // Live counters (mocked - would fetch from API in production)
-  const tasksToday = useAnimatedCounter(2847, 2500);
-  const agentsWorking = useAnimatedCounter(38, 1800);
 
   useEffect(() => {
     setIsVisible(true);
-    // Start counters after a short delay
-    const counterTimer = setTimeout(() => {
-      tasksToday.start();
-      agentsWorking.start();
-    }, 500);
     
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 100);
     };
     
     window.addEventListener('scroll', handleScroll);
-
-    // Rotate activity feed
-    const feedTimer = setInterval(() => {
-      setActivityIndex(prev => (prev + 1) % activityFeed.length);
-    }, 4000);
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      clearTimeout(counterTimer);
-      clearInterval(feedTimer);
-    };
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Chat-style mock component (reused in hero and demo)
-  const TerminalMock = ({ tab, compact = false }: { tab: typeof demoTabs[0], compact?: boolean }) => {
-    // Assistant avatar
-    const Avatar = () => (
-      <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md">
-        <span className="text-white text-[10px] md:text-xs font-bold">A</span>
-      </div>
-    );
-
-    const logLines = compact ? tab.logLines.slice(-2) : tab.logLines.slice(-3);
-
-    return (
-      <div className={`bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 ${compact ? 'p-3' : 'p-4 md:p-5'} shadow-lg`}>
-        {/* Chat header */}
-        <div className={`flex items-center justify-between ${compact ? 'mb-3 pb-2' : 'mb-4 pb-3'} border-b border-zinc-200 dark:border-zinc-700/50`}>
-          <div className="flex items-center gap-2">
-            <ChatAvatar />
-            <div>
-              <span className="text-zinc-800 dark:text-zinc-200 text-xs md:text-sm font-medium">Automna</span>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                <span className="text-zinc-400 dark:text-zinc-500 text-[10px]">Online</span>
-              </div>
-            </div>
+  // Terminal mock component (reused in hero and demo)
+  const TerminalMock = ({ tab, compact = false }: { tab: typeof demoTabs[0], compact?: boolean }) => (
+    <div className={`bg-gradient-to-b from-zinc-900 to-zinc-950 rounded-2xl border border-zinc-800 ${compact ? 'p-4' : 'p-5'} shadow-2xl`}>
+      {/* Terminal header */}
+      <div className={`flex items-center justify-between ${compact ? 'mb-3 pb-3' : 'mb-4 pb-4'} border-b border-zinc-800`}>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1.5">
+            <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-red-500/80"></div>
+            <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-yellow-500/80"></div>
+            <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-green-500/80"></div>
           </div>
+          <span className="text-zinc-500 text-xs md:text-sm">automna agent</span>
         </div>
+        <div className="flex items-center gap-2">
+          {tab.statusBadge === 'running' ? (
+            <>
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+              <span className="text-emerald-400/80 text-xs font-medium">running</span>
+            </>
+          ) : (
+            <>
+              <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+              <span className="text-amber-400/80 text-xs font-medium">preview</span>
+            </>
+          )}
+        </div>
+      </div>
 
-        {/* Chat messages */}
-        <div className={`space-y-3 ${compact ? '' : 'md:space-y-4'}`}>
-          {/* User message - task instruction */}
-          <div className="flex justify-end">
-            <div className={`${compact ? 'max-w-[85%] px-3 py-2' : 'max-w-[80%] px-4 py-2.5'} bg-purple-600 text-white rounded-2xl rounded-br-md shadow-sm`}>
-              <span className="text-xs md:text-sm">{tab.headerLine.replace('task: ', '')}</span>
-            </div>
+      {/* Task header */}
+      <div className={`font-mono text-xs md:text-sm ${compact ? 'mb-3' : 'mb-4'}`}>
+        <div className="flex gap-3">
+          <span className="text-purple-400 shrink-0">task:</span>
+          <span className="text-zinc-300">{tab.headerLine.replace('task: ', '')}</span>
+        </div>
+      </div>
+
+      {/* Log lines */}
+      <div className={`space-y-1.5 md:space-y-2 font-mono text-xs md:text-sm ${compact ? 'mb-3' : 'mb-4'}`}>
+        {(compact ? tab.logLines.slice(-3) : tab.logLines).map((line, i) => (
+          <div key={i} className="flex gap-3">
+            <span className="text-emerald-400 shrink-0">agent:</span>
+            <span className="text-zinc-400">{line.replace('agent: ', '')}</span>
           </div>
+        ))}
+      </div>
 
-          {/* Assistant progress messages */}
-          {logLines.map((line, i) => (
-            <div key={i} className="flex items-start gap-2">
-              {i === 0 && <ChatAvatar />}
-              {i !== 0 && <div className="w-7 md:w-8 shrink-0" />}
-              <div className={`${compact ? 'px-3 py-2' : 'px-4 py-2.5'} bg-white dark:bg-zinc-800 rounded-2xl ${i === 0 ? 'rounded-tl-md' : ''} border border-zinc-200 dark:border-zinc-700 shadow-sm`}>
-                <span className="text-zinc-700 dark:text-zinc-300 text-xs md:text-sm">{line.replace('agent: ', '')}</span>
-              </div>
-            </div>
+      {/* Deliverable card */}
+      <div className={`${compact ? 'my-3 p-3' : 'my-4 p-4'} bg-zinc-800/50 rounded-lg border border-zinc-700`}>
+        <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1.5">{tab.deliverableCard.label}</div>
+        <div className="text-zinc-200 text-xs md:text-sm font-medium mb-2">{tab.deliverableCard.title}</div>
+        <div className="space-y-0.5 mb-3">
+          {(compact ? tab.deliverableCard.bullets.slice(0, 2) : tab.deliverableCard.bullets).map((bullet, i) => (
+            <div key={i} className="text-xs text-zinc-400">• {bullet}</div>
           ))}
-
-          {/* Deliverable card as a special message */}
-          <div className="flex items-start gap-2">
-            <div className="w-7 md:w-8 shrink-0" />
-            <div className={`${compact ? 'p-3' : 'p-3 md:p-4'} bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm max-w-[90%]`}>
-              <div className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1">{tab.deliverableCard.label}</div>
-              <div className="text-zinc-800 dark:text-zinc-200 text-xs md:text-sm font-medium mb-1.5">{tab.deliverableCard.title}</div>
-              <div className="space-y-0.5 mb-2.5">
-                {(compact ? tab.deliverableCard.bullets.slice(0, 2) : tab.deliverableCard.bullets).map((bullet, i) => (
-                  <div key={i} className="text-[11px] md:text-xs text-zinc-500 dark:text-zinc-400">• {bullet}</div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <div className="px-3 py-1.5 bg-zinc-800 dark:bg-zinc-600 text-white text-[11px] md:text-xs rounded-lg font-medium">
-                  {tab.deliverableCard.primaryBtn}
-                </div>
-                <div className="px-3 py-1.5 border border-zinc-200 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 text-[11px] md:text-xs rounded-lg">
-                  {tab.deliverableCard.secondaryBtn}
-                </div>
-              </div>
-            </div>
+        </div>
+        <div className="flex gap-2 md:gap-3">
+          <div className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg font-medium">
+            {tab.deliverableCard.primaryBtn}
+          </div>
+          <div className="px-3 py-1.5 border border-zinc-700 text-zinc-400 text-xs rounded-lg">
+            {tab.deliverableCard.secondaryBtn}
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white antialiased transition-colors">
@@ -671,45 +404,9 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right column - Animated hero chat (desktop only) */}
+            {/* Right column - Hero terminal (desktop only) */}
             <div className="hidden md:block">
-              <HeroChat />
-            </div>
-          </div>
-        </section>
-
-        {/* Live Stats Bar */}
-        <section className="container mx-auto px-6 py-4 md:py-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex flex-col md:flex-row items-center gap-3 md:gap-0 md:justify-between bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 md:px-6 py-3 md:py-4">
-              {/* Activity ticker */}
-              <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Live</span>
-                </div>
-                <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 shrink-0 hidden md:block"></div>
-                <div className="overflow-hidden min-w-0 flex-1">
-                  <div key={activityIndex} className="flex items-center gap-2 animate-fadeIn">
-                    <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 shrink-0">Agent</span>
-                    <span className="text-xs text-zinc-600 dark:text-zinc-400 truncate">{activityFeed[activityIndex].action}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Stats counters */}
-              <div className="flex items-center gap-4 md:gap-6 shrink-0">
-                <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg md:text-xl font-bold text-zinc-800 dark:text-white tabular-nums">{tasksToday.count.toLocaleString()}</span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">tasks today</span>
-                </div>
-                <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg md:text-xl font-bold text-zinc-800 dark:text-white tabular-nums">{agentsWorking.count}</span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">agents working</span>
-                </div>
-              </div>
+              <TerminalMock tab={demoTabs[0]} />
             </div>
           </div>
         </section>
@@ -928,7 +625,7 @@ export default function Home() {
                   </Link>
                 </div>
 
-                {/* Right - chat mock */}
+                {/* Right - terminal mock */}
                 <TerminalMock tab={demoTabs[activeTab]} />
               </div>
             </div>
