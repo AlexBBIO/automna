@@ -483,6 +483,7 @@ export default function DashboardPage() {
         
         let gatewayRes = await fetch('/api/user/gateway');
         let gatewayData = await gatewayRes.json();
+        let wasJustProvisioned = false;
         
         console.log('[dashboard] Gateway response:', {
           hasGatewayUrl: !!gatewayData.gatewayUrl,
@@ -494,6 +495,7 @@ export default function DashboardPage() {
         if (gatewayData.needsProvisioning) {
           console.log('[dashboard] Provisioning new machine...');
           setLoadPhase('provisioning');
+          wasJustProvisioned = true;
           
           const provisionRes = await fetch('/api/user/provision', { method: 'POST' });
           const provisionData = await provisionRes.json();
@@ -525,20 +527,24 @@ export default function DashboardPage() {
         if (gatewayData.gatewayUrl) {
           setGatewayInfo(gatewayData);
           
-          // Only poll health for fresh provisions (machine just created)
-          // Existing users already passed the gatewayUrl check above
-          setLoadPhase('warming');
-          const isReady = await waitForNewProvisionReady();
-          
-          if (!isReady) {
-            // Don't proceed — show an error so the user can retry
-            console.error('[dashboard] Fresh provision failed to become ready');
-            setLoadError('Your agent is taking longer than expected to start. Please try refreshing the page.');
-            setLoadPhase('error');
-            return;
+          if (!wasJustProvisioned) {
+            // Existing user with a running machine — skip warmup entirely
+            console.log('[dashboard] Existing user with gateway, skipping warmup');
+            setLoadPhase('ready');
+          } else {
+            // Fresh provision — poll health until ready
+            setLoadPhase('warming');
+            const isReady = await waitForNewProvisionReady();
+            
+            if (!isReady) {
+              console.error('[dashboard] Fresh provision failed to become ready');
+              setLoadError('Your agent is taking longer than expected to start. Please try refreshing the page.');
+              setLoadPhase('error');
+              return;
+            }
+            
+            setLoadPhase('ready');
           }
-          
-          setLoadPhase('ready');
         } else {
           console.error('[dashboard] No gatewayUrl in response:', gatewayData);
           setLoadPhase('error');
