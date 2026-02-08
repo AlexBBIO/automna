@@ -346,19 +346,19 @@ export default function Home() {
 
               {/* Headline */}
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-[1.1] tracking-tight text-zinc-900 dark:text-white">
-                Delegate real work.
+                Give Automna instructions.
                 <br />
                 <span className="bg-gradient-to-r from-purple-600 via-violet-600 to-purple-700 dark:from-purple-400 dark:via-violet-400 dark:to-purple-500 bg-clip-text text-transparent">
-                  Get finished deliverables back.
+                  Get back finished work.
                 </span>
               </h1>
               
               {/* Subheadline */}
               <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-5 leading-relaxed hidden md:block">
-                Automna runs tasks across the web and your tools—then delivers results to the places you already work. Use approval-only mode, or let it run on autopilot.
+                Automna runs tasks across the web and throughout your tools, then delivers results to the places you already work.
               </p>
               <p className="text-base text-zinc-600 dark:text-zinc-400 mb-5 leading-relaxed md:hidden">
-                AI agents that run tasks across your tools and deliver finished results.
+                Automna runs tasks across the web and your tools, then delivers results where you already work.
               </p>
 
               {/* Mobile: show compact terminal mock before bullets */}
@@ -370,23 +370,15 @@ export default function Home() {
               <ul className="space-y-2.5 md:space-y-3 mb-6 md:mb-8 text-zinc-700 dark:text-zinc-300">
                 <li className="flex items-start gap-3">
                   <span className="text-purple-600 dark:text-purple-400 mt-0.5">✓</span>
-                  <span>Real deliverables: emails, docs, PRs, reports</span>
+                  <span>Automna has a dedicated email and phone number. Just like a human assistant.</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-purple-600 dark:text-purple-400 mt-0.5">✓</span>
-                  <span>Approval gates for sensitive actions</span>
+                  <span>Runs 24/7 in the cloud, so you can get work done while you sleep.</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-purple-600 dark:text-purple-400 mt-0.5">✓</span>
-                  <span>Runs 24/7 in the cloud (scheduled or triggered)</span>
-                </li>
-                <li className="hidden md:flex items-start gap-3">
-                  <span className="text-purple-600 dark:text-purple-400 mt-0.5">✓</span>
-                  <span>Works across your stack: web, email, docs, tasks, repos</span>
-                </li>
-                <li className="hidden md:flex items-start gap-3">
-                  <span className="text-purple-600 dark:text-purple-400 mt-0.5">✓</span>
-                  <span>Persistent memory for your projects and preferences</span>
+                  <span>Integrations mean you can work with Automna in all your existing apps.</span>
                 </li>
               </ul>
 
