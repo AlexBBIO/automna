@@ -6,6 +6,8 @@ import geminiRoutes from "./routes/gemini.js";
 import braveRoutes from "./routes/brave.js";
 import browserbaseRoutes from "./routes/browserbase.js";
 import emailRoutes from "./routes/email.js";
+import callRoutes from "./routes/call.js";
+import blandWebhookRoutes from "./routes/bland-webhook.js";
 
 const app = new Hono();
 
@@ -33,6 +35,12 @@ app.route("/api/browserbase/v1", browserbaseRoutes);
 // Email proxy (Agentmail)
 app.route("/api/user/email", emailRoutes);
 
+// Voice call proxy (Bland.ai)
+app.route("/api/user/call", callRoutes);
+
+// Bland webhook (no auth - called by Bland)
+app.route("/api/webhooks/bland/status", blandWebhookRoutes);
+
 // 404
 app.notFound((c) => c.json({ error: "Not found", path: c.req.path }, 404));
 
@@ -45,7 +53,7 @@ app.onError((err, c) => {
 // Start server
 const port = parseInt(process.env.PORT || "8080", 10);
 console.log(`[FLY-PROXY] Starting on port ${port}`);
-console.log(`[FLY-PROXY] Routes: /api/llm/v1/messages, /api/gemini/*, /api/brave/*, /api/browserbase/v1/*, /api/user/email/*`);
+console.log(`[FLY-PROXY] Routes: /api/llm/v1/messages, /api/gemini/*, /api/brave/*, /api/browserbase/v1/*, /api/user/email/*, /api/user/call/*, /api/webhooks/bland/status`);
 
 export default {
   port,

@@ -87,6 +87,46 @@ export const emailSends = sqliteTable("email_sends", {
   userSentAtIdx: index("idx_email_sends_user_sent_at").on(table.userId, table.sentAt),
 }));
 
+export const phoneNumbers = sqliteTable("phone_numbers", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().unique().references(() => users.id),
+  phoneNumber: text("phone_number").notNull().unique(),
+  twilioSid: text("twilio_sid").notNull(),
+  blandImported: integer("bland_imported", { mode: "boolean" }).default(false),
+  agentName: text("agent_name").default("AI Assistant"),
+  agentRole: text("agent_role"),
+  voiceId: text("voice_id").default("6277266e-01eb-44c6-b965-438566ef7076"),
+  inboundPrompt: text("inbound_prompt"),
+  inboundFirstSentence: text("inbound_first_sentence"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+}, (table) => ({
+  userIdIdx: index("idx_phone_numbers_user_id").on(table.userId),
+}));
+
+export const callUsage = sqliteTable("call_usage", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  blandCallId: text("bland_call_id").notNull().unique(),
+  direction: text("direction").notNull(),
+  toNumber: text("to_number").notNull(),
+  fromNumber: text("from_number").notNull(),
+  status: text("status").notNull().default("initiated"),
+  durationSeconds: integer("duration_seconds"),
+  sessionKey: text("session_key"),
+  task: text("task"),
+  transcript: text("transcript"),
+  summary: text("summary"),
+  recordingUrl: text("recording_url"),
+  costCents: integer("cost_cents"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+}, (table) => ({
+  userIdIdx: index("idx_call_usage_user_id").on(table.userId),
+  blandCallIdIdx: index("idx_call_usage_bland_call_id").on(table.blandCallId),
+  createdAtIdx: index("idx_call_usage_created_at").on(table.createdAt),
+}));
+
 // Plan limits
 export const PLAN_LIMITS = {
   free: { monthlyAutomnaTokens: 10_000, requestsPerMinute: 5, tokensPerMinute: 10_000, monthlyCallMinutes: 0 },
@@ -96,3 +136,5 @@ export const PLAN_LIMITS = {
 } as const;
 
 export type PlanType = keyof typeof PLAN_LIMITS;
+export type PhoneNumber = typeof phoneNumbers.$inferSelect;
+export type CallUsage = typeof callUsage.$inferSelect;
