@@ -538,6 +538,70 @@ HEARTBEATEOF
     echo "[automna] Workspace migrated to version 6"
 fi
 
+# Migration 6→7: Add email attachment docs to TOOLS.md
+if [ "$WORKSPACE_VERSION" -lt 7 ] 2>/dev/null; then
+    echo "[automna] Workspace migration v7: adding email attachment docs..."
+
+    if [ -f "$OPENCLAW_DIR/workspace/TOOLS.md" ] && ! grep -q "attachments" "$OPENCLAW_DIR/workspace/TOOLS.md" 2>/dev/null; then
+        node -e "
+            const fs = require('fs');
+            const file = '$OPENCLAW_DIR/workspace/TOOLS.md';
+            let content = fs.readFileSync(file, 'utf8');
+
+            const oldEmail = 'See \`AGENTMAIL.md\` for full documentation.';
+            const newEmail = \`See \\\`AGENTMAIL.md\\\` for full documentation.
+
+**Quick send:**
+\\\`\\\`\\\`bash
+curl -s -X POST \"https://automna.ai/api/user/email/send\" \\\\
+  -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\" \\\\
+  -H \"Content-Type: application/json\" \\\\
+  -d '{\"to\": \"user@example.com\", \"subject\": \"Hello\", \"text\": \"Message body\"}'
+\\\`\\\`\\\`
+
+**Send with attachments:**
+\\\`\\\`\\\`bash
+# First base64-encode the file
+FILE_B64=\\\$(base64 -w0 /path/to/file.png)
+
+curl -s -X POST \"https://automna.ai/api/user/email/send\" \\\\
+  -H \"Authorization: Bearer \\\$OPENCLAW_GATEWAY_TOKEN\" \\\\
+  -H \"Content-Type: application/json\" \\\\
+  -d \"{
+    \\\\\"to\\\\\": \\\\\"user@example.com\\\\\",
+    \\\\\"subject\\\\\": \\\\\"Photo attached\\\\\",
+    \\\\\"text\\\\\": \\\\\"See the attached image.\\\\\",
+    \\\\\"attachments\\\\\": [{
+      \\\\\"filename\\\\\": \\\\\"photo.png\\\\\",
+      \\\\\"content_type\\\\\": \\\\\"image/png\\\\\",
+      \\\\\"content\\\\\": \\\\\"\\\$FILE_B64\\\\\"
+    }]
+  }\"
+\\\`\\\`\\\`
+
+**Attachment format:** Each attachment needs \\\`filename\\\`, \\\`content_type\\\`, and either \\\`content\\\` (base64) or \\\`url\\\`.\`;
+
+            // Replace old quick-send block if it exists, or just add after the AGENTMAIL.md reference
+            if (content.includes('Quick send:')) {
+                // Has old quick send, replace everything from 'See AGENTMAIL' to the next ### section
+                const emailStart = content.indexOf('### Email (Agentmail)');
+                const nextSection = content.indexOf('###', emailStart + 1);
+                if (emailStart >= 0 && nextSection >= 0) {
+                    content = content.slice(0, emailStart) + '### Email (Agentmail)\\n\\n' + newEmail + '\\n\\n' + content.slice(nextSection);
+                }
+            } else if (content.includes(oldEmail)) {
+                content = content.replace(oldEmail, newEmail);
+            }
+
+            fs.writeFileSync(file, content);
+            console.log('[automna] TOOLS.md patched with email attachment docs');
+        " 2>/dev/null || echo "[automna] Warning: email attachment patch failed"
+    fi
+
+    echo "7" > "$OPENCLAW_DIR/workspace/.workspace-version"
+    echo "[automna] Workspace migrated to version 7"
+fi
+
 # Extract gateway token from args first (needed for config)
 # Args come in as: gateway --allow-unconfigured --bind lan --auth token --token <TOKEN>
 GATEWAY_TOKEN=""

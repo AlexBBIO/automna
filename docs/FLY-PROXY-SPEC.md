@@ -1,8 +1,11 @@
-# Fly.io API Proxy — Migration Spec
+# Fly.io API Proxy — Migration Spec (COMPLETED 2026-02-08)
+
+> **Status: DEPLOYED.** See `API-PROXIES.md` for current operational docs.
+> This file is kept for historical context on the migration decision.
 
 ## Problem
 
-All API proxies currently run as **Vercel Edge Functions** on automna.ai. This creates scaling issues:
+All API proxies previously ran as **Vercel Edge Functions** on automna.ai. This caused scaling issues:
 
 - Each LLM streaming request holds a function invocation open for 30-120+ seconds
 - Vercel has concurrency limits per deployment — burst traffic causes cascading 504s

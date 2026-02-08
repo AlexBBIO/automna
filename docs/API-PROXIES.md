@@ -1,240 +1,318 @@
 # API Proxies
 
-All external API calls from user machines route through Automna proxies.
+All external API calls from user machines route through the Automna proxy.
 
 **Why:**
 - Usage tracking per user (tokens, API calls, cost)
-- Rate limiting
-- Security - users never see real API keys
+- Rate limiting per plan
+- Security — users never see real API keys
 - Billing visibility across all services
-
-## Proxied Services
-
-| Service | Proxy Endpoint | Auth Header | Status |
-|---------|---------------|-------------|--------|
-| Anthropic | `/api/llm/v1/messages` | `x-api-key` | ✅ Production |
-| Gemini | `/api/gemini/[path]` | `x-goog-api-key` or `?key=` | ✅ Production |
-| Browserbase | `/api/browserbase/v1/[path]` | `X-BB-API-Key` | ✅ Production |
-| Brave Search | `/api/brave/[path]` | `X-Subscription-Token` | ✅ Production |
-| Agentmail | `/api/user/email/*` | Bearer token | ✅ Production |
-| Voice Calls | `/api/user/call` | Bearer token | ✅ Production |
-| Call Usage | `/api/user/call/usage` | Bearer token | ✅ Production |
 
 ## Architecture
 
+**Proxy runs on Fly.io** as a dedicated always-on app (`automna-proxy`). This replaces the previous Vercel Edge Function approach which caused 504 timeouts under concurrent streaming load.
+
 ```
-User Machine                     Automna Proxy                 External API
-(OpenClaw)                      (Vercel Edge)
-    │                                │                              │
-    │ Request with gateway token     │                              │
-    │──────────────────────────────► │                              │
-    │                                │                              │
-    │                     1. Validate gateway token                 │
-    │                     2. Lookup user in Turso                   │
-    │                     3. Check rate limits                      │
-    │                                │                              │
-    │                                │ Request with real API key    │
-    │                                │─────────────────────────────►│
-    │                                │                              │
-    │                                │◄─────────────────────────────│
-    │                     4. Log usage to Turso                     │
-    │◄──────────────────────────────│                              │
+User Machine (Fly, sjc)       automna-proxy (Fly, sjc)     External APIs
+    |                              |                            |
+    | gateway token in header      |                            |
+    |----------------------------->|                            |
+    |                   1. Validate token (Turso)               |
+    |                   2. Check rate limits                     |
+    |                   3. Swap token for real API key           |
+    |                              |--- real key --------------->|
+    |                              |<--- response/stream --------|
+    |                   4. Extract usage from response           |
+    |                   5. Log to usage_events (Turso)           |
+    |<----- stream/response -------|                            |
 ```
 
-## Machine Environment Variables
+**Key advantage:** User machines and proxy are both in **sjc** on Fly — same-region, minimal latency, no cold starts, no function concurrency limits.
 
-User machines receive these env vars on provision:
+---
+
+## Proxy App Details
+
+| Property | Value |
+|----------|-------|
+| **App name** | `automna-proxy` |
+| **URL** | `https://automna-proxy.fly.dev` |
+| **Runtime** | Bun (oven/bun:1) |
+| **Framework** | Hono |
+| **Region** | sjc |
+| **Machines** | 2 (HA, shared-cpu-1x, 512MB) |
+| **Source** | `/projects/automna/fly-proxy/` |
+| **Database** | Turso (shared with landing app) |
+| **Cost** | ~$3-5/month |
+
+---
+
+## Proxied Services
+
+| Service | Proxy Path | Upstream | Status |
+|---------|-----------|----------|--------|
+| Anthropic LLM | `/api/llm/v1/messages` | `api.anthropic.com` | ✅ Production |
+| Gemini | `/api/gemini/*` | `generativelanguage.googleapis.com` | ✅ Production |
+| Browserbase | `/api/browserbase/v1/*` | `api.browserbase.com` | ✅ Production |
+| Brave Search | `/api/brave/*` | `api.search.brave.com` | ✅ Production |
+| Email (send) | `/api/user/email/send` | `api.agentmail.to` | ✅ Production |
+| Email (inbox) | `/api/user/email/inbox` | `api.agentmail.to` | ✅ Production |
+| Email (message) | `/api/user/email/inbox/:id` | `api.agentmail.to` | ✅ Production |
+
+### Not on Fly Proxy (stays on Vercel)
+
+- **Voice call initiate** (`POST /api/user/call`) — stays on Vercel for Clerk auth support
+- **Voice call status** (`GET /api/user/call/status`) — stays on Vercel
+- **Voice call usage** (`GET /api/user/call/usage`) — stays on Vercel
+- **Bland webhook** (`POST /api/webhooks/bland/status`) — needs stable public URL
+- **All dashboard/admin routes** — Clerk auth, user management, provisioning
+- **File API** (`/api/files/*`) — file uploads/downloads
+- **WebSocket proxy** (`/api/ws/*`)
+
+---
+
+## Machine Configuration
+
+### How Proxy URL Gets Set
+
+The Docker entrypoint (`docker/entrypoint.sh`) reads the `AUTOMNA_PROXY_URL` env var and writes it into the OpenClaw config on every boot:
 
 ```bash
-# Auth
-OPENCLAW_GATEWAY_TOKEN=<uuid>          # Primary auth token
-
-# Anthropic (via proxy)
-ANTHROPIC_API_KEY=<gateway-token>      # Gateway token, NOT real key
-# ANTHROPIC_BASE_URL set in entrypoint.sh → https://automna.ai/api/llm
-
-# Gemini (via proxy)
-GEMINI_API_KEY=<gateway-token>         # Gateway token
-GOOGLE_API_KEY=<gateway-token>         # Some SDKs use this
-GOOGLE_API_BASE_URL=https://automna.ai/api/gemini
-
-# Browserbase (via proxy)
-BROWSERBASE_API_KEY=<gateway-token>    # Gateway token
-BROWSERBASE_API_URL=https://automna.ai/api/browserbase
-BROWSERBASE_PROJECT_ID=<project-id>    # Shared project ID
-
-# Brave Search (via proxy)
-BRAVE_API_KEY=<gateway-token>          # Gateway token
-BRAVE_API_URL=https://automna.ai/api/brave
-
-# Email (via proxy, no direct API key)
-AGENTMAIL_INBOX_ID=<inbox-id>          # User's inbox
+# In entrypoint.sh:
+AUTOMNA_PROXY_URL="${AUTOMNA_PROXY_URL:-https://automna.ai}"  # defaults to Vercel fallback
+# Writes clawdbot.json with:
+#   models.providers.automna.baseUrl = "$AUTOMNA_PROXY_URL/api/llm"
+# Also sets:
+#   ANTHROPIC_BASE_URL="$AUTOMNA_PROXY_URL/api/llm"
 ```
 
-**Key insight:** Gateway token serves as the "API key" for all services. Proxies validate it, then forward with real keys.
+### Machine Environment Variables
 
-## Vercel Environment Variables
+```bash
+# Proxy URL (controls where entrypoint points the config)
+AUTOMNA_PROXY_URL=https://automna-proxy.fly.dev
 
-Real API keys exist **only** in Vercel:
+# Auth
+OPENCLAW_GATEWAY_TOKEN=<uuid>
 
-| Variable | Purpose |
-|----------|---------|
-| `ANTHROPIC_API_KEY` | Real Anthropic API key |
-| `GEMINI_API_KEY` | Real Google AI API key |
-| `BROWSERBASE_API_KEY` | Real Browserbase API key |
-| `BROWSERBASE_PROJECT_ID` | Browserbase project |
-| `BRAVE_API_KEY` | Real Brave Search API key |
-| `AGENTMAIL_API_KEY` | Real Agentmail API key |
+# Anthropic (gateway token, NOT real key)
+ANTHROPIC_API_KEY=<gateway-token>
+
+# Gemini
+GEMINI_API_KEY=<gateway-token>
+GOOGLE_API_BASE_URL=https://automna-proxy.fly.dev/api/gemini
+
+# Browserbase
+BROWSERBASE_API_KEY=<gateway-token>
+BROWSERBASE_API_URL=https://automna-proxy.fly.dev/api/browserbase
+BROWSERBASE_PROJECT_ID=<project-id>
+BROWSERBASE_CONTEXT_ID=<user-context-id>
+
+# Brave Search
+BRAVE_API_KEY=<gateway-token>
+BRAVE_API_URL=https://automna-proxy.fly.dev/api/brave
+
+# Email (no API key, uses gateway token)
+AGENTMAIL_INBOX_ID=<user-inbox>
+```
+
+**Key insight:** The gateway token serves as the "API key" for all services. The proxy validates it against Turso, then forwards requests with real keys.
+
+### Updating a Machine to Use the Fly Proxy
+
+```bash
+export FLY_API_TOKEN=$(jq -r .token config/fly.json)
+
+# 1. Get current machine config
+MACHINE_ID="<machine-id>"
+APP="automna-u-<shortid>"
+FULL=$(curl -s -H "Authorization: Bearer $FLY_API_TOKEN" \
+  "https://api.machines.dev/v1/apps/$APP/machines/$MACHINE_ID")
+
+# 2. Update env vars (Python one-liner)
+echo "$FULL" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+env = d['config']['env']
+env['AUTOMNA_PROXY_URL'] = 'https://automna-proxy.fly.dev'
+env['BRAVE_API_URL'] = 'https://automna-proxy.fly.dev/api/brave'
+env['BROWSERBASE_API_URL'] = 'https://automna-proxy.fly.dev/api/browserbase'
+env['GOOGLE_API_BASE_URL'] = 'https://automna-proxy.fly.dev/api/gemini'
+json.dump({'config': d['config']}, open('/tmp/update.json', 'w'))
+"
+
+# 3. Apply update
+curl -s -X POST -H "Authorization: Bearer $FLY_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.machines.dev/v1/apps/$APP/machines/$MACHINE_ID" \
+  -d @/tmp/update.json
+
+# 4. Restart (or start if stopped)
+fly machines restart $MACHINE_ID -a $APP
+```
+
+**⚠️ IMPORTANT:** The entrypoint regenerates `clawdbot.json` on every boot. SSH-editing the config file directly won't persist — you must set the `AUTOMNA_PROXY_URL` env var on the machine.
 
 ---
 
-## Anthropic Proxy
+## Fly Proxy Environment Variables
 
-**Endpoint:** `POST /api/llm/v1/messages`
+Real API keys exist **only** on the Fly proxy app:
 
-Matches Anthropic's API path structure so we can use `ANTHROPIC_BASE_URL`.
+```bash
+# Real API keys
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=AI...
+BROWSERBASE_API_KEY=bb_...
+BRAVE_API_KEY=BSA...
+AGENTMAIL_API_KEY=am_...
 
-**Features:**
-- Streaming support (SSE passthrough with usage extraction)
-- Token counting for billing
-- Request timeout (5 min)
+# Database
+TURSO_URL=libsql://automna-alexbbio.aws-us-west-2.turso.io
+TURSO_TOKEN=...
+```
 
-**Files:**
-- `src/app/api/llm/v1/messages/route.ts`
-- `src/app/api/llm/_lib/auth.ts`
-- `src/app/api/llm/_lib/usage.ts`
-
----
-
-## Gemini Proxy
-
-**Endpoint:** `/api/gemini/[...path]`
-
-Proxies all Gemini Generative AI API calls.
-
-**Example paths:**
-- `/api/gemini/v1beta/models/gemini-pro:generateContent`
-- `/api/gemini/v1beta/models/text-embedding-004:embedContent`
-
-**Auth methods supported:**
-- `x-goog-api-key` header (preferred)
-- `?key=` query parameter
-
-**Features:**
-- All HTTP methods (GET, POST, PUT, DELETE, PATCH)
-- Streaming support for SSE responses
-- Usage extraction from `usageMetadata`
-
-**Files:**
-- `src/app/api/gemini/[...path]/route.ts`
+Set via: `fly secrets set -a automna-proxy KEY=VALUE`
 
 ---
 
-## Browserbase Proxy
+## Route Details
 
-**Endpoint:** `/api/browserbase/v1/[...path]`
+### Anthropic LLM Proxy
 
-Proxies all Browserbase API calls for browser automation.
+**Path:** `POST /api/llm/v1/messages`
+**File:** `fly-proxy/src/routes/anthropic.ts`
 
-**Example paths:**
-- `/api/browserbase/v1/sessions` - Create/list sessions
-- `/api/browserbase/v1/sessions/{id}` - Session details
-- `/api/browserbase/v1/contexts` - Manage contexts
+Features:
+- Streaming SSE passthrough with keepalive comments (25s interval)
+- Token extraction from stream events (`message_start` for input/cache, `message_delta` for output)
+- Non-streaming mode supported
+- 5-minute timeout
+- Per-request trace IDs for debugging
+- Forwards `anthropic-version` and `anthropic-beta` headers
 
-**Features:**
-- Auto-injects project ID for session creation
-- Logs session creates for billing
+### Gemini Proxy
+
+**Path:** `/api/gemini/*` (catch-all)
+**File:** `fly-proxy/src/routes/gemini.ts`
+
+Features:
+- Swaps user's `?key=` param for real API key
 - All HTTP methods supported
+- 2-minute timeout
 
-**Files:**
-- `src/app/api/browserbase/v1/[...path]/route.ts`
+### Browserbase Proxy
 
----
+**Path:** `/api/browserbase/v1/*` (catch-all)
+**File:** `fly-proxy/src/routes/browserbase.ts`
 
-## Brave Search Proxy
+Features:
+- Tracks session creation for billing
+- All HTTP methods supported
+- 1-minute timeout
 
-**Endpoint:** `/api/brave/[...path]`
+### Brave Search Proxy
 
-Proxies all Brave Search API calls.
+**Path:** `/api/brave/*` (catch-all)
+**File:** `fly-proxy/src/routes/brave.ts`
 
-**Example paths:**
-- `/api/brave/res/v1/web/search?q=query` - Web search
-- `/api/brave/res/v1/news/search?q=query` - News search
-- `/api/brave/res/v1/images/search?q=query` - Image search
-- `/api/brave/res/v1/videos/search?q=query` - Video search
+Features:
+- Query param passthrough
+- Per-query cost tracking
+- 30-second timeout
 
-**Auth:** `X-Subscription-Token` header (gateway token)
+### Email Proxy
 
-**Features:**
-- All query parameters passed through
-- Usage tracking (queries counted)
-- Rate limit headers preserved
+**Path:** `/api/user/email/*`
+**File:** `fly-proxy/src/routes/email.ts`
 
-**Files:**
-- `src/app/api/brave/[...path]/route.ts`
+Endpoints:
+- `POST /api/user/email/send` — Send email (50/day rate limit)
+- `GET /api/user/email/inbox` — List inbox messages
+- `GET /api/user/email/inbox/:messageId` — Get message detail
 
----
-
-## Agentmail Proxy
-
-**Endpoint:** `/api/user/email/*`
-
-Different pattern - purpose-built endpoints, not transparent proxy.
-
-**Endpoints:**
-- `POST /api/user/email/send` - Send email (rate limited: 50/user/day)
-- `GET /api/user/email/inbox` - List inbox messages
-- `GET /api/user/email/inbox/[messageId]` - Get message details
-
-**Files:**
-- `src/app/api/user/email/send/route.ts`
-- `src/app/api/user/email/inbox/route.ts`
+Features:
+- Attachment support: `{filename, content_type, content (base64)}` or `{filename, url}`
+- Daily send rate limit tracked in `email_sends` table
+- Per-send cost tracking
 
 ---
 
 ## Usage Tracking
 
-All proxy requests log to `llm_usage` table in Turso:
+### Table: `usage_events` (unified billing)
 
-| Column | Description |
-|--------|-------------|
-| `user_id` | Clerk user ID |
-| `provider` | `anthropic`, `gemini`, `browserbase` |
-| `model` | Model/service name |
-| `endpoint` | API endpoint called |
-| `input_tokens` | Input tokens (LLM only) |
-| `output_tokens` | Output tokens (LLM only) |
-| `cost_microdollars` | Calculated cost |
-| `duration_ms` | Request duration |
-| `error` | Error message if failed |
+All billable activity logs here. This is the source of truth for Automna Token usage.
+
+| Field | Description |
+|-------|-------------|
+| userId | Clerk user ID |
+| eventType | `llm`, `search`, `browser`, `call`, `email` |
+| automnaTokens | `ceil(costMicrodollars / 100)` |
+| costMicrodollars | From pricing calculation or fixed costs |
+| metadata | JSON with model, token counts, etc. |
+
+### Table: `llm_usage` (detailed LLM log)
+
+Per-request token-level detail for Anthropic calls.
+
+| Field | Description |
+|-------|-------------|
+| userId, provider, model | Request identity |
+| inputTokens, outputTokens | Token counts |
+| cacheCreationTokens, cacheReadTokens | Prompt caching |
+| costMicrodollars | Calculated cost |
+| durationMs | Request duration |
+| error | Error message if failed |
+
+### Fixed Costs (non-LLM)
+
+| Service | Cost per action | Automna Tokens |
+|---------|----------------|----------------|
+| Brave Search | $0.003/query | 30 AT |
+| Browserbase | $0.02/session | 200 AT |
+| Email send | $0.002/send | 20 AT |
+| Voice call | $0.09/minute | 900 AT/min |
+| Failed call | $0.015/attempt | 150 AT |
 
 ---
 
 ## Rate Limiting
 
-Implemented in `src/app/api/llm/_lib/rate-limit.ts`:
+| Limit | Free | Starter | Pro | Business |
+|-------|------|---------|-----|----------|
+| Monthly AT | 10K | 200K | 1M | 5M |
+| Requests/min | 5 | 20 | 60 | 120 |
+| Call minutes | 0 | 0 | 60 | 300 |
 
-| Limit | Starter | Pro | Business |
-|-------|---------|-----|----------|
-| Monthly tokens | 1M | 5M | 20M |
-| Monthly cost | $20 | $100 | $500 |
-| Requests/min | 20 | 60 | 200 |
-
-Rate limit responses use Anthropic-compatible format with `Retry-After` header.
+Rate limit responses use Anthropic-compatible error format with `Retry-After` header.
 
 ---
 
-## Security Model
+## Auth Flow
 
-| Secret | Location | Who can see |
-|--------|----------|-------------|
-| Real API keys | Vercel env only | Operators only |
-| Gateway token | Turso + machine | Per-user, validated |
+1. User machine sends request with gateway token in `x-api-key` or `Authorization: Bearer` header
+2. Proxy looks up token in `machines` table (Turso) — 5-minute in-memory cache
+3. Returns `{userId, appName, machineId, plan}` or 401
+4. Rate limits checked against plan
+5. Request forwarded to upstream with real API key
+6. Usage logged to Turso (fire-and-forget)
 
-**Users cannot:**
-- See real API keys
-- Bypass rate limits
-- Impersonate other users (token tied to their machine)
+---
+
+## Deploying Updates
+
+```bash
+cd /root/clawd/projects/automna/fly-proxy
+export FLY_API_TOKEN=$(jq -r .token ../config/fly.json)
+export PATH="$PATH:/root/.fly/bin"
+fly deploy --remote-only
+```
+
+Type-check before deploy:
+```bash
+npx tsc --noEmit
+```
 
 ---
 
@@ -242,38 +320,38 @@ Rate limit responses use Anthropic-compatible format with `Retry-After` header.
 
 ### Requests not going through proxy
 
-**Symptom:** Usage appears on direct API key, not in Turso
+**Symptom:** Fly proxy logs show only health checks, no API calls
 
 **Causes:**
-1. SDK not respecting base URL env var
-2. Old env vars on machine
+1. Machine missing `AUTOMNA_PROXY_URL` env var (entrypoint defaults to `automna.ai`)
+2. Machine hasn't been restarted after env var update
 
 **Fix:**
 ```bash
-# Check machine env
-fly ssh console -a automna-u-<id>
-printenv | grep -E "GEMINI|BROWSERBASE|ANTHROPIC"
+# Verify the config on the machine
+fly ssh console -a automna-u-<id> -C "cat /home/node/.openclaw/clawdbot.json" | grep baseUrl
+# Should show: https://automna-proxy.fly.dev/api/llm
 
-# Should show:
-# GEMINI_API_KEY=<gateway-token>
-# GOOGLE_API_BASE_URL=https://automna.ai/api/gemini
-# etc.
+# Check env vars
+fly ssh console -a automna-u-<id> -C "env" | grep PROXY
+# Should show: AUTOMNA_PROXY_URL=https://automna-proxy.fly.dev
 ```
 
-### 401 Unauthorized from proxy
+### 401 from proxy
 
-**Cause:** Invalid gateway token
+**Cause:** Invalid or expired gateway token
 
 **Fix:**
-1. Check token exists in `machines` table
-2. Verify token matches machine's env var
-3. Regenerate token via admin panel if needed
+```bash
+# Check token in Turso
+turso db shell automna "SELECT gateway_token FROM machines WHERE app_name='automna-u-<id>'"
+# Compare with what the machine is sending
+```
 
-### Cloudflare WAF blocking
+### Image model 401
 
-**Symptom:** `403 Your request was blocked`
+**Symptom:** `image failed: 401 invalid x-api-key`
 
-**Fix:** Add WAF skip rules in Cloudflare:
-- `/api/llm/*`
-- `/api/gemini/*`
-- `/api/browserbase/*`
+**Cause:** OpenClaw's image tool uses `ANTHROPIC_API_KEY` env var directly against the default Anthropic endpoint, bypassing the custom provider config.
+
+**Status:** Known issue. The `ANTHROPIC_BASE_URL` env var is set by the entrypoint, which should route image calls through the proxy. If the image tool ignores this, it's an OpenClaw bug.
