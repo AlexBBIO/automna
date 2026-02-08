@@ -1,17 +1,25 @@
-FROM node:22-slim
+FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --production=false
+COPY package.json bun.lock* ./
+RUN bun install
 
 COPY tsconfig.json ./
 COPY src/ ./src/
 
-RUN npx tsc
+# Type check
+RUN bunx tsc --noEmit
 
-# Remove dev dependencies
-RUN npm prune --production
+FROM oven/bun:1-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/tsconfig.json ./
 
 EXPOSE 8080
-CMD ["node", "dist/index.js"]
+
+CMD ["bun", "run", "src/index.ts"]
