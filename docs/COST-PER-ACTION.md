@@ -87,15 +87,29 @@ If we define **1 credit = $0.01 of cost to us**:
 | Inbox Check | 5 credits |
 | Web Search (with synthesis) | 7 credits |
 
-| Tier | Monthly Automna Tokens | Rough Equivalent |
-|------|----------------------|------------------|
-| **Lite ($20)** | 120,000 | ~240 messages OR ~10 phone min OR mix |
-| **Pro ($79)** | 320,000 | ~640 messages OR ~26 phone min OR mix |
-| **Business ($149)** | 540,000 | ~1,080 messages OR ~43 phone min OR mix |
-| **Enterprise ($299)** | 990,000 | ~1,980 messages OR ~79 phone min OR mix |
+### Current Plan Limits (from `schema.ts` PLAN_LIMITS)
+
+| Tier | Monthly AT | Cost Cap | Call Min | Req/min | ~Messages |
+|------|-----------|----------|---------|---------|-----------|
+| **Free** | 10,000 | $1 | 0 | 5 | ~13-20 |
+| **Starter ($79)** | 200,000 | $20 | 0 | 20 | ~260-400 |
+| **Pro ($149)** | 1,000,000 | $100 | 60 | 60 | ~1,300-2,000 |
+| **Business ($299)** | 5,000,000 | $500 | 300 | 120 | ~6,500-10,000 |
 
 > Exchange rate: **10,000 Automna Tokens = $1.00 real cost**
-> Already tracked in `usage_events` table with `automna_tokens` per event.
+> Source of truth: `landing/src/lib/db/schema.ts` → `PLAN_LIMITS`
+> Tracked in `usage_events` table with `automna_tokens` per event.
+
+### Proposed Lite ($20) Tier
+
+| | Lite ($20) |
+|---|---|
+| **Monthly AT** | TBD |
+| **Cost Cap** | TBD |
+| **Call Minutes** | TBD |
+| **Req/min** | TBD |
+| **Features** | Full (same as Pro — Opus, phone, email, integrations) |
+| **Machine** | shared-cpu-1x, 2GB RAM |
 
 ---
 
