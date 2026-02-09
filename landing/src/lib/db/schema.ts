@@ -157,13 +157,21 @@ export const PLAN_LIMITS = {
     tokensPerMinute: 10_000,
     monthlyCallMinutes: 0,
   },
+  lite: {
+    monthlyAutomnaCredits: 50_000,   // $5 real cost cap
+    monthlyTokens: 50_000,          // LEGACY — remove after migration
+    monthlyCostCents: 500,          // LEGACY — remove after migration
+    requestsPerMinute: 10,
+    tokensPerMinute: 25_000,
+    monthlyCallMinutes: 30,
+  },
   starter: {
     monthlyAutomnaCredits: 200_000,  // $20 real cost cap
     monthlyTokens: 500_000,         // LEGACY — remove after migration
     monthlyCostCents: 2000,         // LEGACY — remove after migration
     requestsPerMinute: 20,
     tokensPerMinute: 50_000,
-    monthlyCallMinutes: 0,          // No calling on starter
+    monthlyCallMinutes: 30,
   },
   pro: {
     monthlyAutomnaCredits: 1_000_000, // $100 real cost cap

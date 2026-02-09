@@ -177,7 +177,7 @@ async function scaleMachineForPlan(userId: string, plan: string): Promise<void> 
  * Provision a phone number for users upgrading to calling-enabled plans.
  * Non-fatal: logs errors but doesn't fail the webhook.
  */
-const PLANS_WITH_CALLING = ["pro", "business"];
+const PLANS_WITH_CALLING = ["lite", "starter", "pro", "business"];
 
 async function provisionPhoneForPlan(userId: string, plan: string): Promise<void> {
   if (!PLANS_WITH_CALLING.includes(plan)) return;
