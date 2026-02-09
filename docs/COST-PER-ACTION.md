@@ -12,7 +12,7 @@
 | **Chat Message** (Opus) | ~21,000 | ~122 | $0.050 | 20 messages |
 | **Chat Message** (Power User) | ~113,000 | ~148 | $0.098 | 10 messages |
 | **Phone Call** (per minute) | n/a | n/a | $0.125 | 8 minutes |
-| **Phone Call** (avg call, 30s) | n/a | n/a | $0.064 | 15 calls |
+| **Phone Call** (avg call, 1min) | n/a | n/a | $0.125 | 15 calls |
 | **Email Send** | ~21,000 | ~200 | $0.060 | 16 emails |
 | **Inbox Check** | ~21,000 | ~150 | $0.050 | 20 checks |
 | **Web Search** | ~1 | ~10 | $0.001 | 1,000 searches |
