@@ -360,8 +360,8 @@ export default function PricingPage() {
             One agent. Your rules.
           </h1>
           <p className="text-base md:text-xl text-zinc-500 dark:text-gray-400 max-w-2xl mx-auto">
-            Every plan gets the full experience — Claude Opus, phone calls, email, integrations.
-            Pick how much you want to use it.
+            Every plan gets the same core agent — Claude Opus, phone calls, email, integrations.
+            Higher tiers add always-on uptime, memory, and more credits.
           </p>
         </div>
 
@@ -463,8 +463,8 @@ export default function PricingPage() {
         {/* Lite callout */}
         <div className="mt-10 md:mt-16 max-w-3xl mx-auto text-center px-4 md:px-6">
           <p className="text-zinc-400 dark:text-gray-500 text-xs md:text-sm">
-            Not sure yet? <span className="text-purple-600 dark:text-purple-400">Lite at ${isAnnual ? '16' : '20'}/mo</span> gives you the full experience.
-            Same AI, same capabilities — just fewer credits. Upgrade anytime.
+            Not sure yet? <span className="text-purple-600 dark:text-purple-400">Lite at ${isAnnual ? '16' : '20'}/mo</span> gives you the same core agent and tools,
+            but runs on-demand (sleeps when idle) with lower limits. Upgrade anytime.
           </p>
         </div>
 

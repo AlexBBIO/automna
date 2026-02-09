@@ -1142,8 +1142,8 @@ export default function Home() {
                 One agent. Your rules.
               </h2>
               <p className="text-zinc-500 dark:text-zinc-400 text-base md:text-lg max-w-2xl mx-auto">
-                Every plan gets the full experience — Claude Opus, phone calls, email, integrations.
-                Pick how much you want to use it.
+                Every plan gets the same core agent — Claude Opus, phone calls, email, integrations.
+                Higher tiers add always-on uptime, memory, and more credits.
               </p>
             </div>
 
@@ -1379,7 +1379,7 @@ export default function Home() {
             </div>
 
             <p className="text-center text-zinc-400 dark:text-gray-500 text-xs md:text-sm mt-6 md:mt-8">
-              Not sure yet? <span className="text-purple-600 dark:text-purple-400">Lite at $20/mo</span> gives you the full experience. Upgrade anytime.
+              Not sure yet? <span className="text-purple-600 dark:text-purple-400">Lite at $20/mo</span> gives you the same core agent and tools, but runs on-demand with lower limits. Upgrade anytime.
             </p>
           </div>
         </section>
