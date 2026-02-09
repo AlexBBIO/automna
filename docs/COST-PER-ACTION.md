@@ -41,24 +41,34 @@
 
 ## Tier Budget Model
 
-### Assumptions
-- Infrastructure per user: ~$10/mo (Fly machine + phone number + email)
-- Target margin: 50%+ on higher tiers, breakeven/slim on Lite
+### Infrastructure Cost Per Tier
+
+| Tier | Machine | RAM | vCPU | Fly Cost/mo | Phone # | Total Infra |
+|------|---------|-----|------|-------------|---------|-------------|
+| **Lite ($20)** | shared-cpu-1x | 2GB | 1 shared | ~$7 | $1 | **~$8** |
+| **Pro ($79)** | shared-cpu-2x | 4GB | 2 shared | ~$14 | $1 | **~$15** |
+| **Business ($149)** | shared-cpu-2x | 4GB | 2 shared | ~$14 | $1 | **~$15** |
+| **Enterprise ($299)** | shared-cpu-2x | 4GB | 2 shared | ~$14 | $1 | **~$15** |
+
+> Email inbox cost is negligible. Volume storage (~1GB) adds ~$0.15/mo.
+
+### Budget Breakdown
 
 | | Lite ($20) | Pro ($79) | Business ($149) | Enterprise ($299) |
 |---|---|---|---|---|
-| **Infra cost** | $10 | $10 | $10 | $10 |
-| **Budget for usage** | $10 | $69 | $139 | $289 |
+| **Revenue** | $20 | $79 | $149 | $299 |
+| **Infra cost** | $8 | $15 | $15 | $15 |
+| **Budget for usage** | $12 | $64 | $134 | $284 |
 | **Target margin** | ~0% | ~50% | ~60% | ~65% |
-| **Usage budget (at margin)** | $10 | $35 | $56 | $101 |
+| **Usage budget (at margin)** | $12 | $32 | $54 | $99 |
 
 ### What Each Tier Can Afford (at target margin)
 
 | Action | Lite ($20) | Pro ($79) | Business ($149) | Enterprise ($299) |
 |--------|-----------|----------|----------------|-------------------|
-| **Messages** | 200 | 700 | 1,120 | 2,020 |
-| **Phone Minutes** | 8 | 28 | 45 | 81 |
-| **Emails** | 167 | 583 | 933 | 1,683 |
+| **Messages** | 240 | 640 | 1,080 | 1,980 |
+| **Phone Minutes** | 10 | 26 | 43 | 79 |
+| **Emails** | 200 | 533 | 900 | 1,650 |
 
 > These are "pure" numbers — if a user ONLY did one action type.
 > Real usage is a mix, so actual limits should be expressed as a shared token/credit pool.
@@ -77,12 +87,30 @@ If we define **1 credit = $0.01 of cost to us**:
 | Inbox Check | 5 credits |
 | Web Search (with synthesis) | 7 credits |
 
-| Tier | Monthly Credits | Rough Equivalent |
-|------|----------------|------------------|
-| **Lite ($20)** | 1,000 | ~200 messages OR ~77 phone minutes OR mix |
-| **Pro ($79)** | 3,500 | ~700 messages OR ~269 phone minutes OR mix |
-| **Business ($149)** | 5,600 | ~1,120 messages OR ~431 phone minutes OR mix |
-| **Enterprise ($299)** | 10,100 | ~2,020 messages OR ~777 phone minutes OR mix |
+| Tier | Monthly Automna Tokens | Rough Equivalent |
+|------|----------------------|------------------|
+| **Lite ($20)** | 120,000 | ~240 messages OR ~10 phone min OR mix |
+| **Pro ($79)** | 320,000 | ~640 messages OR ~26 phone min OR mix |
+| **Business ($149)** | 540,000 | ~1,080 messages OR ~43 phone min OR mix |
+| **Enterprise ($299)** | 990,000 | ~1,980 messages OR ~79 phone min OR mix |
+
+> Exchange rate: **10,000 Automna Tokens = $1.00 real cost**
+> Already tracked in `usage_events` table with `automna_tokens` per event.
+
+---
+
+## Automna Token Costs Per Action
+
+Already tracked via `usage_events` table. Exchange rate: **10,000 AT = $1.00**
+
+| Action | Automna Tokens | Real Cost |
+|--------|---------------|-----------|
+| Chat Message (avg) | ~500-770 | $0.05-0.08 |
+| Chat Message (power user) | ~1,000+ | $0.10+ |
+| Phone Call (per min) | ~1,250 | $0.125 |
+| Email Send | ~20 | $0.002 |
+| Web Search | ~28 | $0.003 |
+| Search + Synthesis | ~650 | $0.065 |
 
 ---
 
@@ -101,6 +129,11 @@ If we define **1 credit = $0.01 of cost to us**:
 - Avg cost: $0.064/call
 - Cost per minute: ~$0.125 (Bland AI BYOT)
 - Range: $0.03 (12s call) to $0.14 (69s call)
+
+### Machine Specs (Current)
+- **Starter/Lite:** shared-cpu-1x, 2GB RAM, 1 vCPU → ~$7/mo
+- **Pro:** shared-cpu-2x, 4GB RAM, 2 vCPU → ~$14/mo
+- **Business:** shared-cpu-2x, 4GB RAM, 2 vCPU → ~$14/mo
 
 ### Per-User Daily Usage (normal users)
 - Avg messages/day: ~30
