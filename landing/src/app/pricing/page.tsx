@@ -13,6 +13,7 @@ const plans = [
     price: 20,
     annual: 16,
     priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_LITE,
+    annualPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_LITE_ANNUAL,
     description: 'Experience the magic',
     tagline: 'Everything. Just a taste.',
     features: [
@@ -33,6 +34,7 @@ const plans = [
     price: 79,
     annual: 63,
     priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER,
+    annualPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER_ANNUAL,
     description: 'Your always-on assistant',
     tagline: 'Never sleeps. Never forgets.',
     features: [
@@ -56,6 +58,7 @@ const plans = [
     price: 149,
     annual: 119,
     priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO,
+    annualPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL,
     description: 'For power users',
     tagline: 'Built for heavy use.',
     features: [
@@ -81,6 +84,7 @@ const plans = [
     price: 299,
     annual: 239,
     priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_BUSINESS,
+    annualPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_BUSINESS_ANNUAL,
     description: 'Unlimited power',
     tagline: 'For all-day, every-day use.',
     features: [
@@ -300,7 +304,7 @@ export default function PricingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          priceId: plan.priceId,
+          priceId: isAnnual ? plan.annualPriceId : plan.priceId,
           plan: plan.name.toLowerCase(),
           billing: isAnnual ? 'annual' : 'monthly',
         }),

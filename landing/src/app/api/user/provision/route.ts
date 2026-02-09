@@ -735,9 +735,15 @@ export async function POST() {
           
           // Map Stripe price ID to plan name
           const priceIdToPlan: Record<string, string> = {};
+          if (process.env.STRIPE_PRICE_LITE) priceIdToPlan[process.env.STRIPE_PRICE_LITE] = "lite";
           if (process.env.STRIPE_PRICE_STARTER) priceIdToPlan[process.env.STRIPE_PRICE_STARTER] = "starter";
           if (process.env.STRIPE_PRICE_PRO) priceIdToPlan[process.env.STRIPE_PRICE_PRO] = "pro";
           if (process.env.STRIPE_PRICE_BUSINESS) priceIdToPlan[process.env.STRIPE_PRICE_BUSINESS] = "business";
+          // Annual prices map to the same plan names
+          if (process.env.STRIPE_PRICE_LITE_ANNUAL) priceIdToPlan[process.env.STRIPE_PRICE_LITE_ANNUAL] = "lite";
+          if (process.env.STRIPE_PRICE_STARTER_ANNUAL) priceIdToPlan[process.env.STRIPE_PRICE_STARTER_ANNUAL] = "starter";
+          if (process.env.STRIPE_PRICE_PRO_ANNUAL) priceIdToPlan[process.env.STRIPE_PRICE_PRO_ANNUAL] = "pro";
+          if (process.env.STRIPE_PRICE_BUSINESS_ANNUAL) priceIdToPlan[process.env.STRIPE_PRICE_BUSINESS_ANNUAL] = "business";
           
           const stripePlan = priceId ? priceIdToPlan[priceId] : null;
           
