@@ -221,11 +221,32 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* "Same AI everywhere" badge */}
-        <div className="flex justify-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-sm">
-            <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-            Same AI on every plan — no feature gating
+        {/* What every plan includes - above the fold */}
+        <div className="max-w-3xl mx-auto mb-16">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
+            <h3 className="text-xl font-bold mb-4 text-center">What every plan includes</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-sm">
+              <div className="p-3">
+                <div className="text-2xl mb-1">🧠</div>
+                <div className="text-gray-300 font-medium">Claude Opus</div>
+                <div className="text-gray-500">Latest model</div>
+              </div>
+              <div className="p-3">
+                <div className="text-2xl mb-1">📞</div>
+                <div className="text-gray-300 font-medium">Phone Number</div>
+                <div className="text-gray-500">Calls in & out</div>
+              </div>
+              <div className="p-3">
+                <div className="text-2xl mb-1">📧</div>
+                <div className="text-gray-300 font-medium">Email Inbox</div>
+                <div className="text-gray-500">Send & receive</div>
+              </div>
+              <div className="p-3">
+                <div className="text-2xl mb-1">🌐</div>
+                <div className="text-gray-300 font-medium">Browser</div>
+                <div className="text-gray-500">Research & browse</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -304,37 +325,8 @@ export default function PricingPage() {
           ))}
         </div>
 
-        {/* Comparison highlight */}
-        <div className="mt-16 max-w-3xl mx-auto">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
-            <h3 className="text-xl font-bold mb-4 text-center">What every plan includes</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-sm">
-              <div className="p-3">
-                <div className="text-2xl mb-1">🧠</div>
-                <div className="text-gray-300 font-medium">Claude Opus</div>
-                <div className="text-gray-500">Latest model</div>
-              </div>
-              <div className="p-3">
-                <div className="text-2xl mb-1">📞</div>
-                <div className="text-gray-300 font-medium">Phone Number</div>
-                <div className="text-gray-500">Calls in & out</div>
-              </div>
-              <div className="p-3">
-                <div className="text-2xl mb-1">📧</div>
-                <div className="text-gray-300 font-medium">Email Inbox</div>
-                <div className="text-gray-500">Send & receive</div>
-              </div>
-              <div className="p-3">
-                <div className="text-2xl mb-1">🌐</div>
-                <div className="text-gray-300 font-medium">Browser</div>
-                <div className="text-gray-500">Research & browse</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Lite callout */}
-        <div className="mt-8 max-w-3xl mx-auto text-center">
+        <div className="mt-16 max-w-3xl mx-auto text-center">
           <p className="text-gray-500 text-sm">
             Not sure yet? <span className="text-purple-400">Lite at $20/mo</span> gives you the full experience.
             <br />
