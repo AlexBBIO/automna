@@ -1196,14 +1196,15 @@ export default function Home() {
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     50K credits/month
                   </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Estimated: ~100 messages/mo
+                  </li>
                   <li className="flex items-center gap-2 text-zinc-400 dark:text-gray-500 text-xs md:text-sm italic">
                     <span className="text-yellow-500 dark:text-yellow-400 text-xs flex-shrink-0">⚡</span>
                     Machine sleeps when idle
                   </li>
                 </ul>
-                <div className="mb-4 py-1.5 px-2 rounded-lg bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/5">
-                  <p className="text-zinc-500 dark:text-gray-500 text-[10px] md:text-xs text-center">≈ 80 messages · 50 emails</p>
-                </div>
                 <Link
                   href="/sign-up?plan=lite"
                   className="block w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white rounded-lg font-semibold text-center transition-all text-sm"
@@ -1249,10 +1250,11 @@ export default function Home() {
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     30 phone minutes/month
                   </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Estimated: ~400 messages/mo
+                  </li>
                 </ul>
-                <div className="mb-4 py-1.5 px-2 rounded-lg bg-white/50 dark:bg-white/5 border border-purple-200 dark:border-white/5">
-                  <p className="text-zinc-500 dark:text-gray-500 text-[10px] md:text-xs text-center">≈ 300 messages · 100 emails · 30 min calls</p>
-                </div>
                 <Link
                   href="/sign-up?plan=starter"
                   className="block w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold text-center transition-all text-sm"
@@ -1287,10 +1289,11 @@ export default function Home() {
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     Higher rate limits
                   </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Estimated: ~2,000 messages/mo
+                  </li>
                 </ul>
-                <div className="mb-4 py-1.5 px-2 rounded-lg bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/5">
-                  <p className="text-zinc-500 dark:text-gray-500 text-[10px] md:text-xs text-center">≈ 1,500 messages · 500 emails · 60 min calls</p>
-                </div>
                 <Link
                   href="/sign-up?plan=pro"
                   className="block w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white rounded-lg font-semibold text-center transition-all text-sm"
@@ -1325,10 +1328,11 @@ export default function Home() {
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     Highest rate limits
                   </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Estimated: ~10,000 messages/mo
+                  </li>
                 </ul>
-                <div className="mb-4 py-1.5 px-2 rounded-lg bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/5">
-                  <p className="text-zinc-500 dark:text-gray-500 text-[10px] md:text-xs text-center">≈ 8,000 messages · 2,000 emails · 300 min calls</p>
-                </div>
                 <Link
                   href="/sign-up?plan=business"
                   className="block w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white rounded-lg font-semibold text-center transition-all text-sm"

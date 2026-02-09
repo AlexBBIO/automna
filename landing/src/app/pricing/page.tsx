@@ -22,8 +22,8 @@ const plans = [
       'All integrations (Discord, WhatsApp, etc.)',
       'Browser access',
       '50K credits/month',
+      'Estimated: ~100 messages/mo',
     ],
-    usage: '≈ 80 messages · 50 emails',
     footnote: 'Machine sleeps when idle',
     cta: 'Try for $20',
     ctaAnnual: 'Try for $16',
@@ -46,8 +46,8 @@ const plans = [
       'Long-term memory',
       '200K credits/month',
       '30 phone minutes/month',
+      'Estimated: ~400 messages/mo',
     ],
-    usage: '≈ 300 messages · 100 emails · 30 min calls',
     cta: 'Get Starter',
     ctaAnnual: 'Get Starter',
     popular: true,
@@ -71,8 +71,8 @@ const plans = [
       '1M credits/month',
       '60 phone minutes/month',
       'Higher rate limits',
+      'Estimated: ~2,000 messages/mo',
     ],
-    usage: '≈ 1,500 messages · 500 emails · 60 min calls',
     cta: 'Go Pro',
     ctaAnnual: 'Go Pro',
   },
@@ -95,8 +95,8 @@ const plans = [
       '5M credits/month',
       '300 phone minutes/month',
       'Highest rate limits',
+      'Estimated: ~10,000 messages/mo',
     ],
-    usage: '≈ 8,000 messages · 2,000 emails · 300 min calls',
     cta: 'Go Business',
     ctaAnnual: 'Go Business',
   },
@@ -196,15 +196,6 @@ function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout }: {
           </li>
         )}
       </ul>
-
-      {/* Approximate usage breakdown */}
-      {plan.usage && (
-        <div className="mb-4 md:mb-6 py-2 px-3 rounded-lg bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/5">
-          <p className="text-zinc-500 dark:text-gray-500 text-[10px] md:text-xs text-center">
-            {plan.usage}
-          </p>
-        </div>
-      )}
 
       {isSignedIn ? (
         <button
