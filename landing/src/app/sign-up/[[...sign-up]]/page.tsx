@@ -20,7 +20,7 @@ export default function SignUpPage() {
         routing="path"
         path="/sign-up"
         signInUrl="/sign-in"
-        forceRedirectUrl="/dashboard"
+        forceRedirectUrl="/pricing?welcome=true"
       />
     </div>
   );

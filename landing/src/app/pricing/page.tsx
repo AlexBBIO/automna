@@ -112,6 +112,7 @@ const plans = [
 function SubscriptionBanner() {
   const searchParams = useSearchParams();
   const needsSubscription = searchParams.get('subscribe') === 'true';
+  const isWelcome = searchParams.get('welcome') === 'true';
   const wasCanceled = searchParams.get('canceled') === 'true';
 
   useEffect(() => {
@@ -126,6 +127,18 @@ function SubscriptionBanner() {
         <div className="bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-300 dark:border-zinc-600/50 rounded-lg p-4 text-center">
           <p className="text-zinc-600 dark:text-zinc-300">
             No worries! Take your time. Pick a plan when you&apos;re ready.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isWelcome) {
+    return (
+      <div className="container mx-auto px-4 md:px-6">
+        <div className="bg-purple-50 dark:bg-purple-900/50 border border-purple-300 dark:border-purple-500/50 rounded-lg p-4 text-center">
+          <p className="text-purple-800 dark:text-purple-200">
+            <span className="font-semibold">Account created! 🎉</span> Pick a plan to activate your AI agent. It&apos;ll be ready in about 60 seconds.
           </p>
         </div>
       </div>

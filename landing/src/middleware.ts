@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 // Define protected routes (dashboard and anything under it)
 const isProtectedRoute = createRouteMatcher([
@@ -20,6 +21,26 @@ export default clerkMiddleware(async (auth, req) => {
   // Protect dashboard routes
   if (isProtectedRoute(req)) {
     await auth.protect();
+
+    // If user just completed Stripe checkout, let them through
+    // (webhook may not have updated subscription status yet)
+    const url = new URL(req.url);
+    if (url.searchParams.get("success") === "true") {
+      return;
+    }
+
+    // Check subscription status from session claims
+    // Requires Clerk Dashboard → Sessions → Customize session token with:
+    // { "subscriptionStatus": "{{user.public_metadata.subscriptionStatus}}" }
+    const { sessionClaims } = await auth();
+    const subscriptionStatus = (sessionClaims as Record<string, unknown>)?.subscriptionStatus as string | undefined;
+
+    if (subscriptionStatus !== "active" && subscriptionStatus !== "trialing") {
+      // No active subscription — send to pricing page
+      const pricingUrl = new URL("/pricing", req.url);
+      pricingUrl.searchParams.set("subscribe", "true");
+      return NextResponse.redirect(pricingUrl);
+    }
   }
 });
 
