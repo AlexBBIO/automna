@@ -74,8 +74,8 @@ Added AI-powered phone calling via Twilio + Bland.ai:
 5. **Auto-provisioning:** Stripe webhook provisions a phone number when user upgrades to Pro/Business
 6. **Default voice:** Alexandra (young chirpy American female, ID: `6277266e-01eb-44c6-b965-438566ef7076`)
 7. **Security:** No Twilio/Bland credentials on user machines. All calls proxied through `automna-proxy.fly.dev/api/user/call`. Gateway token is the only auth needed.
-8. **Cost:** Twilio $1.15/mo per number + Bland $0.12/min. Pro tier (60 min cap) worst case ~$8.20/mo at $149 price.
-9. **Plan limits:** Free/Starter: 0 min, Pro: 60 min/mo, Business: 300 min/mo
+8. **Cost:** Twilio $1.15/mo per number + Bland $0.09/min. All paid plans include calling.
+9. **Plan limits:** Free: 0 min, Lite: 30 min/mo, Starter: 60 min/mo, Pro: 120 min/mo, Business: 300 min/mo
 
 **DB tables:** `phone_numbers` (user → number mapping, voice/identity config), `call_usage` (call tracking, transcripts, cost)
 
@@ -132,9 +132,10 @@ Implemented centralized LLM API proxy (now at `https://automna-proxy.fly.dev/api
    - **Cost calculation** - Microdollar precision, per-model pricing
 
 3. **Plan Limits** (see `fly-proxy/src/lib/schema.ts` PLAN_LIMITS for current values)
-   | Plan | Monthly AT Budget | RPM |
-   |------|------------------|-----|
+   | Plan | Monthly Credit Budget | RPM |
+   |------|----------------------|-----|
    | Free | 10K | 5 |
+   | Lite | 50K | 10 |
    | Starter | 200K | 20 |
    | Pro | 1M | 60 |
    | Business | 5M | 120 |
@@ -740,11 +741,12 @@ if (currentSessionRef.current !== sessionKey) {
 
 **Products & Pricing:**
 
-| Plan | Price | Price ID | Token Budget | Features |
-|------|-------|----------|-------------|----------|
-| Starter | $79/mo | `price_1Sukg0LgmKPRkIsH6PMVR7BR` | 200K AT | Web chat + 1 integration, browser, email |
-| Pro | $149/mo | `price_1SukgALgmKPRkIsHmfwtzyl6` | 1M AT | All integrations, phone calls (60 min), unlimited memory |
-| Business | $299/mo | `price_1SukgBLgmKPRkIsHBcNE7azu` | 5M AT | Team workspace, phone calls (300 min), API access, dedicated support |
+| Plan | Price | Price ID | Credit Budget | Features |
+|------|-------|----------|--------------|----------|
+| Lite | $20/mo | TBD | 50K credits | Full agent, all integrations, browser, phone, email (sleeps when idle) |
+| Starter | $79/mo | `price_1Sukg0LgmKPRkIsH6PMVR7BR` | 200K credits | Always-on 24/7, proactive monitoring, long-term memory |
+| Pro | $149/mo | `price_1SukgALgmKPRkIsHmfwtzyl6` | 1M credits | Higher rate limits, custom skills, email support |
+| Business | $299/mo | `price_1SukgBLgmKPRkIsHBcNE7azu` | 5M credits | Highest rate limits, API access, analytics, dedicated support |
 
 **Webhook Events Handled:**
 - `checkout.session.completed` → Creates/updates user subscription
@@ -1586,43 +1588,46 @@ We build a custom chat interface using **assistant-ui** (open source, MIT) inste
 
 ### Pricing Tiers
 
-| Tier | Price | Token Budget | Features |
-|------|-------|-------------|----------|
-| **Starter** | $79/mo | 200K Automna Tokens | Web chat + 1 integration, browser, email |
-| **Pro** | $149/mo | 1M Automna Tokens | All integrations, phone calls (60 min), unlimited memory |
-| **Business** | $299/mo | 5M Automna Tokens | Team workspace, phone calls (300 min), API access, dedicated support |
-| **Enterprise** | Contact us | Custom | Custom |
+| Tier | Price | Credit Budget | Features |
+|------|-------|--------------|----------|
+| **Lite** | $20/mo | 50K Automna Credits | Full agent, all integrations, browser, phone, email. Machine sleeps when idle. |
+| **Starter** | $79/mo | 200K Automna Credits | Everything in Lite + always-on 24/7, proactive monitoring, long-term memory. |
+| **Pro** | $149/mo | 1M Automna Credits | Everything in Starter + higher rate limits, custom skills, email support. |
+| **Business** | $299/mo | 5M Automna Credits | Everything in Pro + highest rate limits, API access, analytics dashboard, dedicated support. |
+
+Annual pricing (20% discount): Lite $16/mo, Starter $63/mo, Pro $119/mo, Business $239/mo.
 
 All plans include Claude AI (no API key required). Each user gets a dedicated Fly.io instance.
 
-See [AUTOMNA-TOKENS.md](docs/AUTOMNA-TOKENS.md) for how tokens map to real costs.
+See [AUTOMNA-CREDITS.md](docs/AUTOMNA-CREDITS.md) for how credits map to real costs.
 
 **Comparison to alternatives:**
 - Human VA: $15-25/hr = $2,400-4,000/mo
 - ChatGPT/Claude Pro: $20/mo but chat-only, no execution
-- Automna: $79-299/mo for full agentic capabilities
+- Automna: $20-299/mo for full agentic capabilities
 
-### Automna Token System
+### Automna Credit System
 
-> **Note:** The old "credits" system has been replaced by **Automna Tokens** — a unified
-> virtual currency that maps directly to real costs. See [AUTOMNA-TOKENS.md](docs/AUTOMNA-TOKENS.md)
-> for the full specification.
+Automna Credits are a unified virtual currency that maps directly to real costs.
+See [AUTOMNA-CREDITS.md](docs/AUTOMNA-CREDITS.md) for the full specification.
 
 **Key points:**
-- 1 Automna Token = $0.0001 (100 microdollars)
+- 1 Automna Credit = $0.0001 (100 microdollars), so 10,000 credits = $1
+- ALL usage (chat, email, phone, search, browser) deducts from a single credit pool
 - LLM costs are metered from exact Anthropic token counts (variable per request)
-- Non-LLM services have fixed per-unit rates (search: 30 AT, email: 20 AT, calls: 900 AT/min)
-- Users see "tokens used / budget" — never raw dollars
+- Non-LLM services have fixed per-unit rates (search: 30 credits, email: 20 credits, calls: 900 credits/min)
+- Users see "credits used / budget" — never raw dollars
 
 ### Cost Structure (Per User)
 
-| Tier | Price | Infra Cost | LLM Budget | Total Cost (avg) | Margin |
+| Tier | Price | Infra Cost | Credit Cap | Total Cost (avg) | Margin |
 |------|-------|------------|------------|------------------|--------|
-| Starter $79 | $79 | ~$9 | $20 cap | ~$15 | ~81% |
-| Pro $149 | $149 | ~$9 | $100 cap | ~$40 | ~73% |
-| Business $299 | $299 | ~$9 | $500 cap | ~$80 | ~73% |
+| Lite $20 | $20 | ~$8 | $5 cap | ~$12 | ~40% |
+| Starter $79 | $79 | ~$8 | $20 cap | ~$18 | ~77% |
+| Pro $149 | $149 | ~$15 | $100 cap | ~$50 | ~66% |
+| Business $299 | $299 | ~$15 | $500 cap | ~$80 | ~73% |
 
-*LLM budget = Automna Token cap converted to dollars. Most users won't hit the cap.
+*Credit cap = Automna Credit budget converted to dollars. Most users won't hit the cap.
 
 **Infrastructure costs (Fly.io):**
 - Per-user: 2GB RAM, 1 shared vCPU, 1GB volume (~$9/mo)
@@ -1803,7 +1808,7 @@ This reinforces our BYOK model — users pay Anthropic directly for usage, we ch
 | **Poe** | $20/mo | Multi-model chat | Many models | Chat only, no agent capabilities |
 | **Character.ai** | Free/Premium | Chat personas | Fun, engaging | Entertainment only, no productivity |
 | **Self-hosted Clawdbot** | DIY | Full agent | Full control, free | Requires technical skills, maintenance burden |
-| **Automna** | $79-299/mo | Full managed agent | Always-on, integrations, phone calls, zero setup | Newer, smaller |
+| **Automna** | $20-299/mo | Full managed agent | Always-on, integrations, phone calls, zero setup | Newer, smaller |
 
 **Our Differentiators:**
 1. **Full execution** — Not chat, actual task completion
@@ -2097,7 +2102,7 @@ Authentication Method:
 - Claude Max: $100-200/mo (Claude Code on YOUR machine, no integrations)
 - Human VA: $2,400-4,000/mo
 
-**Our positioning:** Premium tier ($79-299/mo) but fraction of human VA cost, more capable than Claude Max (fully managed + integrations + phone calls).
+**Our positioning:** $20-299/mo tiers — fraction of human VA cost, more capable than Claude Max (fully managed + integrations + phone calls).
 
 ### C. Clawdbot License
 

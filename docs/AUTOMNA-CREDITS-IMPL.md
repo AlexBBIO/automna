@@ -49,11 +49,12 @@ automnaCredits = ceil(costMicrodollars / 100)
 
 ### Plan budgets (Automna Credits per month)
 
-| Plan | Cost Cap | Budget | Display |
-|------|----------|--------|---------|
-| Starter | $20 | 200,000 | "200K" |
-| Pro | $100 | 1,000,000 | "1M" |
-| Business | $500 | 5,000,000 | "5M" |
+| Plan | Price | Cost Cap | Budget | Display |
+|------|-------|----------|--------|---------|
+| Lite | $20/mo | $5 | 50,000 | "50K" |
+| Starter | $79/mo | $20 | 200,000 | "200K" |
+| Pro | $149/mo | $100 | 1,000,000 | "1M" |
+| Business | $299/mo | $500 | 5,000,000 | "5M" |
 
 ---
 
@@ -158,15 +159,20 @@ export const PLAN_LIMITS = {
     requestsPerMinute: 5,
     monthlyCallMinutes: 0,
   },
+  lite: {
+    monthlyAutomnaCredits: 50_000,       // $5 cost cap
+    requestsPerMinute: 10,
+    monthlyCallMinutes: 30,
+  },
   starter: {
     monthlyAutomnaCredits: 200_000,      // $20 cost cap
     requestsPerMinute: 20,
-    monthlyCallMinutes: 0,
+    monthlyCallMinutes: 60,
   },
   pro: {
     monthlyAutomnaCredits: 1_000_000,    // $100 cost cap
     requestsPerMinute: 60,
-    monthlyCallMinutes: 60,
+    monthlyCallMinutes: 120,
   },
   business: {
     monthlyAutomnaCredits: 5_000_000,    // $500 cost cap
@@ -740,13 +746,14 @@ BEFORE:
 - Business: '10M tokens/month'
 
 AFTER:
-- Starter: '200K tokens/month'
-- Pro: '1M tokens/month'
-- Business: '5M tokens/month'
+- Lite: '50K credits/month'
+- Starter: '200K credits/month'
+- Pro: '1M credits/month'
+- Business: '5M credits/month'
 ```
 
 > **⚠️ These numbers are DIFFERENT from before.** The old "500K tokens" meant raw API tokens.
-> The new "200K tokens" means Automna Credits (cost-weighted). Even though the number is
+> The new credit amounts are cost-weighted Automna Credits. Even though the numbers are
 > smaller, users actually get MORE effective usage because the old system was wildly
 > inflated by cache tokens.
 
@@ -777,10 +784,10 @@ is created with correct `automna_tokens`:
 
 ### 11c. Verify frontend
 
-1. UsageBanner shows "X of Y tokens" (Automna Credits, not raw)
+1. UsageBanner shows "X of Y credits" (Automna Credits, not raw)
 2. Progress bar percentage matches `percentUsed`
-3. Admin dashboard shows both AT and real cost
-4. Pricing page shows correct plan budgets
+3. Admin dashboard shows both AC and real cost
+4. Pricing page shows correct plan budgets (Lite 50K, Starter 200K, Pro 1M, Business 5M)
 
 ### 11d. Legacy cleanup (can defer)
 

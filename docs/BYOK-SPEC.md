@@ -89,16 +89,17 @@ Three-part approach:
 ### The Model
 
 ```
-                    Lite ($29)       Starter ($79)      Pro ($149)      Business ($299)
+                    Lite ($20)       Starter ($79)      Pro ($149)      Business ($299)
                     ──────────       ─────────────      ─────────       ────────────────
-LLM Tokens          BYOK only        200K included      1M included     5M included
-BYOK Option         Required         Optional            Optional        Optional
-Overage via BYOK    N/A (all BYOK)   ✅ Yes              ✅ Yes          ✅ Yes
-Integrations        Web + 1          Web + 1             All             All
-Phone Calls         ❌               ❌                  60 min          300 min
-Browser             Basic            Basic               Full            Full
+Credits             50K              200K included       1M included     5M included
+BYOK Option         Optional         Optional            Optional        Optional
+Overage via BYOK    ✅ Yes           ✅ Yes              ✅ Yes          ✅ Yes
+Integrations        All              All                 All             All
+Phone Calls         30 min           60 min              120 min         300 min
+Browser             ✅               ✅                  ✅              ✅
 Email               ✅               ✅                  ✅              ✅
-Memory              30 days          30 days             Unlimited       Unlimited
+Memory              ✅               ✅                  ✅              ✅
+Machine             Sleeps idle      Always-on           Always-on       Always-on
 ```
 
 ### How It Works
@@ -126,33 +127,31 @@ Token budget gets consumed.
 
 ### Updated Plan Lineup
 
-| Plan | Price | LLM Tokens | Non-LLM Budget | BYOK | Key Features |
-|------|-------|------------|-----------------|------|-------------|
-| **Lite** | $29/mo | BYOK only | 50K AT ($5) | Required | Web chat, 1 integration, browser, email |
-| **Starter** | $79/mo | 200K AT ($20) | Included in 200K | Optional | Web chat, 1 integration, browser, email |
-| **Pro** | $149/mo | 1M AT ($100) | Included in 1M | Optional | All integrations, phone, full browser, unlimited memory |
-| **Business** | $299/mo | 5M AT ($500) | Included in 5M | Optional | Team workspace, API access, analytics, dedicated support |
+| Plan | Price | Credits | Non-LLM Budget (BYOK) | BYOK | Key Features |
+|------|-------|---------|----------------------|------|-------------|
+| **Lite** | $20/mo | 50K ($5) | 50K ($5) | Optional | Full agent, all integrations, browser, phone, email. Machine sleeps when idle. |
+| **Starter** | $79/mo | 200K ($20) | 50K ($5) | Optional | Everything in Lite + always-on 24/7, proactive monitoring, long-term memory. |
+| **Pro** | $149/mo | 1M ($100) | 100K ($10) | Optional | Everything in Starter + higher rate limits, custom skills, email support. |
+| **Business** | $299/mo | 5M ($500) | 200K ($20) | Optional | Everything in Pro + highest rate limits, API access, analytics, dedicated support. |
 
 ### What BYOK Changes Per Tier
 
 | Tier | Without BYOK | With BYOK |
 |------|-------------|-----------|
-| **Lite** | N/A (BYOK mandatory) | 0 AT for LLM, 50K AT for non-LLM |
-| **Starter** | 200K AT total budget | LLM unlimited (own key), 50K AT for non-LLM |
-| **Pro** | 1M AT total budget | LLM unlimited (own key), 100K AT for non-LLM |
-| **Business** | 5M AT total budget | LLM unlimited (own key), 200K AT for non-LLM |
+| **Lite** | 50K credits total budget | LLM unlimited (own key), 50K credits for non-LLM |
+| **Starter** | 200K credits total budget | LLM unlimited (own key), 50K credits for non-LLM |
+| **Pro** | 1M credits total budget | LLM unlimited (own key), 100K credits for non-LLM |
+| **Business** | 5M credits total budget | LLM unlimited (own key), 200K credits for non-LLM |
 
-When BYOK is active, the Automna Token budget only covers non-LLM services. Since non-LLM
-costs are small (search: 30 AT, email: 20 AT, browser: 200 AT/session), even the 50K
+When BYOK is active, the Automna Credit budget only covers non-LLM services. Since non-LLM
+costs are small (search: 30 credits, email: 20 credits, browser: 200 credits/session), even the 50K
 non-LLM budget is generous for most users.
 
 ### Stripe Products
 
-New Stripe product needed:
-
 | Product | Price ID | Amount |
 |---------|----------|--------|
-| Lite | `price_xxx` (new) | $29/mo |
+| Lite | `price_xxx` (new) | $20/mo |
 | Starter | `price_1Sukg0...` (existing) | $79/mo |
 | Pro | `price_1SukgA...` (existing) | $149/mo |
 | Business | `price_1SukgB...` (existing) | $299/mo |
@@ -364,28 +363,28 @@ BYOK users still need a budget for non-LLM services. Define per-plan:
 ```typescript
 export const PLAN_LIMITS = {
   lite: {
-    monthlyAutomnaTokens: 50_000,        // $5 for non-LLM only
-    requestsPerMinute: 30,
-    monthlyCallMinutes: 0,
-    byokRequired: true,
-    byokLlmExcluded: true,               // LLM doesn't count against budget
+    monthlyAutomnaCredits: 50_000,        // $5 cost cap
+    requestsPerMinute: 10,
+    monthlyCallMinutes: 30,
+    byokRequired: false,
+    byokLlmExcluded: false,              // Dynamic: true when BYOK enabled
   },
   starter: {
-    monthlyAutomnaTokens: 200_000,       // $20 total (or non-LLM only if BYOK)
+    monthlyAutomnaCredits: 200_000,       // $20 cost cap (or non-LLM only if BYOK)
     requestsPerMinute: 20,
-    monthlyCallMinutes: 0,
+    monthlyCallMinutes: 60,
     byokRequired: false,
     byokLlmExcluded: false,              // Dynamic: true when BYOK enabled
   },
   pro: {
-    monthlyAutomnaTokens: 1_000_000,     // $100 total (or non-LLM only if BYOK)
+    monthlyAutomnaCredits: 1_000_000,     // $100 cost cap (or non-LLM only if BYOK)
     requestsPerMinute: 60,
-    monthlyCallMinutes: 60,
+    monthlyCallMinutes: 120,
     byokRequired: false,
     byokLlmExcluded: false,
   },
   business: {
-    monthlyAutomnaTokens: 5_000_000,     // $500 total (or non-LLM only if BYOK)
+    monthlyAutomnaCredits: 5_000_000,     // $500 cost cap (or non-LLM only if BYOK)
     requestsPerMinute: 120,
     monthlyCallMinutes: 300,
     byokRequired: false,
@@ -404,6 +403,9 @@ export const BYOK_NON_LLM_BUDGETS = {
 
 When BYOK is active, the effective budget switches to the non-LLM-only amount. This is
 much smaller (since non-LLM services are cheap), but more than enough for typical usage.
+
+> **Note:** All paid plans include phone calling. The `monthlyCallMinutes` backend cap is
+> a safety guard rail, separate from the credit pool.
 
 ---
 
@@ -457,19 +459,20 @@ for bill shock, and support headaches. Consider for later.
 ```
 ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
 │   Lite   │  │ Starter  │  │   Pro    │  │ Business │
-│  $29/mo  │  │  $79/mo  │  │ $149/mo  │  │ $299/mo  │
+│  $20/mo  │  │  $79/mo  │  │ $149/mo  │  │ $299/mo  │
 │          │  │          │  │ ★ Popular│  │          │
-│ BYOK     │  │ 200K     │  │ 1M       │  │ 5M       │
-│ required │  │ tokens   │  │ tokens   │  │ tokens   │
+│ 50K      │  │ 200K     │  │ 1M       │  │ 5M       │
+│ credits  │  │ credits  │  │ credits  │  │ credits  │
 │          │  │          │  │          │  │          │
-│ Web + 1  │  │ Web + 1  │  │ All      │  │ All      │
-│ integr.  │  │ integr.  │  │ integr.  │  │ integr.  │
-│ Browser  │  │ Browser  │  │ Phone    │  │ Phone    │
-│ Email    │  │ Email    │  │ Full     │  │ Team     │
-│          │  │          │  │ browser  │  │ workspace│
-│          │  │          │  │ Unlim.   │  │ API      │
-│          │  │          │  │ memory   │  │ access   │
-│          │  │          │  │          │  │          │
+│ Full     │  │ Always-on│  │ Higher   │  │ Highest  │
+│ agent    │  │ 24/7     │  │ rate     │  │ rate     │
+│ All      │  │ Proactive│  │ limits   │  │ limits   │
+│ integr.  │  │ monitor  │  │ Custom   │  │ API      │
+│ Browser  │  │ Long-term│  │ skills   │  │ access   │
+│ Phone    │  │ memory   │  │ Email    │  │ Analytics│
+│ Email    │  │          │  │ support  │  │ Dedicated│
+│ Sleeps   │  │          │  │          │  │ support  │
+│ idle     │  │          │  │          │  │          │
 │[Get Lite]│  │[ Start ]│  │[ Go Pro ]│  │[Business]│
 └──────────┘  └──────────┘  └──────────┘  └──────────┘
 
@@ -625,16 +628,15 @@ When a Starter/Pro/Business user hits their budget:
 
 ### Pricing
 
-1. **Is $29/mo the right price for Lite?** Could go as low as $19 to be more aggressive.
-   At $29, our margin is ~$19/user (fixed cost ~$10). At $19, margin is ~$9 — thin but
-   profitable if volume is high.
+1. **Lite pricing set at $20/mo.** At $20, margin is ~$7-12/user (fixed cost ~$8).
+   Thin but profitable, and the low cost cap ($5) prevents losses.
 
-2. **Should Lite have fewer features?** Currently spec'd with same features as Starter
-   minus included tokens. Could further restrict (e.g., no browser, fewer integrations)
-   to create clearer upgrade incentive.
+2. **Lite has full features but machine sleeps when idle.** All integrations, browser,
+   phone, email included. The key difference vs Starter is always-on vs sleep-when-idle,
+   plus proactive monitoring and long-term memory on Starter+.
 
-3. **Non-LLM budget for BYOK tiers:** Is 50K AT ($5) enough? For context:
-   - 50K AT = ~1,666 web searches, or 250 browser sessions, or 2,500 emails
+3. **Non-LLM budget for BYOK tiers:** Is 50K credits ($5) enough? For context:
+   - 50K credits = ~1,666 web searches, or 250 browser sessions, or 2,500 emails
    - Most users won't come close. But a heavy browser user might.
 
 ### Technical
@@ -666,9 +668,9 @@ When a Starter/Pro/Business user hits their budget:
 ## Summary
 
 **What we're building:**
-- New **Lite tier** ($29/mo, BYOK required) as a low-cost entry point
-- **Optional BYOK** for all existing tiers (Starter/Pro/Business)
-- **Overage via BYOK** — when users hit their budget, prompt them to add their own key
+- **Lite tier** ($20/mo) as a low-cost entry point with full features (machine sleeps when idle)
+- **Optional BYOK** for all tiers (Lite/Starter/Pro/Business)
+- **Overage via BYOK** — when users hit their credit budget, prompt them to add their own key
   instead of hard-blocking
 
 **Key technical changes:**
@@ -677,10 +679,10 @@ When a Starter/Pro/Business user hits their budget:
 - BYOK flag on usage events (don't count BYOK LLM against budget)
 - Non-LLM-only budget for BYOK users
 - Settings page for key management
-- Pricing page updated with Lite tier
+- 4-tier pricing (Lite/Starter/Pro/Business)
 
 **What stays the same:**
-- Automna Token system (unchanged)
+- Automna Credit system (unchanged)
 - Non-LLM billing (unchanged)
 - Machine provisioning (mostly unchanged, just different config for Lite)
 - All platform features work identically regardless of BYOK status

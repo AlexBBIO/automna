@@ -1,8 +1,7 @@
 # Voice Calling Feature Spec
 
 **Status:** Implemented ✅ (deployed 2026-02-07)  
-**Available Tiers:** Pro ($149/mo), Business ($299/mo)  
-**Not included:** Starter ($79/mo)
+**Available Tiers:** All plans — Lite ($20/mo), Starter ($79/mo), Pro ($149/mo), Business ($299/mo)
 
 ## Overview
 
@@ -138,13 +137,17 @@ export const PLAN_LIMITS = {
     // ... existing
     monthlyCallMinutes: 0,
   },
+  lite: {
+    // ... existing
+    monthlyCallMinutes: 30,  // 30 minutes/month
+  },
   starter: {
     // ... existing  
-    monthlyCallMinutes: 0, // No calling on starter
+    monthlyCallMinutes: 60,  // 60 minutes/month
   },
   pro: {
     // ... existing
-    monthlyCallMinutes: 60, // 60 minutes/month
+    monthlyCallMinutes: 120, // 120 minutes/month
   },
   business: {
     // ... existing
@@ -206,7 +209,7 @@ export async function POST(req: NextRequest) {
     const userId = machine.userId;
     const plan = machine.plan || "starter";
     
-    // 2. Check plan has calling enabled
+    // 2. Check plan has calling enabled (all paid plans include calling)
     const limits = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS];
     if (!limits.monthlyCallMinutes || limits.monthlyCallMinutes === 0) {
       return NextResponse.json({ 
@@ -635,13 +638,13 @@ import { phoneNumbers } from "@/lib/db/schema";
 
 // Inside handleSubscriptionUpdated():
 
-// Check if upgrading to a plan with calling
-const plansWithCalling = ["pro", "business"];
-const previousPlan = previousAttributes?.plan || "starter";
-const newPlan = subscription.metadata?.plan || "pro";
+// Check if upgrading to a paid plan (all paid plans include calling)
+const plansWithCalling = ["lite", "starter", "pro", "business"];
+const previousPlan = previousAttributes?.plan || "free";
+const newPlan = subscription.metadata?.plan || "starter";
 
 if (plansWithCalling.includes(newPlan) && !plansWithCalling.includes(previousPlan)) {
-  // User is upgrading to a calling-enabled plan
+  // User is subscribing to a calling-enabled plan
   const existingPhone = await db.query.phoneNumbers.findFirst({
     where: eq(phoneNumbers.userId, userId),
   });
@@ -747,9 +750,13 @@ TWILIO_BLAND_ENCRYPTED_KEY=xxxxxxxx  # Generated in Bland BYOT setup
 
 | Plan | Monthly Minutes | Overage |
 |------|-----------------|---------|
-| Starter ($79/mo) | 0 (no calling) | N/A |
-| Pro ($149/mo) | 60 min | Blocked |
+| Lite ($20/mo) | 30 min | Blocked |
+| Starter ($79/mo) | 60 min | Blocked |
+| Pro ($149/mo) | 120 min | Blocked |
 | Business ($299/mo) | 300 min | Blocked |
+
+> **Note:** Call minutes are a separate backend cap (`monthlyCallMinutes`) in addition
+> to the Automna Credit budget. Users see credits; the minute cap is a safety guard rail.
 
 **v2 (future):** Allow overage at $0.15/min
 
@@ -757,17 +764,29 @@ TWILIO_BLAND_ENCRYPTED_KEY=xxxxxxxx  # Generated in Bland BYOT setup
 
 ## Cost Analysis
 
-**Per User (Pro tier, worst case - 60 min used):**
-- Twilio number: $1/mo
-- Bland usage: 60 min × $0.12 = $7.20/mo
-- **Total: ~$8.20/mo** (at $149 price point = good margin)
+**Per User (Lite tier, worst case - 30 min used):**
+- Twilio number: $1.15/mo
+- Bland usage: 30 min × $0.09 = $2.70/mo
+- **Total: ~$3.85/mo** (at $20 price point = manageable)
+
+**Per User (Starter tier, worst case - 60 min used):**
+- Twilio number: $1.15/mo
+- Bland usage: 60 min × $0.09 = $5.40/mo
+- **Total: ~$6.55/mo** (at $79 price point = good margin)
+
+**Per User (Pro tier, worst case - 120 min used):**
+- Twilio number: $1.15/mo
+- Bland usage: 120 min × $0.09 = $10.80/mo
+- **Total: ~$11.95/mo** (at $149 price point = very profitable)
 
 **Per User (Business tier, worst case - 300 min used):**
-- Twilio number: $1/mo
-- Bland usage: 300 min × $0.12 = $36/mo
-- **Total: ~$37/mo** (at $299 price point = very profitable)
+- Twilio number: $1.15/mo
+- Bland usage: 300 min × $0.09 = $27/mo
+- **Total: ~$28.15/mo** (at $299 price point = very profitable)
 
 Most users won't max out minutes, so average cost will be lower.
+
+> **Note:** Phone call costs also deduct from the user's Automna Credit pool at 900 credits/min.
 
 ---
 
@@ -794,7 +813,7 @@ Most users won't max out minutes, so average cost will be lower.
 - [x] Added phone call docs to workspace AGENTS.md and TOOLS.md (curl proxy instructions)
 - [x] Workspace migration system (versioned, patches existing users on boot)
 - [x] Agent polling loop for call completion (bash for-loop in docs)
-- [x] Plan gating (Pro/Business only, 403 for Starter)
+- [x] Plan gating (all paid plans: Lite/Starter/Pro/Business)
 - [x] Docker image rebuilt with `jq` for polling script
 - [x] Automna Token billing for calls (900 AT/min, 150 AT failed)
 
