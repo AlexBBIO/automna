@@ -127,8 +127,8 @@ export function UsageBanner({ usage }: { usage: UsageData | null }) {
   const s = styles[level];
 
   const messages = {
-    info: `You've used ${usedDisplay} of ${limitDisplay} tokens on your ${planName} plan this month.`,
-    warning: `You've used ${usedDisplay} of ${limitDisplay} tokens on your ${planName} plan. Upgrade to keep chatting uninterrupted.`,
+    info: `You've used ${usedDisplay} of ${limitDisplay} credits on your ${planName} plan this month.`,
+    warning: `You've used ${usedDisplay} of ${limitDisplay} credits on your ${planName} plan. Upgrade to keep chatting uninterrupted.`,
     limit: `You've reached your ${planName} plan limit. Upgrade to continue using your agent.`,
   };
 

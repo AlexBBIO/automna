@@ -460,7 +460,7 @@ export async function POST(request: NextRequest) {
       error: data.type === "error" ? JSON.stringify(data.error) : undefined,
     });
 
-    // Log to unified usage_events for Automna Token billing
+    // Log to unified usage_events for Automna Credit billing
     const costMicro = calculateCostMicrodollars(
       model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens
     );

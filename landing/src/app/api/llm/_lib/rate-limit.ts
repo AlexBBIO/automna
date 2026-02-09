@@ -1,7 +1,7 @@
 /**
  * LLM Rate Limiting
  * 
- * Enforces per-minute RPM limits and monthly Automna Token budgets.
+ * Enforces per-minute RPM limits and monthly Automna Credit budgets.
  * Monthly budget reads from usage_events table (unified billing).
  */
 
@@ -9,13 +9,13 @@ import { db } from '@/lib/db';
 import { llmRateLimits, PLAN_LIMITS } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import type { AuthenticatedUser } from './auth';
-import { getUsedAutomnaTokens } from '@/app/api/_lib/usage-events';
+import { getUsedAutomnaCredits } from '@/app/api/_lib/usage-events';
 
 export interface RateLimitResult {
   allowed: boolean;
   reason?: string;
   limits?: {
-    monthlyAutomnaTokens: { used: number; limit: number };
+    monthlyAutomnaCredits: { used: number; limit: number };
     requestsPerMinute: { used: number; limit: number };
   };
   retryAfter?: number; // seconds until rate limit resets
@@ -31,15 +31,15 @@ export async function checkRateLimits(
   const now = Math.floor(Date.now() / 1000);
   const currentMinute = Math.floor(now / 60);
   
-  // 1. Check monthly Automna Token budget
-  const usedAutomnaTokens = await getUsedAutomnaTokens(user.userId);
+  // 1. Check monthly Automna Credit budget
+  const usedAutomnaCredits = await getUsedAutomnaCredits(user.userId);
   
-  if (usedAutomnaTokens >= limits.monthlyAutomnaTokens) {
+  if (usedAutomnaCredits >= limits.monthlyAutomnaCredits) {
     return {
       allowed: false,
-      reason: `Monthly token limit reached (${usedAutomnaTokens.toLocaleString()} / ${limits.monthlyAutomnaTokens.toLocaleString()})`,
+      reason: `Monthly credit limit reached (${usedAutomnaCredits.toLocaleString()} / ${limits.monthlyAutomnaCredits.toLocaleString()})`,
       limits: {
-        monthlyAutomnaTokens: { used: usedAutomnaTokens, limit: limits.monthlyAutomnaTokens },
+        monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: limits.monthlyAutomnaCredits },
         requestsPerMinute: { used: 0, limit: limits.requestsPerMinute },
       },
     };
@@ -89,7 +89,7 @@ export async function checkRateLimits(
       reason: `Rate limit exceeded (${rateLimit.requestsThisMinute}/${limits.requestsPerMinute} requests/min)`,
       retryAfter: secondsUntilReset,
       limits: {
-        monthlyAutomnaTokens: { used: usedAutomnaTokens, limit: limits.monthlyAutomnaTokens },
+        monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: limits.monthlyAutomnaCredits },
         requestsPerMinute: { used: rateLimit.requestsThisMinute, limit: limits.requestsPerMinute },
       },
     };
@@ -106,7 +106,7 @@ export async function checkRateLimits(
   return {
     allowed: true,
     limits: {
-      monthlyAutomnaTokens: { used: usedAutomnaTokens, limit: limits.monthlyAutomnaTokens },
+      monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: limits.monthlyAutomnaCredits },
       requestsPerMinute: { used: rateLimit.requestsThisMinute + 1, limit: limits.requestsPerMinute },
     },
   };

@@ -1,7 +1,7 @@
 /**
- * Usage Stats API (Automna Token System)
+ * Usage Stats API (Automna Credit System)
  * 
- * Returns Automna Token usage for the authenticated user.
+ * Returns Automna Credit usage for the authenticated user.
  * Reads from usage_events table (unified billing).
  * 
  * GET /api/llm/usage
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   // Get monthly totals from usage_events
   const monthlyTotalResult = await db
     .select({
-      totalAutomnaTokens: sql<number>`COALESCE(SUM(automna_tokens), 0)`.as('total_at'),
+      totalAutomnaCredits: sql<number>`COALESCE(SUM(automna_tokens), 0)`.as('total_ac'),
       totalCostMicro: sql<number>`COALESCE(SUM(cost_microdollars), 0)`.as('total_cost'),
       totalRequests: sql<number>`COUNT(*)`.as('total_requests'),
     })
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
       )
     );
   
-  const totalAutomnaTokens = Number(monthlyTotalResult[0]?.totalAutomnaTokens || 0);
+  const totalAutomnaCredits = Number(monthlyTotalResult[0]?.totalAutomnaCredits || 0);
   const totalCostMicro = Number(monthlyTotalResult[0]?.totalCostMicro || 0);
   const totalRequests = Number(monthlyTotalResult[0]?.totalRequests || 0);
   
@@ -117,7 +117,7 @@ export async function GET(request: Request) {
   monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
   
   const percentUsed = Math.min(100, Math.round(
-    (totalAutomnaTokens / limits.monthlyAutomnaTokens) * 100
+    (totalAutomnaCredits / limits.monthlyAutomnaCredits) * 100
   ));
   
   return Response.json({
@@ -127,25 +127,27 @@ export async function GET(request: Request) {
       end: monthEnd.toISOString(),
     },
     usage: {
-      automnaTokens: totalAutomnaTokens,
+      automnaCredits: totalAutomnaCredits,
       requests: totalRequests,
       // Legacy fields for backward compat (will remove later)
-      totalTokens: totalAutomnaTokens,
+      automnaTokens: totalAutomnaCredits,
+      totalTokens: totalAutomnaCredits,
       costCents: Math.floor(totalCostMicro / 10_000),
     },
     limits: {
-      monthlyAutomnaTokens: limits.monthlyAutomnaTokens,
+      monthlyAutomnaCredits: limits.monthlyAutomnaCredits,
       requestsPerMinute: limits.requestsPerMinute,
       // Legacy fields for backward compat
-      monthlyTokens: limits.monthlyAutomnaTokens,
-      monthlyCostCents: Math.floor(limits.monthlyAutomnaTokens / 100),
+      monthlyAutomnaTokens: limits.monthlyAutomnaCredits,
+      monthlyTokens: limits.monthlyAutomnaCredits,
+      monthlyCostCents: Math.floor(limits.monthlyAutomnaCredits / 100),
     },
     remaining: {
-      automnaTokens: Math.max(0, limits.monthlyAutomnaTokens - totalAutomnaTokens),
+      automnaCredits: Math.max(0, limits.monthlyAutomnaCredits - totalAutomnaCredits),
     },
     percentUsed: {
       tokens: percentUsed,
-      cost: percentUsed,  // Same number now — both derived from AT
+      cost: percentUsed,  // Same number now — both derived from AC
     },
     breakdown: {
       llm: breakdown.llm || 0,

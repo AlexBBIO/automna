@@ -1,8 +1,8 @@
 /**
- * Unified Usage Event Logger (Automna Token System)
+ * Unified Usage Event Logger (Automna Credit System)
  * 
  * Logs ALL billable activity to the usage_events table.
- * Each event gets an Automna Token cost: ceil(costMicrodollars / 100).
+ * Each event gets an Automna Credit cost: ceil(costMicrodollars / 100).
  * 
  * Used by: LLM proxy, Brave proxy, Browserbase proxy, email, calls, Gemini.
  */
@@ -10,7 +10,7 @@
 import { db } from "@/lib/db";
 import { usageEvents } from "@/lib/db/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
-import { MICRODOLLARS_PER_AUTOMNA_TOKEN } from "./cost-constants";
+import { MICRODOLLARS_PER_AUTOMNA_CREDIT } from "./cost-constants";
 
 export type UsageEventType = 'llm' | 'search' | 'browser' | 'call' | 'email' | 'embedding';
 
@@ -23,21 +23,21 @@ interface UsageEventInput {
 }
 
 /**
- * Convert microdollars to Automna Tokens.
+ * Convert microdollars to Automna Credits.
  */
-export function toAutomnaTokens(costMicrodollars: number): number {
-  return Math.ceil(costMicrodollars / MICRODOLLARS_PER_AUTOMNA_TOKEN);
+export function toAutomnaCredits(costMicrodollars: number): number {
+  return Math.ceil(costMicrodollars / MICRODOLLARS_PER_AUTOMNA_CREDIT);
 }
 
 /**
  * Log a usage event to the database.
  */
 export async function logUsageEvent(input: UsageEventInput): Promise<void> {
-  const automnaTokens = toAutomnaTokens(input.costMicrodollars);
+  const automnaCredits = toAutomnaCredits(input.costMicrodollars);
 
   console.log(
     `[Usage] user=${input.userId} type=${input.eventType} ` +
-    `AT=${automnaTokens} cost=$${(input.costMicrodollars / 1_000_000).toFixed(4)}` +
+    `AC=${automnaCredits} cost=$${(input.costMicrodollars / 1_000_000).toFixed(4)}` +
     (input.error ? ` error=${input.error}` : "")
   );
 
@@ -45,7 +45,7 @@ export async function logUsageEvent(input: UsageEventInput): Promise<void> {
     await db.insert(usageEvents).values({
       userId: input.userId,
       eventType: input.eventType,
-      automnaTokens,
+      automnaTokens: automnaCredits,
       costMicrodollars: input.costMicrodollars,
       metadata: input.metadata ? JSON.stringify(input.metadata) : null,
       error: input.error ?? null,
@@ -65,9 +65,9 @@ export function logUsageEventBackground(input: UsageEventInput): void {
 }
 
 /**
- * Get total Automna Tokens used by a user this month.
+ * Get total Automna Credits used by a user this month.
  */
-export async function getUsedAutomnaTokens(userId: string): Promise<number> {
+export async function getUsedAutomnaCredits(userId: string): Promise<number> {
   const monthStart = new Date();
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
@@ -89,7 +89,7 @@ export async function getUsedAutomnaTokens(userId: string): Promise<number> {
 }
 
 /**
- * Get Automna Tokens used by a user this month, broken down by event type.
+ * Get Automna Credits used by a user this month, broken down by event type.
  */
 export async function getUsedAutomnaTokensByType(
   userId: string

@@ -1,15 +1,15 @@
 /**
- * Cost Constants for Automna Token System
+ * Cost Constants for Automna Credit System
  * 
  * All costs in microdollars (1 USD = 1,000,000 microdollars).
- * 1 Automna Token = 100 microdollars = $0.0001
+ * 1 Automna Credit = 100 microdollars = $0.0001
  * 
  * ⚠️ UPDATE THIS FILE when adding new billable services or when
- * provider pricing changes. See docs/AUTOMNA-TOKENS.md for details.
+ * provider pricing changes. See docs/AUTOMNA-CREDITS-IMPL.md for details.
  */
 
 // Exchange rate
-export const MICRODOLLARS_PER_AUTOMNA_TOKEN = 100;
+export const MICRODOLLARS_PER_AUTOMNA_CREDIT = 100;
 
 // Fixed-rate service costs (microdollars)
 export const COSTS = {

@@ -174,7 +174,7 @@ async function handleRequest(request: NextRequest, method: string) {
         durationMs,
       });
 
-      // Log to unified usage_events for Automna Token billing
+      // Log to unified usage_events for Automna Credit billing
       logUsageEventBackground({
         userId: auth.userId,
         eventType: 'browser',

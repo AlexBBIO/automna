@@ -97,7 +97,7 @@ If we define **1 credit = $0.01 of cost to us**:
 
 > Note: `free` entry exists in PLAN_LIMITS but is unused (no free tier in production).
 
-> Exchange rate: **10,000 Automna Tokens = $1.00 real cost**
+> Exchange rate: **10,000 Automna Credits = $1.00 real cost**
 > Source of truth: `landing/src/lib/db/schema.ts` → `PLAN_LIMITS`
 > Tracked in `usage_events` table with `automna_tokens` per event.
 
@@ -114,11 +114,11 @@ If we define **1 credit = $0.01 of cost to us**:
 
 ---
 
-## Automna Token Costs Per Action
+## Automna Credit Costs Per Action
 
-Already tracked via `usage_events` table. Exchange rate: **10,000 AT = $1.00**
+Already tracked via `usage_events` table. Exchange rate: **10,000 AC = $1.00**
 
-| Action | Automna Tokens | Real Cost |
+| Action | Automna Credits | Real Cost |
 |--------|---------------|-----------|
 | Chat Message (avg) | ~500-770 | $0.05-0.08 |
 | Chat Message (power user) | ~1,000+ | $0.10+ |

@@ -172,7 +172,7 @@ async function handleRequest(request: NextRequest, method: string) {
         error: data.error ? JSON.stringify(data.error) : undefined,
       });
 
-      // Log to unified usage_events for Automna Token billing
+      // Log to unified usage_events for Automna Credit billing
       // Gemini pricing: use approximate rates (embeddings are ~free)
       const isEmbedding = endpoint === 'embedContent' || endpoint === 'batchEmbedContents';
       // Flash-Lite: $0.10/$0.40 per M. Pro: $2/$12 per M. Flash: $0.50/$3 per M.
@@ -237,7 +237,7 @@ async function handleRequest(request: NextRequest, method: string) {
           durationMs,
         });
 
-        // Log to unified usage_events for Automna Token billing
+        // Log to unified usage_events for Automna Credit billing
         const isEmbedding = endpoint === 'embedContent' || endpoint === 'batchEmbedContents';
         const geminiInputRate = model.includes('pro') ? 2.0 : model.includes('flash-lite') ? 0.10 : 0.50;
         const geminiOutputRate = model.includes('pro') ? 12.0 : model.includes('flash-lite') ? 0.40 : 3.0;

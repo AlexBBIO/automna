@@ -128,7 +128,7 @@ export const emailSends = sqliteTable("email_sends", {
 }));
 
 // ============================================
-// UNIFIED USAGE EVENTS (Automna Token billing)
+// UNIFIED USAGE EVENTS (Automna Credit billing)
 // ============================================
 
 // Tracks ALL billable activity: LLM, search, browser, calls, email
@@ -147,10 +147,10 @@ export const usageEvents = sqliteTable("usage_events", {
 }));
 
 // Plan limits (stored in code for simplicity)
-// monthlyAutomnaTokens = cost cap / $0.0001 (1 AT = 100 microdollars)
+// monthlyAutomnaCredits = cost cap / $0.0001 (1 AC = 100 microdollars)
 export const PLAN_LIMITS = {
   free: {
-    monthlyAutomnaTokens: 10_000,   // $1 real cost cap
+    monthlyAutomnaCredits: 10_000,   // $1 real cost cap
     monthlyTokens: 100_000,         // LEGACY — remove after migration
     monthlyCostCents: 100,          // LEGACY — remove after migration
     requestsPerMinute: 5,
@@ -158,7 +158,7 @@ export const PLAN_LIMITS = {
     monthlyCallMinutes: 0,
   },
   starter: {
-    monthlyAutomnaTokens: 200_000,  // $20 real cost cap
+    monthlyAutomnaCredits: 200_000,  // $20 real cost cap
     monthlyTokens: 500_000,         // LEGACY — remove after migration
     monthlyCostCents: 2000,         // LEGACY — remove after migration
     requestsPerMinute: 20,
@@ -166,7 +166,7 @@ export const PLAN_LIMITS = {
     monthlyCallMinutes: 0,          // No calling on starter
   },
   pro: {
-    monthlyAutomnaTokens: 1_000_000, // $100 real cost cap
+    monthlyAutomnaCredits: 1_000_000, // $100 real cost cap
     monthlyTokens: 2_000_000,        // LEGACY — remove after migration
     monthlyCostCents: 10000,         // LEGACY — remove after migration
     requestsPerMinute: 60,
@@ -174,7 +174,7 @@ export const PLAN_LIMITS = {
     monthlyCallMinutes: 60,           // 60 minutes/month
   },
   business: {
-    monthlyAutomnaTokens: 5_000_000, // $500 real cost cap
+    monthlyAutomnaCredits: 5_000_000, // $500 real cost cap
     monthlyTokens: 10_000_000,       // LEGACY — remove after migration
     monthlyCostCents: 50000,         // LEGACY — remove after migration
     requestsPerMinute: 120,

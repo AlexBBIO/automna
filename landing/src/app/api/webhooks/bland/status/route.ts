@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[bland-webhook] Call ${callId} updated: ${finalStatus}, ${durationSeconds}s, $${(costCents / 100).toFixed(2)}`);
 
-    // Log to unified usage_events for Automna Token billing
+    // Log to unified usage_events for Automna Credit billing
     const callCostMicrodollars = durationSeconds > 0
       ? Math.round((durationSeconds / 60) * COSTS.CALL_PER_MINUTE)
       : COSTS.CALL_FAILED_ATTEMPT;

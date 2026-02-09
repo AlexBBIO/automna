@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     const result = await agentmailResponse.json();
 
-    // Log to unified usage_events for Automna Token billing
+    // Log to unified usage_events for Automna Credit billing
     logUsageEventBackground({
       userId,
       eventType: 'email',

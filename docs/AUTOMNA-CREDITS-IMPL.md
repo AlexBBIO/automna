@@ -1,7 +1,7 @@
-# Automna Token System — Implementation Spec
+# Automna Credit System — Implementation Spec
 
 *Created: 2026-02-07*
-*Parent doc: [AUTOMNA-TOKENS.md](./AUTOMNA-TOKENS.md) (system design & cost research)*
+*Parent doc: [AUTOMNA-CREDITS-IMPL.md](./AUTOMNA-CREDITS-IMPL.md) (system design & cost research)*
 
 > **⚠️ This is a BIG change.** It touches pricing, rate limiting, usage tracking, every API
 > proxy, the frontend, the admin dashboard, and the pricing page. Read fully before coding.
@@ -31,9 +31,9 @@
 ## 1. Overview
 
 ### What we're building
-A unified "Automna Token" billing system where **1 Automna Token = $0.0001 real cost
+A unified "Automna Credit" billing system where **1 Automna Credit = $0.0001 real cost
 (100 microdollars)**. All billable activities (LLM, calls, email, search, browser) contribute
-to a single monthly token budget. Users see Automna Tokens everywhere; they never see
+to a single monthly token budget. Users see Automna Credits everywhere; they never see
 raw dollars or API token counts.
 
 ### Why
@@ -44,10 +44,10 @@ raw dollars or API token counts.
 
 ### Core formula
 ```
-automnaTokens = ceil(costMicrodollars / 100)
+automnaCredits = ceil(costMicrodollars / 100)
 ```
 
-### Plan budgets (Automna Tokens per month)
+### Plan budgets (Automna Credits per month)
 
 | Plan | Cost Cap | Budget | Display |
 |------|----------|--------|---------|
@@ -97,7 +97,7 @@ DELETE FROM llm_rate_limits;
 ```
 
 > **Decision point:** Do we also wipe email_sends and call_usage? Probably not — those
-> tables are structurally correct, just not connected to Automna Token budgets yet.
+> tables are structurally correct, just not connected to Automna Credit budgets yet.
 
 ### 2c. Deploy pricing fix
 
@@ -124,8 +124,8 @@ export const usageEvents = sqliteTable("usage_events", {
   eventType: text("event_type").notNull(),
   // Values: 'llm' | 'search' | 'browser' | 'call' | 'email' | 'embedding'
 
-  // Automna Token cost (THE key field)
-  automnaTokens: integer("automna_tokens").notNull().default(0),
+  // Automna Credit cost (THE key field)
+  automnaCredits: integer("automna_tokens").notNull().default(0),
 
   // Underlying real cost in microdollars (for internal tracking / margin analysis)
   costMicrodollars: integer("cost_microdollars").notNull().default(0),
@@ -149,34 +149,34 @@ export const usageEvents = sqliteTable("usage_events", {
 
 ### 3b. Update PLAN_LIMITS
 
-Replace token/cost limits with Automna Token budgets:
+Replace token/cost limits with Automna Credit budgets:
 
 ```typescript
 export const PLAN_LIMITS = {
   free: {
-    monthlyAutomnaTokens: 10_000,       // $1 worth (trial)
+    monthlyAutomnaCredits: 10_000,       // $1 worth (trial)
     requestsPerMinute: 5,
     monthlyCallMinutes: 0,
   },
   starter: {
-    monthlyAutomnaTokens: 200_000,      // $20 cost cap
+    monthlyAutomnaCredits: 200_000,      // $20 cost cap
     requestsPerMinute: 20,
     monthlyCallMinutes: 0,
   },
   pro: {
-    monthlyAutomnaTokens: 1_000_000,    // $100 cost cap
+    monthlyAutomnaCredits: 1_000_000,    // $100 cost cap
     requestsPerMinute: 60,
     monthlyCallMinutes: 60,
   },
   business: {
-    monthlyAutomnaTokens: 5_000_000,    // $500 cost cap
+    monthlyAutomnaCredits: 5_000_000,    // $500 cost cap
     requestsPerMinute: 120,
     monthlyCallMinutes: 300,
   },
 } as const;
 ```
 
-> **Note:** `monthlyTokens` and `monthlyCostCents` are REMOVED. One number (Automna Tokens)
+> **Note:** `monthlyTokens` and `monthlyCostCents` are REMOVED. One number (Automna Credits)
 > replaces both. `monthlyCallMinutes` stays as an additional guard rail for now (calls
 > are expensive, separate cap prevents one runaway call from eating the whole budget).
 
@@ -196,16 +196,16 @@ interface UsageEventInput {
   error?: string;
 }
 
-export function toAutomnaTokens(costMicrodollars: number): number {
+export function toAutomnaCredits(costMicrodollars: number): number {
   return Math.ceil(costMicrodollars / 100);
 }
 
 export async function logUsageEvent(input: UsageEventInput): Promise<void> {
-  const automnaTokens = toAutomnaTokens(input.costMicrodollars);
+  const automnaCredits = toAutomnaCredits(input.costMicrodollars);
 
   console.log(
     `[Usage] user=${input.userId} type=${input.eventType} ` +
-    `tokens=${automnaTokens} cost=$${(input.costMicrodollars / 1_000_000).toFixed(4)}` +
+    `AC=${automnaCredits} cost=$${(input.costMicrodollars / 1_000_000).toFixed(4)}` +
     (input.error ? ` error=${input.error}` : "")
   );
 
@@ -213,7 +213,7 @@ export async function logUsageEvent(input: UsageEventInput): Promise<void> {
     await db.insert(usageEvents).values({
       userId: input.userId,
       eventType: input.eventType,
-      automnaTokens,
+      automnaCredits,
       costMicrodollars: input.costMicrodollars,
       metadata: input.metadata ? JSON.stringify(input.metadata) : null,
       error: input.error ?? null,
@@ -271,7 +271,7 @@ import { calculateCostMicrodollars } from "../_lib/pricing";
 
 // ... existing token extraction code ...
 
-// Log to usage_events for Automna Token billing
+// Log to usage_events for Automna Credit billing
 const costMicro = calculateCostMicrodollars(
   model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens
 );
@@ -378,7 +378,7 @@ if (isSessionCreate && response.ok) {
 2. **Charge a flat per-session fee** (e.g., assume 5 min avg = 100 AT) — simple but imprecise
 3. **Charge on session create with estimated duration** from `max_duration` if provided
 
-**Recommended for now:** Charge a flat 200 Automna Tokens per session create (~10 min
+**Recommended for now:** Charge a flat 200 Automna Credits per session create (~10 min
 equivalent, $0.02). Revisit when we have real session duration data.
 
 ```typescript
@@ -456,22 +456,22 @@ logUsageEventBackground({
 });
 ```
 
-**Also update the call initiation endpoint** to check Automna Token budget (not just
+**Also update the call initiation endpoint** to check Automna Credit budget (not just
 call minutes) before allowing a call:
 
 **File:** `landing/src/app/api/user/call/route.ts`
 
 ```typescript
-import { getUsedAutomnaTokens } from "@/app/api/_lib/usage-events";
+import { getUsedAutomnaCredits } from "@/app/api/_lib/usage-events";
 
 // After existing monthly minute check, also check token budget:
-const usedTokens = await getUsedAutomnaTokens(userId);
+const usedTokens = await getUsedAutomnaCredits(userId);
 const limits = PLAN_LIMITS[plan];
-if (usedTokens >= limits.monthlyAutomnaTokens) {
+if (usedTokens >= limits.monthlyAutomnaCredits) {
   return NextResponse.json({
     error: "Monthly usage limit reached",
     used_tokens: usedTokens,
-    limit_tokens: limits.monthlyAutomnaTokens,
+    limit_tokens: limits.monthlyAutomnaCredits,
   }, { status: 429 });
 }
 ```
@@ -480,7 +480,7 @@ if (usedTokens >= limits.monthlyAutomnaTokens) {
 
 ## 6. Phase 5: Update Rate Limiter
 
-**Goal:** Rate limiter checks Automna Token budget instead of raw token sums.
+**Goal:** Rate limiter checks Automna Credit budget instead of raw token sums.
 
 **File:** `landing/src/app/api/llm/_lib/rate-limit.ts`
 
@@ -488,7 +488,7 @@ if (usedTokens >= limits.monthlyAutomnaTokens) {
 
 Add to `usage-events.ts`:
 ```typescript
-export async function getUsedAutomnaTokens(userId: string): Promise<number> {
+export async function getUsedAutomnaCredits(userId: string): Promise<number> {
   const monthStart = new Date();
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
@@ -509,7 +509,7 @@ export async function getUsedAutomnaTokens(userId: string): Promise<number> {
   return Number(result[0]?.total || 0);
 }
 
-export async function getUsedAutomnaTokensByType(userId: string): Promise<Record<string, number>> {
+export async function getUsedAutomnaCreditsByType(userId: string): Promise<Record<string, number>> {
   const monthStart = new Date();
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
@@ -539,18 +539,18 @@ export async function getUsedAutomnaTokensByType(userId: string): Promise<Record
 
 ### 6b. Update `checkRateLimits()`
 
-Replace the monthly token/cost checks with a single Automna Token check:
+Replace the monthly token/cost checks with a single Automna Credit check:
 
 ```typescript
 // REPLACE the monthly usage section with:
-const usedAutomnaTokens = await getUsedAutomnaTokens(user.userId);
+const usedAutomnaTokens = await getUsedAutomnaCredits(user.userId);
 
-if (usedAutomnaTokens >= limits.monthlyAutomnaTokens) {
+if (usedAutomnaTokens >= limits.monthlyAutomnaCredits) {
   return {
     allowed: false,
-    reason: `Monthly token limit reached (${usedAutomnaTokens.toLocaleString()} / ${limits.monthlyAutomnaTokens.toLocaleString()})`,
+    reason: `Monthly token limit reached (${usedAutomnaTokens.toLocaleString()} / ${limits.monthlyAutomnaCredits.toLocaleString()})`,
     limits: {
-      monthlyAutomnaTokens: { used: usedAutomnaTokens, limit: limits.monthlyAutomnaTokens },
+      monthlyAutomnaCredits: { used: usedAutomnaTokens, limit: limits.monthlyAutomnaCredits },
       requestsPerMinute: { used: 0, limit: limits.requestsPerMinute },
     },
   };
@@ -566,7 +566,7 @@ export interface RateLimitResult {
   allowed: boolean;
   reason?: string;
   limits?: {
-    monthlyAutomnaTokens: { used: number; limit: number };
+    monthlyAutomnaCredits: { used: number; limit: number };
     requestsPerMinute: { used: number; limit: number };
   };
   retryAfter?: number;
@@ -577,7 +577,7 @@ export interface RateLimitResult {
 
 ## 7. Phase 6: Update Usage API Endpoint
 
-**Goal:** `/api/llm/usage` returns Automna Tokens instead of raw token counts.
+**Goal:** `/api/llm/usage` returns Automna Credits instead of raw token counts.
 
 **File:** `landing/src/app/api/llm/usage/route.ts`
 
@@ -591,18 +591,18 @@ return Response.json({
     end: monthEnd.toISOString(),
   },
   usage: {
-    automnaTokens: totalAutomnaTokens,      // THE number
+    automnaCredits: totalAutomnaTokens,      // THE number
     costMicrodollars: totalCostMicro,        // Internal, maybe hide later
   },
   limits: {
-    monthlyAutomnaTokens: limits.monthlyAutomnaTokens,
+    monthlyAutomnaCredits: limits.monthlyAutomnaCredits,
     requestsPerMinute: limits.requestsPerMinute,
   },
   remaining: {
-    automnaTokens: Math.max(0, limits.monthlyAutomnaTokens - totalAutomnaTokens),
+    automnaCredits: Math.max(0, limits.monthlyAutomnaCredits - totalAutomnaTokens),
   },
   percentUsed: Math.min(100, Math.round(
-    (totalAutomnaTokens / limits.monthlyAutomnaTokens) * 100
+    (totalAutomnaTokens / limits.monthlyAutomnaCredits) * 100
   )),
   // Breakdown by activity type
   breakdown: {
@@ -649,10 +649,10 @@ const totalResult = await db
 export interface UsageData {
   plan: string;
   usage: {
-    automnaTokens: number;
+    automnaCredits: number;
   };
   limits: {
-    monthlyAutomnaTokens: number;
+    monthlyAutomnaCredits: number;
   };
   percentUsed: number;  // Single number now (not tokens vs cost)
   breakdown: {
@@ -675,11 +675,11 @@ setIsOverLimit(data.percentUsed >= 100);
 
 **File:** `landing/src/components/UsageBanner.tsx`
 
-Replace token/cost display with Automna Tokens:
+Replace token/cost display with Automna Credits:
 
 ```typescript
-const usedK = Math.round(usage.usage.automnaTokens / 1000);
-const limitK = Math.round(usage.limits.monthlyAutomnaTokens / 1000);
+const usedK = Math.round(usage.usage.automnaCredits / 1000);
+const limitK = Math.round(usage.limits.monthlyAutomnaCredits / 1000);
 
 // Format for display
 const formatTokens = (n: number) => {
@@ -689,14 +689,14 @@ const formatTokens = (n: number) => {
 };
 
 const messages = {
-  info: `You've used ${formatTokens(usage.usage.automnaTokens)} of ${formatTokens(usage.limits.monthlyAutomnaTokens)} tokens on your ${planName} plan.`,
-  warning: `You've used ${formatTokens(usage.usage.automnaTokens)} of ${formatTokens(usage.limits.monthlyAutomnaTokens)} tokens. Upgrade to keep chatting uninterrupted.`,
+  info: `You've used ${formatTokens(usage.usage.automnaCredits)} of ${formatTokens(usage.limits.monthlyAutomnaCredits)} tokens on your ${planName} plan.`,
+  warning: `You've used ${formatTokens(usage.usage.automnaCredits)} of ${formatTokens(usage.limits.monthlyAutomnaCredits)} tokens. Upgrade to keep chatting uninterrupted.`,
   limit: `You've reached your ${planName} plan token limit. Upgrade to continue using your agent.`,
 };
 ```
 
 Key change: `percentUsed` is now a single number (not max of tokens vs cost), and the
-banner shows Automna Tokens, not raw API tokens.
+banner shows Automna Credits, not raw API tokens.
 
 ### 8c. Update any other components that display usage
 
@@ -705,7 +705,7 @@ Check for references:
 - `landing/src/app/dashboard/page.tsx` — user dashboard
 
 Update any `totalTokens`, `costCents`, `percentUsed.tokens`, `percentUsed.cost` references
-to use the new `automnaTokens` / `percentUsed` fields.
+to use the new `automnaCredits` / `percentUsed` fields.
 
 ---
 
@@ -713,7 +713,7 @@ to use the new `automnaTokens` / `percentUsed` fields.
 
 **File:** `landing/src/app/admin/usage/page.tsx`
 
-The admin view should show BOTH Automna Tokens (user-facing) and real cost (internal):
+The admin view should show BOTH Automna Credits (user-facing) and real cost (internal):
 
 ```
 User: grandathrawn@gmail.com
@@ -746,7 +746,7 @@ AFTER:
 ```
 
 > **⚠️ These numbers are DIFFERENT from before.** The old "500K tokens" meant raw API tokens.
-> The new "200K tokens" means Automna Tokens (cost-weighted). Even though the number is
+> The new "200K tokens" means Automna Credits (cost-weighted). Even though the number is
 > smaller, users actually get MORE effective usage because the old system was wildly
 > inflated by cache tokens.
 
@@ -771,13 +771,13 @@ is created with correct `automna_tokens`:
 
 ### 11b. Verify rate limiter
 
-1. Check that a user at 100% Automna Token budget gets blocked on LLM requests
-2. Check that the 429 response includes the new `monthlyAutomnaTokens` field
+1. Check that a user at 100% Automna Credit budget gets blocked on LLM requests
+2. Check that the 429 response includes the new `monthlyAutomnaCredits` field
 3. Check that per-minute RPM limits still work independently
 
 ### 11c. Verify frontend
 
-1. UsageBanner shows "X of Y tokens" (Automna Tokens, not raw)
+1. UsageBanner shows "X of Y tokens" (Automna Credits, not raw)
 2. Progress bar percentage matches `percentUsed`
 3. Admin dashboard shows both AT and real cost
 4. Pricing page shows correct plan budgets
@@ -799,18 +799,18 @@ is created with correct `automna_tokens`:
 |---|------|-------------|-------|
 | 1 | `landing/src/app/api/llm/_lib/pricing.ts` | Fix Opus 4.5 pricing, add Gemini pricing | 1 |
 | 2 | `landing/src/lib/db/schema.ts` | Add `usage_events` table, update `PLAN_LIMITS` | 2 |
-| 3 | `landing/src/app/api/_lib/usage-events.ts` | **NEW** — `logUsageEvent()`, `toAutomnaTokens()`, `getUsedAutomnaTokens()` | 2 |
+| 3 | `landing/src/app/api/_lib/usage-events.ts` | **NEW** — `logUsageEvent()`, `toAutomnaCredits()`, `getUsedAutomnaCredits()` | 2 |
 | 4 | `landing/src/app/api/llm/v1/messages/route.ts` | Add `logUsageEventBackground()` call | 3 |
 | 5 | `landing/src/app/api/gemini/[...path]/route.ts` | Add `logUsageEventBackground()` call | 3 |
 | 6 | `landing/src/app/api/brave/[...path]/route.ts` | Add `logUsageEventBackground()` call | 4 |
 | 7 | `landing/src/app/api/browserbase/v1/[...path]/route.ts` | Add `logUsageEventBackground()` call | 4 |
 | 8 | `landing/src/app/api/user/email/send/route.ts` | Add `logUsageEventBackground()` call | 4 |
 | 9 | `landing/src/app/api/webhooks/bland/status/route.ts` | Add `logUsageEventBackground()` call | 4 |
-| 10 | `landing/src/app/api/user/call/route.ts` | Add AT budget check before allowing calls | 4 |
-| 11 | `landing/src/app/api/llm/_lib/rate-limit.ts` | Switch from raw tokens to AT budget check | 5 |
+| 10 | `landing/src/app/api/user/call/route.ts` | Add AC budget check before allowing calls | 4 |
+| 11 | `landing/src/app/api/llm/_lib/rate-limit.ts` | Switch from raw tokens to AC budget check | 5 |
 | 12 | `landing/src/app/api/llm/usage/route.ts` | Return AT instead of raw tokens | 6 |
 | 13 | `landing/src/hooks/useUsageStatus.ts` | Update `UsageData` interface | 7 |
-| 14 | `landing/src/components/UsageBanner.tsx` | Display Automna Tokens | 7 |
+| 14 | `landing/src/components/UsageBanner.tsx` | Display Automna Credits | 7 |
 | 15 | `landing/src/app/dashboard/page.tsx` | Update usage display | 7 |
 | 16 | `landing/src/app/admin/usage/page.tsx` | Show AT + real cost | 8 |
 | 17 | `landing/src/app/api/admin/usage/route.ts` | Query `usage_events` | 8 |
@@ -825,10 +825,10 @@ is created with correct `automna_tokens`:
 ### Pre-deployment
 - [ ] `pricing.ts` has correct Opus 4.5 rates ($5/$25)
 - [ ] `usage_events` table created in Turso
-- [ ] `PLAN_LIMITS` updated with `monthlyAutomnaTokens`
+- [ ] `PLAN_LIMITS` updated with `monthlyAutomnaCredits`
 - [ ] All 6 proxy routes have `logUsageEventBackground()` calls
 - [ ] Rate limiter reads from `usage_events`
-- [ ] Usage endpoint returns `automnaTokens` format
+- [ ] Usage endpoint returns `automnaCredits` format
 - [ ] Frontend components compile with new interfaces
 - [ ] Pricing page shows new token numbers
 
@@ -849,7 +849,7 @@ is created with correct `automna_tokens`:
 If something goes wrong:
 
 1. **Frontend only broken:** Revert Vercel deployment (instant via Vercel dashboard)
-2. **Rate limiter too aggressive:** Temporarily multiply `monthlyAutomnaTokens` by 10x
+2. **Rate limiter too aggressive:** Temporarily multiply `monthlyAutomnaCredits` by 10x
    in PLAN_LIMITS
 3. **Double-counting:** The `usage_events` table is NEW, so we can truncate it without
    affecting anything else. Old `llm_usage` table is untouched.
@@ -875,6 +875,6 @@ export const COSTS = {
   // LLM costs are computed dynamically from pricing.ts
 } as const;
 
-// Automna Token exchange rate
-export const MICRODOLLARS_PER_AUTOMNA_TOKEN = 100;
+// Automna Credit exchange rate
+export const MICRODOLLARS_PER_AUTOMNA_CREDIT = 100;
 ```

@@ -158,7 +158,7 @@ async function handleRequest(request: NextRequest, method: string) {
       error: data.type === "ErrorResponse" ? data.message : undefined,
     });
 
-    // Log to unified usage_events for Automna Token billing
+    // Log to unified usage_events for Automna Credit billing
     if (data.type !== "ErrorResponse") {
       logUsageEventBackground({
         userId: auth.userId,
