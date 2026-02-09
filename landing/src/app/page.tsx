@@ -1136,143 +1136,210 @@ export default function Home() {
 
         {/* Pricing */}
         <section id="pricing" className="container mx-auto px-6 py-10 md:py-24">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-8 md:mb-12">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-6 md:mb-10">
               <h2 className="text-2xl md:text-4xl font-bold mb-3 text-zinc-900 dark:text-white">
-                Simple, transparent pricing
+                One agent. Your rules.
               </h2>
-              <p className="text-zinc-500 dark:text-zinc-400 text-base md:text-lg">
-                Start small. Scale when ready.
-              </p>
-              <p className="text-zinc-400 dark:text-zinc-500 text-xs md:text-sm mt-2">
-                If Automna saves you ~2 hours/month, Pro pays for itself.
+              <p className="text-zinc-500 dark:text-zinc-400 text-base md:text-lg max-w-2xl mx-auto">
+                Every plan gets the full experience — Claude Opus, phone calls, email, integrations.
+                Pick how much you want to use it.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto">
-              {/* Starter */}
-              <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all">
-                <h3 className="text-lg md:text-xl font-semibold text-zinc-900 dark:text-white">Starter</h3>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-3 md:mb-4">Get started</p>
-                <div className="text-3xl md:text-4xl font-bold mb-4 md:mb-6 text-zinc-900 dark:text-white">
-                  $79<span className="text-base text-zinc-400 dark:text-zinc-500 font-normal">/mo</span>
+            {/* What every plan includes */}
+            <div className="max-w-3xl mx-auto mb-8 md:mb-10">
+              <div className="bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl md:rounded-2xl p-4 md:p-6">
+                <h3 className="text-sm md:text-base font-bold mb-3 text-center text-zinc-900 dark:text-white">What every plan includes</h3>
+                <div className="grid grid-cols-4 gap-2 md:gap-4 text-center">
+                  <div className="p-1 md:p-2">
+                    <div className="text-lg md:text-xl mb-1">🧠</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Claude Opus</div>
+                  </div>
+                  <div className="p-1 md:p-2">
+                    <div className="text-lg md:text-xl mb-1">📞</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Phone</div>
+                  </div>
+                  <div className="p-1 md:p-2">
+                    <div className="text-lg md:text-xl mb-1">📧</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Email</div>
+                  </div>
+                  <div className="p-1 md:p-2">
+                    <div className="text-lg md:text-xl mb-1">🌐</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Browser</div>
+                  </div>
                 </div>
-                <ul className="space-y-2.5 md:space-y-3 mb-5 md:mb-6">
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Your own AI agent
+              </div>
+            </div>
+
+            {/* 4-tier pricing grid */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+              {/* Lite */}
+              <div className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-white/20 hover:shadow-md transition-all flex flex-col">
+                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Lite</h3>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Experience the magic</p>
+                <div className="mb-1">
+                  <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$20</span>
+                  <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
+                </div>
+                <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">Everything. Just a taste.</p>
+                <ul className="space-y-2 mb-4 flex-grow">
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Full AI agent (Claude Opus)
                   </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Web chat + 1 integration
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    All integrations
                   </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Browser access
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    50K credits/month
                   </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Personal email inbox
-                  </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    200K credits/month
+                  <li className="flex items-center gap-2 text-zinc-400 dark:text-gray-500 text-xs md:text-sm italic">
+                    <span className="text-yellow-500 dark:text-yellow-400 text-xs flex-shrink-0">⚡</span>
+                    Machine sleeps when idle
                   </li>
                 </ul>
+                <div className="mb-4 py-1.5 px-2 rounded-lg bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/5">
+                  <p className="text-zinc-500 dark:text-gray-500 text-[10px] md:text-xs text-center">≈ 80 messages · 50 emails</p>
+                </div>
+                <Link
+                  href="/sign-up?plan=lite"
+                  className="block w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white rounded-lg font-semibold text-center transition-all text-sm"
+                >
+                  Try for $20
+                </Link>
+              </div>
+
+              {/* Starter - Most Popular */}
+              <div className="relative bg-gradient-to-b from-purple-50 to-violet-50 dark:from-purple-500/20 dark:to-purple-900/20 border-2 border-purple-500 rounded-xl p-5 md:p-6 shadow-xl shadow-purple-100 dark:shadow-purple-500/10 flex flex-col">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-purple-600 rounded-full text-xs font-medium whitespace-nowrap text-white">
+                  Most Popular
+                </div>
+                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Starter</h3>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Your always-on assistant</p>
+                <div className="mb-1">
+                  <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$79</span>
+                  <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
+                </div>
+                <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">Never sleeps. Never forgets.</p>
+                <ul className="space-y-2 mb-4 flex-grow">
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Full AI agent (Claude Opus)
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    All integrations
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Always-on (24/7 uptime)
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Long-term memory
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    200K credits/month
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    30 phone minutes/month
+                  </li>
+                </ul>
+                <div className="mb-4 py-1.5 px-2 rounded-lg bg-white/50 dark:bg-white/5 border border-purple-200 dark:border-white/5">
+                  <p className="text-zinc-500 dark:text-gray-500 text-[10px] md:text-xs text-center">≈ 300 messages · 100 emails · 30 min calls</p>
+                </div>
                 <Link
                   href="/sign-up?plan=starter"
-                  className="block w-full py-3 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg font-medium text-center hover:border-zinc-400 dark:hover:border-zinc-600 transition-all text-sm"
+                  className="block w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold text-center transition-all text-sm"
                 >
-                  Start Starter
+                  Get Starter
                 </Link>
               </div>
 
               {/* Pro */}
-              <div className="bg-gradient-to-b from-purple-50 to-violet-50 dark:from-purple-500/15 dark:to-violet-500/5 border-2 border-purple-300 dark:border-purple-500/40 rounded-xl p-5 md:p-6 shadow-xl shadow-purple-100 dark:shadow-purple-500/10 md:scale-[1.02]">
-                <div className="text-purple-600 dark:text-purple-400 text-xs font-semibold mb-2 uppercase tracking-wide">Most Popular</div>
-                <h3 className="text-lg md:text-xl font-semibold text-zinc-900 dark:text-white">Pro</h3>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-3 md:mb-4">For power users</p>
-                <div className="text-3xl md:text-4xl font-bold mb-4 md:mb-6 text-zinc-900 dark:text-white">
-                  $149<span className="text-base text-zinc-400 dark:text-zinc-500 font-normal">/mo</span>
+              <div className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-white/20 hover:shadow-md transition-all flex flex-col">
+                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Pro</h3>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">For power users</p>
+                <div className="mb-1">
+                  <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$149</span>
+                  <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
                 </div>
-                <ul className="space-y-2.5 md:space-y-3 mb-5 md:mb-6">
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
+                <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">Built for heavy use.</p>
+                <ul className="space-y-2 mb-4 flex-grow">
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     Everything in Starter
                   </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
-                    All integrations
-                  </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
-                    Inbound & outbound phone calls
-                  </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     1M credits/month
                   </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
-                    Unlimited memory
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    60 phone minutes/month
                   </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-purple-600 dark:text-purple-400 text-xs">✓</span>
-                    Email support
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Higher rate limits
                   </li>
                 </ul>
+                <div className="mb-4 py-1.5 px-2 rounded-lg bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/5">
+                  <p className="text-zinc-500 dark:text-gray-500 text-[10px] md:text-xs text-center">≈ 1,500 messages · 500 emails · 60 min calls</p>
+                </div>
                 <Link
                   href="/sign-up?plan=pro"
-                  className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium text-center transition-all text-sm"
+                  className="block w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white rounded-lg font-semibold text-center transition-all text-sm"
                 >
-                  Start Pro
+                  Go Pro
                 </Link>
               </div>
 
               {/* Business */}
-              <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all">
-                <h3 className="text-lg md:text-xl font-semibold text-zinc-900 dark:text-white">Business</h3>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-3 md:mb-4">For teams</p>
-                <div className="text-3xl md:text-4xl font-bold mb-4 md:mb-6 text-zinc-900 dark:text-white">
-                  $299<span className="text-base text-zinc-400 dark:text-zinc-500 font-normal">/mo</span>
+              <div className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-white/20 hover:shadow-md transition-all flex flex-col">
+                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Business</h3>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Unlimited power</p>
+                <div className="mb-1">
+                  <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$299</span>
+                  <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
                 </div>
-                <ul className="space-y-2.5 md:space-y-3 mb-5 md:mb-6">
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
+                <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">For all-day, every-day use.</p>
+                <ul className="space-y-2 mb-4 flex-grow">
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     Everything in Pro
                   </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Inbound & outbound phone calls
-                  </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Team workspace
-                  </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     5M credits/month
                   </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    API access
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    300 phone minutes/month
                   </li>
-                  <li className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-600 text-xs">✓</span>
-                    Dedicated support
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Highest rate limits
                   </li>
                 </ul>
+                <div className="mb-4 py-1.5 px-2 rounded-lg bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/5">
+                  <p className="text-zinc-500 dark:text-gray-500 text-[10px] md:text-xs text-center">≈ 8,000 messages · 2,000 emails · 300 min calls</p>
+                </div>
                 <Link
                   href="/sign-up?plan=business"
-                  className="block w-full py-3 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg font-medium text-center hover:border-zinc-400 dark:hover:border-zinc-600 transition-all text-sm"
+                  className="block w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white rounded-lg font-semibold text-center transition-all text-sm"
                 >
-                  Start Business
+                  Go Business
                 </Link>
               </div>
             </div>
 
-            <p className="text-center text-zinc-500 dark:text-zinc-400 text-xs md:text-sm mt-5 md:mt-6">
-              All plans include Claude AI. No API key needed.
+            <p className="text-center text-zinc-400 dark:text-gray-500 text-xs md:text-sm mt-6 md:mt-8">
+              Not sure yet? <span className="text-purple-600 dark:text-purple-400">Lite at $20/mo</span> gives you the full experience. Upgrade anytime.
             </p>
           </div>
         </section>
