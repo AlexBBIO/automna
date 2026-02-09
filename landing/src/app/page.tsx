@@ -1271,7 +1271,19 @@ export default function Home() {
                 <ul className="space-y-2 mb-4 flex-grow">
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Everything in Starter
+                    Full AI agent (Claude Opus)
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    All integrations
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Always-on (24/7 uptime)
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Long-term memory
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
@@ -1280,6 +1292,10 @@ export default function Home() {
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     Custom skills
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Email support
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
@@ -1310,7 +1326,19 @@ export default function Home() {
                 <ul className="space-y-2 mb-4 flex-grow">
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Everything in Pro
+                    Full AI agent (Claude Opus)
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    All integrations
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Always-on (24/7 uptime)
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Long-term memory
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
@@ -1318,7 +1346,15 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Custom skills
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     API access
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Analytics dashboard
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
