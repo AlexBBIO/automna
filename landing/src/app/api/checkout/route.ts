@@ -8,6 +8,7 @@ const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
 // Price IDs - these will be created in Stripe dashboard
 // For now, we'll create them dynamically or use price lookup
 const PRICES = {
+  lite: process.env.STRIPE_PRICE_LITE,
   starter: process.env.STRIPE_PRICE_STARTER,
   pro: process.env.STRIPE_PRICE_PRO,
   business: process.env.STRIPE_PRICE_BUSINESS,

@@ -27,6 +27,7 @@ const FROM = process.env.RESEND_FROM || 'Automna <onboarding@resend.dev>';
 
 // Token limits by plan
 const TOKEN_LIMITS: Record<string, string> = {
+  lite: '50K',
   starter: '200K',
   pro: '1M',
   business: '5M',
