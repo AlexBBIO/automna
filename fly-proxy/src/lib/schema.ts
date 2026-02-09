@@ -130,7 +130,8 @@ export const callUsage = sqliteTable("call_usage", {
 // Plan limits
 export const PLAN_LIMITS = {
   free: { monthlyAutomnaTokens: 10_000, requestsPerMinute: 5, tokensPerMinute: 10_000, monthlyCallMinutes: 0 },
-  starter: { monthlyAutomnaTokens: 200_000, requestsPerMinute: 20, tokensPerMinute: 50_000, monthlyCallMinutes: 0 },
+  lite: { monthlyAutomnaTokens: 50_000, requestsPerMinute: 10, tokensPerMinute: 25_000, monthlyCallMinutes: 30 },
+  starter: { monthlyAutomnaTokens: 200_000, requestsPerMinute: 20, tokensPerMinute: 50_000, monthlyCallMinutes: 30 },
   pro: { monthlyAutomnaTokens: 1_000_000, requestsPerMinute: 60, tokensPerMinute: 150_000, monthlyCallMinutes: 60 },
   business: { monthlyAutomnaTokens: 5_000_000, requestsPerMinute: 120, tokensPerMinute: 300_000, monthlyCallMinutes: 300 },
 } as const;
