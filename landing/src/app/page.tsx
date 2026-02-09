@@ -1248,10 +1248,6 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    30 phone minutes/month
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     Estimated: ~400 messages/mo
                   </li>
                 </ul>
@@ -1279,15 +1275,15 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    1M credits/month
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    60 phone minutes/month
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     Higher rate limits
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Custom skills
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    1M credits/month
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
@@ -1318,15 +1314,19 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    5M credits/month
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    300 phone minutes/month
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
                     Highest rate limits
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    API access
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Dedicated support
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    5M credits/month
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
