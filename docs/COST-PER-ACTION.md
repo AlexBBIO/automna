@@ -89,12 +89,13 @@ If we define **1 credit = $0.01 of cost to us**:
 
 ### Current Plan Limits (from `schema.ts` PLAN_LIMITS)
 
-| Tier | Monthly AT | Cost Cap | Call Min | Req/min | ~Messages |
-|------|-----------|----------|---------|---------|-----------|
-| **Free** | 10,000 | $1 | 0 | 5 | ~13-20 |
-| **Starter ($79)** | 200,000 | $20 | 0 | 20 | ~260-400 |
-| **Pro ($149)** | 1,000,000 | $100 | 60 | 60 | ~1,300-2,000 |
-| **Business ($299)** | 5,000,000 | $500 | 300 | 120 | ~6,500-10,000 |
+| Tier | Price | Monthly AT | Cost Cap | Call Min | Req/min | ~Messages |
+|------|-------|-----------|----------|---------|---------|-----------|
+| **Starter** | $79 | 200,000 | $20 | 0 | 20 | ~260-400 |
+| **Pro** | $149 | 1,000,000 | $100 | 60 | 60 | ~1,300-2,000 |
+| **Business** | $299 | 5,000,000 | $500 | 300 | 120 | ~6,500-10,000 |
+
+> Note: `free` entry exists in PLAN_LIMITS but is unused (no free tier in production).
 
 > Exchange rate: **10,000 Automna Tokens = $1.00 real cost**
 > Source of truth: `landing/src/lib/db/schema.ts` → `PLAN_LIMITS`
