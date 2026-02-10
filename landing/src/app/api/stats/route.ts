@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { machines, llmUsage } from "@/lib/db/schema";
-import { eq, gte, sql, count } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 
 let cache: { data: any; ts: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -20,17 +20,13 @@ export async function GET() {
       });
     }
 
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthStartUnix = Math.floor(monthStart.getTime() / 1000);
-
     const [tasksResult, machinesResult] = await Promise.all([
-      db.select({ count: count() }).from(llmUsage).where(gte(llmUsage.timestamp, monthStartUnix)),
+      db.select({ count: count() }).from(llmUsage),
       db.select({ count: count() }).from(machines).where(eq(machines.status, "started")),
     ]);
 
     const data = {
-      tasksMonth: tasksResult[0]?.count ?? 0,
+      tasksTotal: tasksResult[0]?.count ?? 0,
       activeAgents: machinesResult[0]?.count ?? 0,
     };
 
@@ -41,6 +37,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error("[stats] Error:", error);
-    return NextResponse.json({ tasksMonth: 0, activeAgents: 0 });
+    return NextResponse.json({ tasksTotal: 0, activeAgents: 0 });
   }
 }
