@@ -113,8 +113,7 @@ export async function GET() {
             restartCount: restartCount > 0 ? restartCount - 1 : 0, // First start isn't a restart
           };
 
-          // Try to get process info via SSH/exec for memory usage
-          // Fly doesn't expose memory metrics directly, so we use the machine's /proc
+          // Get memory usage via Fly exec API (reads /proc/meminfo)
           try {
             const execRes = await fetch(
               `https://api.machines.dev/v1/apps/${m.appName}/machines/${m.id}/exec`,
@@ -125,7 +124,7 @@ export async function GET() {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  cmd: ["sh", "-c", "cat /proc/meminfo | grep -E 'MemTotal|MemAvailable' | awk '{print $2}'"],
+                  command: ["cat", "/proc/meminfo"],
                   timeout: 3,
                 }),
                 signal: AbortSignal.timeout(5000),
@@ -134,18 +133,17 @@ export async function GET() {
 
             if (execRes.ok) {
               const execData = await execRes.json();
-              // stdout contains two lines: MemTotal and MemAvailable in kB
               const stdout = execData.stdout || "";
-              const lines = Buffer.from(stdout, "base64").toString().trim().split("\n");
-              if (lines.length >= 2) {
-                const totalKb = parseInt(lines[0]);
-                const availKb = parseInt(lines[1]);
-                if (!isNaN(totalKb) && !isNaN(availKb)) {
-                  const usedKb = totalKb - availKb;
-                  base.metrics!.memoryUsedMb = Math.round(usedKb / 1024);
-                  base.metrics!.memoryLimitMb = Math.round(totalKb / 1024);
-                  base.metrics!.memoryPercent = Math.round((usedKb / totalKb) * 100);
-                }
+              // Parse MemTotal and MemAvailable from /proc/meminfo output
+              const totalMatch = stdout.match(/MemTotal:\s+(\d+)/);
+              const availMatch = stdout.match(/MemAvailable:\s+(\d+)/);
+              if (totalMatch && availMatch) {
+                const totalKb = parseInt(totalMatch[1]);
+                const availKb = parseInt(availMatch[1]);
+                const usedKb = totalKb - availKb;
+                base.metrics!.memoryUsedMb = Math.round(usedKb / 1024);
+                base.metrics!.memoryLimitMb = Math.round(totalKb / 1024);
+                base.metrics!.memoryPercent = Math.round((usedKb / totalKb) * 100);
               }
             }
           } catch {
