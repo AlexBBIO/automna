@@ -392,14 +392,14 @@ function Phone() {
   return (
     <div>
       <H2>Phone Calls</H2>
-      <Badge color="purple">Pro & Business</Badge>
+      <Badge color="purple">All Plans</Badge>
       <P>
-        Pro and Business tier agents get a dedicated US phone number and can make or receive AI-powered voice calls.
+        Every plan includes a dedicated US phone number. Your agent can make and receive AI-powered voice calls.
       </P>
 
       <H3>Your phone number</H3>
       <P>
-        When you upgrade to Pro or Business, a US phone number is automatically provisioned for your agent.
+        When you subscribe, a US phone number is automatically provisioned for your agent.
         Your agent can use this number to:
       </P>
       <Ul>

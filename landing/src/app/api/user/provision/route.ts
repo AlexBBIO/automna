@@ -17,6 +17,8 @@ import { db } from "@/lib/db";
 import { machines, machineEvents, phoneNumbers, users, provisionStatus } from "@/lib/db/schema";
 import Stripe from "stripe";
 import { sendMachineReady } from "@/lib/email";
+import { provisionPhoneNumber } from "@/lib/twilio";
+import { importNumberToBland, configureInboundNumber } from "@/lib/bland";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 import { eq, and, ne } from "drizzle-orm";
@@ -185,6 +187,56 @@ async function createAgentmailInbox(shortId: string): Promise<string | null> {
 
   console.error("[provision] Failed to create Agentmail inbox after 5 attempts");
   return null;
+}
+
+/**
+ * Provision a phone number for a user if they don't already have one.
+ * This is a fallback — the Stripe webhook normally handles this,
+ * but if it fails or fires late, provisioning catches it here.
+ * Non-fatal: logs errors but doesn't block provisioning.
+ */
+async function ensurePhoneNumber(userId: string): Promise<string | null> {
+  try {
+    const existing = await db.query.phoneNumbers.findFirst({
+      where: eq(phoneNumbers.userId, userId),
+    });
+
+    if (existing) {
+      console.log(`[provision] User ${userId} already has phone ${existing.phoneNumber}`);
+      return existing.phoneNumber;
+    }
+
+    console.log(`[provision] Provisioning phone number for user ${userId}`);
+    const { phoneNumber, sid } = await provisionPhoneNumber("725");
+
+    const imported = await importNumberToBland(phoneNumber);
+
+    if (imported) {
+      await configureInboundNumber(phoneNumber, {
+        prompt: `You are a helpful AI assistant. You answer phone calls on behalf of your user.
+Be friendly, professional, and helpful. If someone is calling for the user, take a message 
+including their name, what it's regarding, and a callback number. Keep responses concise and natural.`,
+        firstSentence: "Hello, you've reached an AI assistant. How can I help you?",
+      });
+    }
+
+    await db.insert(phoneNumbers).values({
+      userId,
+      phoneNumber,
+      twilioSid: sid,
+      blandImported: imported,
+      agentName: "AI Assistant",
+      voiceId: "6277266e-01eb-44c6-b965-438566ef7076",
+      inboundPrompt: "You are a helpful AI assistant...",
+      inboundFirstSentence: "Hello, you've reached an AI assistant. How can I help you?",
+    });
+
+    console.log(`[provision] Provisioned phone ${phoneNumber} for user ${userId}`);
+    return phoneNumber;
+  } catch (error) {
+    console.error(`[provision] Failed to provision phone for ${userId}:`, error);
+    return null;
+  }
 }
 
 interface FlyApp {
@@ -669,6 +721,11 @@ export async function POST() {
           })
           .where(eq(machines.id, existingMachine.id));
         
+        // Ensure phone number exists (fallback if Stripe webhook missed it)
+        ensurePhoneNumber(userId).catch((err) =>
+          console.error("[provision] Background phone provision failed:", err)
+        );
+        
         return NextResponse.json({
           appName: existingMachine.appName,
           machineId: existingMachine.id,
@@ -680,6 +737,12 @@ export async function POST() {
       } else {
         // Machine exists and is running
         console.log(`[provision] Machine ${existingMachine.id} already running`);
+        
+        // Ensure phone number exists (fallback if Stripe webhook missed it)
+        ensurePhoneNumber(userId).catch((err) =>
+          console.error("[provision] Background phone provision failed:", err)
+        );
+        
         return NextResponse.json({
           appName: existingMachine.appName,
           machineId: existingMachine.id,
@@ -892,18 +955,17 @@ export async function POST() {
     // and will upgrade waiting_for_gateway → ready when OpenClaw responds
     console.log(`[provision] Successfully created ${appName} with machine ${machine.id}`);
 
+    // Ensure phone number exists (fallback if Stripe webhook didn't provision one)
+    const phoneNumber = await ensurePhoneNumber(userId);
+
     // Send machine ready email (non-blocking)
-    // Include phone number if already provisioned (Pro/Business plans get it from Stripe webhook)
     const userEmail = user.emailAddresses?.[0]?.emailAddress;
     if (userEmail && agentmailInboxId) {
-      const userPhone = await db.query.phoneNumbers.findFirst({
-        where: eq(phoneNumbers.userId, userId),
-      });
       sendMachineReady(
         userEmail,
         agentmailInboxId,
         user.firstName || undefined,
-        userPhone?.phoneNumber || null
+        phoneNumber || null
       ).catch((err) => console.error("[provision] Failed to send machine ready email:", err));
     }
 

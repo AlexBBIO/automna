@@ -111,10 +111,10 @@ response = client.messages.create(
 )
 ```
 
-### Voice Calling (Pro & Business plans)
+### Voice Calling (All Plans)
 
 Make and receive phone calls through your dedicated phone number.
-**This feature requires a Pro or Business subscription.** If the user is on Starter, let them know they can upgrade at https://automna.ai/pricing to unlock voice calling.
+**All plans include voice calling.** If the user's phone number hasn't been provisioned yet, let them know it should arrive shortly or to contact support.
 
 **Make an outbound call:**
 ```bash
@@ -185,7 +185,7 @@ curl -s "https://automna-proxy.fly.dev/api/user/call/usage" \
 | Web Search | ✅ Active | Brave Search via `web_search` tool |
 | Browser | ✅ Active | Browserbase via Playwright (see BROWSERBASE.md) |
 | Email | ✅ Active | See AGENTMAIL.md |
-| Voice Calling | ✅ Pro/Business | Outbound calls via `/api/user/call` proxy |
+| Voice Calling | ✅ All Plans | Outbound calls via `/api/user/call` proxy |
 | Discord | ❌ Not connected | Ask user for bot token |
 | Telegram | ❌ Not connected | Ask user for bot token |
 

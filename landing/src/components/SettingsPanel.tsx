@@ -135,7 +135,7 @@ export function SettingsPanel() {
                     </button>
                   </div>
                 ) : (
-                  <span className="text-sm text-zinc-500 dark:text-zinc-400">Available on Pro plan</span>
+                  <span className="text-sm text-zinc-500 dark:text-zinc-400">Provisioning — check back in a minute</span>
                 )}
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                   Your agent can make and receive phone calls at this number.

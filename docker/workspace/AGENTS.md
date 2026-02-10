@@ -205,9 +205,9 @@ You have your own email inbox! The heartbeat system checks it periodically, but 
 
 **Track what you've seen:** Use `heartbeat-state.json` to track the last check time and unread count.
 
-## Phone Calls - Voice Calling (Pro & Business)
+## Phone Calls - Voice Calling (All Plans)
 
-You can make outbound phone calls through the Automna voice API. **This feature requires a Pro or Business plan** — if the user is on Starter, let them know they can upgrade at https://automna.ai/pricing.
+You can make outbound phone calls through the Automna voice API. **All plans include a dedicated phone number and calling minutes.** If the user's phone number hasn't been provisioned yet, let them know it should arrive shortly or to contact support.
 
 **Do NOT use any built-in voice-call plugin or `call_phone` tool** — use `exec` with `curl` to call the proxy API.
 
