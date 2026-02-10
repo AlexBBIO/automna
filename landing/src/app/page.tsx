@@ -391,17 +391,17 @@ function HeroChat() {
 }
 
 // Animated counter hook
-function useAnimatedCounter(target: number, duration: number = 2000) {
+function useAnimatedCounter(initialTarget: number, duration: number = 2000) {
   const [count, setCount] = useState(0);
+  const [target, setTarget] = useState(initialTarget);
   const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
-    if (!hasStarted) return;
+    if (!hasStarted || target === 0) return;
     const start = Date.now();
     const timer = setInterval(() => {
       const elapsed = Date.now() - start;
       const progress = Math.min(elapsed / duration, 1);
-      // Ease out
       const eased = 1 - Math.pow(1 - progress, 3);
       setCount(Math.floor(eased * target));
       if (progress >= 1) clearInterval(timer);
@@ -409,7 +409,7 @@ function useAnimatedCounter(target: number, duration: number = 2000) {
     return () => clearInterval(timer);
   }, [hasStarted, target, duration]);
 
-  return { count, start: () => setHasStarted(true) };
+  return { count, start: () => setHasStarted(true), setTarget };
 }
 
 // Sample activity feed lines (would be real data in production)
@@ -432,17 +432,25 @@ export default function Home() {
   const demoCarouselRef = useRef<HTMLDivElement>(null);
   const [activityIndex, setActivityIndex] = useState(0);
 
-  // Live counters (mocked - would fetch from API in production)
-  const tasksToday = useAnimatedCounter(2847, 2500);
-  const agentsWorking = useAnimatedCounter(38, 1800);
+  // Live counters - fetched from API
+  const tasksMonth = useAnimatedCounter(0, 2500);
+  const activeAgents = useAnimatedCounter(0, 1800);
 
   useEffect(() => {
     setIsVisible(true);
-    // Start counters after a short delay
-    const counterTimer = setTimeout(() => {
-      tasksToday.start();
-      agentsWorking.start();
-    }, 500);
+    // Fetch real stats from API
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(data => {
+        tasksMonth.setTarget(data.tasksMonth || 0);
+        activeAgents.setTarget(data.activeAgents || 0);
+        setTimeout(() => {
+          tasksMonth.start();
+          activeAgents.start();
+        }, 500);
+      })
+      .catch(() => {});
+    const counterTimer: ReturnType<typeof setTimeout> | null = null;
     
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 100);
@@ -457,7 +465,7 @@ export default function Home() {
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      clearTimeout(counterTimer);
+      if (counterTimer) clearTimeout(counterTimer);
       clearInterval(feedTimer);
     };
   }, []);
@@ -694,13 +702,13 @@ export default function Home() {
               <div className="flex items-center gap-4 md:gap-6 shrink-0">
                 <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg md:text-xl font-bold text-zinc-800 dark:text-white tabular-nums">{tasksToday.count.toLocaleString()}</span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">tasks today</span>
+                  <span className="text-lg md:text-xl font-bold text-zinc-800 dark:text-white tabular-nums">{tasksMonth.count.toLocaleString()}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">tasks this month</span>
                 </div>
                 <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700"></div>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg md:text-xl font-bold text-zinc-800 dark:text-white tabular-nums">{agentsWorking.count}</span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">agents working</span>
+                  <span className="text-lg md:text-xl font-bold text-zinc-800 dark:text-white tabular-nums">{activeAgents.count}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">agents online</span>
                 </div>
               </div>
             </div>
