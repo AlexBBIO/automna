@@ -283,6 +283,21 @@ export const callUsage = sqliteTable("call_usage", {
 }));
 
 // ============================================
+// PROVISIONING STATUS TRACKING
+// ============================================
+
+// Tracks real-time provisioning progress (separate from machines table)
+// No row = user is either not provisioning or already has a machine (treat as ready)
+export const provisionStatus = sqliteTable("provision_status", {
+  userId: text("user_id").primaryKey().references(() => users.id),
+  status: text("status").notNull().default("pending"),
+  // pending | creating_app | allocating_ips | creating_integrations | creating_machine | starting | waiting_for_gateway | ready | error
+  error: text("error"),
+  startedAt: integer("started_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+// ============================================
 // TYPE EXPORTS
 // ============================================
 
@@ -308,3 +323,5 @@ export type CallUsage = typeof callUsage.$inferSelect;
 export type NewCallUsage = typeof callUsage.$inferInsert;
 export type UsageEvent = typeof usageEvents.$inferSelect;
 export type NewUsageEvent = typeof usageEvents.$inferInsert;
+export type ProvisionStatus = typeof provisionStatus.$inferSelect;
+export type NewProvisionStatus = typeof provisionStatus.$inferInsert;

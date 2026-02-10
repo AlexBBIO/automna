@@ -5,7 +5,20 @@ import { useState, useEffect } from 'react';
 interface ChatSkeletonProps {
   phase?: 'connecting' | 'provisioning' | 'warming' | 'loading-history' | 'ready';
   message?: string;
+  provisionStage?: string;
 }
+
+// Map real provision statuses to user-friendly messages and progress
+const stageInfo: Record<string, { text: string; progress: number }> = {
+  pending:                { text: 'Preparing your environment...', progress: 5 },
+  creating_app:           { text: 'Creating your environment...', progress: 10 },
+  allocating_ips:         { text: 'Setting up networking...', progress: 25 },
+  creating_integrations:  { text: 'Configuring email & browser...', progress: 40 },
+  creating_machine:       { text: 'Building your agent...', progress: 55 },
+  starting:               { text: 'Starting services...', progress: 70 },
+  waiting_for_gateway:    { text: 'Almost ready...', progress: 85 },
+  ready:                  { text: 'Ready!', progress: 100 },
+};
 
 // Provisioning steps shown during the ~60s wait
 const provisioningSteps = [
@@ -33,7 +46,7 @@ function formatElapsedTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProps) {
+export function ChatSkeleton({ phase = 'connecting', message, provisionStage }: ChatSkeletonProps) {
   const [provisionStep, setProvisionStep] = useState(0);
   const [animatedProgress, setAnimatedProgress] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -130,7 +143,11 @@ export function ChatSkeleton({ phase = 'connecting', message }: ChatSkeletonProp
     ready: { progress: 100, text: 'Ready!' },
   };
 
-  const current = phases[phase] || phases.connecting;
+  // Use real provision stage if available, fall back to fake progress
+  const realStage = provisionStage && stageInfo[provisionStage];
+  const current = realStage
+    ? { progress: realStage.progress, text: realStage.text }
+    : (phases[phase] || phases.connecting);
 
   return (
     <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 transition-colors">

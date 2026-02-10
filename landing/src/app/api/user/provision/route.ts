@@ -14,7 +14,7 @@
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { machines, machineEvents, phoneNumbers, users } from "@/lib/db/schema";
+import { machines, machineEvents, phoneNumbers, users, provisionStatus } from "@/lib/db/schema";
 import Stripe from "stripe";
 import { sendMachineReady } from "@/lib/email";
 
@@ -775,6 +775,27 @@ export async function POST() {
     const planSpecs = getMachineSpecsForPlan(userPlan);
     console.log(`[provision] Creating new app ${appName} for user ${userId} (plan: ${userPlan}, cpus: ${planSpecs.cpus}, memory: ${planSpecs.memory_mb}MB)`);
 
+    // Helper to write provisioning status (non-fatal if it fails)
+    const setStatus = async (status: string, error?: string) => {
+      try {
+        await db.insert(provisionStatus).values({
+          userId,
+          status,
+          error: error || null,
+          startedAt: new Date(),
+          updatedAt: new Date(),
+        }).onConflictDoUpdate({
+          target: provisionStatus.userId,
+          set: { status, error: error || null, updatedAt: new Date() },
+        });
+      } catch (err) {
+        console.warn(`[provision] Failed to write status '${status}':`, err);
+      }
+    };
+
+    // Insert initial provisioning status
+    await setStatus("creating_app");
+
     // Get org ID for app creation
     const orgId = await getPersonalOrgId();
     console.log(`[provision] Using org ID: ${orgId}`);
@@ -785,6 +806,7 @@ export async function POST() {
       await createApp(appName, orgId);
       
       // Step 1b: Allocate public IPs for DNS resolution
+      await setStatus("allocating_ips");
       console.log(`[provision] Allocating IPs for ${appName}`);
       await allocateIps(appName);
     } else {
@@ -792,6 +814,7 @@ export async function POST() {
     }
 
     // Step 2: Create volume, Browserbase context, and Agentmail inbox in parallel
+    await setStatus("creating_integrations");
     const gatewayToken = crypto.randomUUID();
     console.log(`[provision] Creating volume and integrations for ${appName}`);
     const [volume, browserbaseContextId, agentmailInboxId] = await Promise.all([
@@ -801,10 +824,12 @@ export async function POST() {
     ]);
 
     // Step 3: Create machine (env vars passed directly, no Fly secrets needed)
+    await setStatus("creating_machine");
     console.log(`[provision] Creating machine for ${appName}`);
     const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId, agentmailInboxId, userPlan);
 
     // Step 4: Wait for machine to be ready
+    await setStatus("starting");
     console.log(`[provision] Waiting for machine ${machine.id} to start`);
     const readyMachine = await waitForMachine(appName, machine.id);
 
@@ -835,6 +860,8 @@ export async function POST() {
       }),
     });
 
+    // Mark provisioning as ready
+    await setStatus("ready");
     console.log(`[provision] Successfully created ${appName} with machine ${machine.id}`);
 
     // Send machine ready email (non-blocking)
@@ -863,6 +890,28 @@ export async function POST() {
     });
   } catch (error) {
     console.error("[provision] Error:", error);
+    // Write error status (best-effort, userId may not be available if auth failed)
+    try {
+      const { userId: errUserId } = await auth();
+      if (errUserId) {
+        await db.insert(provisionStatus).values({
+          userId: errUserId,
+          status: "error",
+          error: error instanceof Error ? error.message : "Provisioning failed",
+          startedAt: new Date(),
+          updatedAt: new Date(),
+        }).onConflictDoUpdate({
+          target: provisionStatus.userId,
+          set: {
+            status: "error",
+            error: error instanceof Error ? error.message : "Provisioning failed",
+            updatedAt: new Date(),
+          },
+        });
+      }
+    } catch {
+      // Ignore - best effort
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Provisioning failed" },
       { status: 500 }

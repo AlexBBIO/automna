@@ -49,6 +49,7 @@ interface GatewayInfo {
 }
 
 type LoadPhase = 'init' | 'syncing' | 'fetching-gateway' | 'provisioning' | 'warming' | 'ready' | 'error';
+type ProvisionStage = string | null;
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
@@ -57,6 +58,7 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
   const prewarmStarted = useRef(false);
+  const [provisionStage, setProvisionStage] = useState<ProvisionStage>(null);
   
   // Conversation state - fetched from OpenClaw
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -360,52 +362,51 @@ export default function DashboardPage() {
   };
 
   /**
-   * Wait for a freshly provisioned gateway to be ready.
-   * Only used for NEW provisions — existing users skip this entirely.
-   * Polls HTTP health until the OpenClaw gateway is responding.
-   * Returns true if ready, false if timed out (caller should show error).
+   * Poll provisioning status until ready or error.
+   * Uses the provision_status table for real progress, with a 5-minute safety valve.
    */
-  const waitForNewProvisionReady = async (): Promise<boolean> => {
+  const pollProvisionStatus = async (): Promise<boolean> => {
     if (prewarmStarted.current) return true;
     prewarmStarted.current = true;
     
-    const MAX_WAIT_MS = 120000; // 2 minutes for fresh provisions
-    const POLL_INTERVAL_MS = 2000;
-    const CONSECUTIVE_SUCCESS_NEEDED = 2;
-    console.log('[warmup] Waiting for freshly provisioned gateway...');
+    const MAX_WAIT_MS = 300000; // 5 minutes absolute safety valve
+    const POLL_INTERVAL_MS = 1500;
+    console.log('[warmup] Polling provision status...');
     const startTime = Date.now();
-    let consecutiveSuccesses = 0;
     
     while (Date.now() - startTime < MAX_WAIT_MS) {
       try {
-        const response = await fetch('/api/user/health', {
+        const response = await fetch('/api/user/provision/status', {
           method: 'GET',
           signal: AbortSignal.timeout(6000),
         });
         
         const data = await response.json();
         
-        if (data.ready) {
-          consecutiveSuccesses++;
-          console.log(`[warmup] Health check passed (${consecutiveSuccesses}/${CONSECUTIVE_SUCCESS_NEEDED})`);
-          
-          if (consecutiveSuccesses >= CONSECUTIVE_SUCCESS_NEEDED) {
-            console.log('[warmup] Gateway is ready!');
-            return true;
-          }
-        } else {
-          consecutiveSuccesses = 0;
-          console.log(`[warmup] Gateway not ready yet: ${data.error || 'unknown'}`);
+        if (data.status) {
+          setProvisionStage(data.status);
+          console.log(`[warmup] Provision status: ${data.status}`);
+        }
+        
+        if (data.status === 'ready') {
+          console.log('[warmup] Provisioning complete!');
+          return true;
+        }
+        
+        if (data.status === 'error') {
+          console.error('[warmup] Provisioning failed:', data.error);
+          setLoadError(data.error || 'Provisioning failed');
+          return false;
         }
       } catch (err) {
-        consecutiveSuccesses = 0;
-        console.log(`[warmup] Health check failed: ${err instanceof Error ? err.message : 'error'}`);
+        console.log(`[warmup] Status poll failed: ${err instanceof Error ? err.message : 'error'}`);
       }
       
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
     }
     
-    console.error('[warmup] Gateway failed to become ready after 2 minutes');
+    console.error('[warmup] Provisioning timed out after 5 minutes');
+    setLoadError('Your agent is taking longer than expected to start. Please try refreshing the page.');
     return false;
   };
 
@@ -512,7 +513,7 @@ export default function DashboardPage() {
           } else {
             // Fresh provision — poll health until ready
             setLoadPhase('warming');
-            const isReady = await waitForNewProvisionReady();
+            const isReady = await pollProvisionStatus();
             
             if (!isReady) {
               console.error('[dashboard] Fresh provision failed to become ready');
@@ -612,7 +613,7 @@ export default function DashboardPage() {
           <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 animate-pulse"></div>
         </nav>
         <div className="flex-1">
-          <ChatSkeleton phase={skeletonPhase} />
+          <ChatSkeleton phase={skeletonPhase} provisionStage={provisionStage || undefined} />
         </div>
       </div>
     );
