@@ -961,7 +961,8 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       }
     }, 10000);
 
-    // Debounce connection (100ms) to prevent race conditions when switching sessions
+    // Debounce connection (500ms) to prevent race conditions when switching sessions
+    // (React remounts can cause rapid mount/unmount cycles in ~200ms)
     connectionDelayTimer = setTimeout(() => {
 
       // ── HTTP History Fetch (parallel with WebSocket) ──
@@ -972,11 +973,29 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       const historyUrl = buildHistoryUrl(config.gatewayUrl, sessionKey);
       log('Starting HTTP history fetch');
 
-      fetch(historyUrl, { signal: httpAbort.signal })
-        .then((res) => {
+      // Fetch with retry on 502/503 (gateway cold start)
+      const fetchHistoryWithRetry = async (attempt = 1, maxAttempts = 3) => {
+        try {
+          const res = await fetch(historyUrl, { signal: httpAbort.signal });
+          if ((res.status === 502 || res.status === 503) && attempt < maxAttempts) {
+            log(`HTTP history got ${res.status}, retrying (${attempt}/${maxAttempts})...`);
+            await new Promise(r => setTimeout(r, 2000 * attempt));
+            return fetchHistoryWithRetry(attempt + 1, maxAttempts);
+          }
           if (!res.ok) return { messages: [] };
           return res.json();
-        })
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'AbortError') throw err;
+          if (attempt < maxAttempts) {
+            log(`HTTP history fetch error, retrying (${attempt}/${maxAttempts})...`);
+            await new Promise(r => setTimeout(r, 2000 * attempt));
+            return fetchHistoryWithRetry(attempt + 1, maxAttempts);
+          }
+          throw err;
+        }
+      };
+
+      fetchHistoryWithRetry()
         .then((data) => {
           if (!mountedRef.current || historyLoadedRef.current) return;
           if (currentSessionRef.current !== sessionKey) return;
@@ -1124,7 +1143,7 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
         }
       };
 
-    }, 100); // End of connection debounce
+    }, 500); // End of connection debounce
 
     // ── Cleanup ──
 

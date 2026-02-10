@@ -10,6 +10,7 @@ import {
   BarChart3, 
   CreditCard, 
   Activity,
+  Cpu,
   Settings,
   ArrowLeft,
   Megaphone
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/admin/usage", label: "Usage", icon: BarChart3 },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/health", label: "Health", icon: Activity },
+  { href: "/admin/resources", label: "Resources", icon: Cpu },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
