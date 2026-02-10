@@ -459,6 +459,14 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
     setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData.files);
+    if (files.length > 0) {
+      e.preventDefault();
+      setPendingFiles(prev => [...prev, ...files]);
+    }
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -767,6 +775,7 @@ export function AutomnaChat({ gatewayUrl, authToken, sessionKey, initialMessage,
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               disabled={isOverLimit}
               placeholder={isOverLimit ? "Plan limit reached" : pendingFiles.length > 0 ? "Add a message (optional)..." : "Ask anything..."}
               rows={1}
