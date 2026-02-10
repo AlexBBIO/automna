@@ -3,23 +3,35 @@
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { trackEvent } from '@/lib/analytics';
+
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 
 function StartRedirect() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Track the campaign landing
     const ref = searchParams.get('ref') || 'unknown';
-    trackEvent('campaign_landing', {
-      campaign: 'newsletter',
-      ref,
-      landing_page: '/start',
-    });
 
-    // Redirect to homepage - GA4 will know they came through /start
-    router.replace('/');
+    // Fire GA4 event with a callback to ensure it sends before redirect
+    if (typeof window !== 'undefined' && window.gtag) {
+      window.gtag('event', 'campaign_landing', {
+        campaign: 'newsletter',
+        ref,
+        landing_page: '/start',
+        event_callback: () => {
+          router.replace('/');
+        },
+        event_timeout: 2000, // redirect after 2s max even if GA4 is slow
+      });
+    } else {
+      // gtag not loaded (ad blocker etc), just redirect
+      router.replace('/');
+    }
   }, [router, searchParams]);
 
   return null;
