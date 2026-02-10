@@ -374,6 +374,7 @@ export default function DashboardPage() {
     console.log('[warmup] Polling provision status...');
     const startTime = Date.now();
     
+    // Phase 1: Poll status endpoint for backend provisioning stages
     while (Date.now() - startTime < MAX_WAIT_MS) {
       try {
         const response = await fetch('/api/user/provision/status', {
@@ -388,21 +389,94 @@ export default function DashboardPage() {
           console.log(`[warmup] Provision status: ${data.status}`);
         }
         
-        if (data.status === 'ready') {
-          console.log('[warmup] Provisioning complete!');
-          return true;
-        }
-        
         if (data.status === 'error') {
           console.error('[warmup] Provisioning failed:', data.error);
           setLoadError(data.error || 'Provisioning failed');
           return false;
+        }
+        
+        // Once machine is created and starting, switch to WebSocket probing
+        if (data.status === 'waiting_for_gateway' || data.status === 'ready') {
+          break;
         }
       } catch (err) {
         console.log(`[warmup] Status poll failed: ${err instanceof Error ? err.message : 'error'}`);
       }
       
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    
+    // Phase 2: Fetch gateway URL and probe with WebSocket directly
+    // The WS connection IS the readiness check — no middleman
+    console.log('[warmup] Machine started, probing gateway via WebSocket...');
+    setProvisionStage('waiting_for_gateway');
+    
+    try {
+      const gwRes = await fetch('/api/user/gateway');
+      const gwData = await gwRes.json();
+      
+      if (!gwData.gatewayUrl) {
+        console.error('[warmup] No gateway URL available');
+        setLoadError('Could not get gateway URL. Please try refreshing.');
+        return false;
+      }
+      
+      // Store gateway info so it's available when we transition to ready
+      setGatewayInfo(gwData);
+      
+      // Try WebSocket connection — when onopen fires, gateway is ready
+      const wsReady = await new Promise<boolean>((resolve) => {
+        const WS_TIMEOUT = MAX_WAIT_MS - (Date.now() - startTime);
+        const timeout = setTimeout(() => {
+          console.error('[warmup] WebSocket probe timed out');
+          resolve(false);
+        }, Math.max(WS_TIMEOUT, 10000));
+        let resolved = false;
+        
+        const tryConnect = () => {
+          if (resolved || Date.now() - startTime > MAX_WAIT_MS) {
+            if (!resolved) { resolved = true; clearTimeout(timeout); resolve(false); }
+            return;
+          }
+          
+          console.log('[warmup] Attempting WebSocket connection...');
+          let retryScheduled = false;
+          const ws = new WebSocket(gwData.gatewayUrl);
+          
+          const scheduleRetry = () => {
+            if (retryScheduled || resolved) return;
+            retryScheduled = true;
+            setTimeout(tryConnect, 3000);
+          };
+          
+          ws.onopen = () => {
+            console.log('[warmup] WebSocket connected! Gateway is ready.');
+            resolved = true;
+            clearTimeout(timeout);
+            ws.close();
+            resolve(true);
+          };
+          
+          ws.onerror = () => {
+            try { ws.close(); } catch {}
+            scheduleRetry();
+          };
+          
+          ws.onclose = () => {
+            scheduleRetry();
+          };
+        };
+        
+        tryConnect();
+      });
+      
+      if (wsReady) {
+        console.log('[warmup] Provisioning complete!');
+        setProvisionStage('ready');
+        return true;
+      }
+    } catch (err) {
+      console.error('[warmup] Gateway probe error:', err);
     }
     
     console.error('[warmup] Provisioning timed out after 5 minutes');
@@ -513,15 +587,10 @@ export default function DashboardPage() {
             return;
           }
           
-          // Provision complete — fetch gateway info
-          setLoadPhase('fetching-gateway');
-          gatewayRes = await fetch('/api/user/gateway');
-          gatewayData = await gatewayRes.json();
-          
-          console.log('[dashboard] Gateway response after provisioning:', {
-            hasGatewayUrl: !!gatewayData.gatewayUrl,
-            appName: gatewayData.appName,
-          });
+          // pollProvisionStatus already fetched gateway info and verified
+          // WebSocket connectivity — go straight to ready
+          setLoadPhase('ready');
+          return;
         }
         
         if (gatewayData.gatewayUrl) {

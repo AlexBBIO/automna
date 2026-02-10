@@ -493,6 +493,28 @@ async function createMachine(
 
   if (!response.ok) {
     const error = await response.text();
+    // Handle orphaned machines: if a machine named "openclaw" already exists
+    // (e.g., DB record was deleted but Fly machine wasn't), reuse it
+    if (error.includes("already_exists")) {
+      console.log(`[provision] Machine already exists in ${appName}, reusing...`);
+      const listResp = await fetch(`${FLY_API_BASE}/apps/${appName}/machines`, {
+        headers: { Authorization: `Bearer ${FLY_API_TOKEN}` },
+      });
+      if (listResp.ok) {
+        const machines = await listResp.json();
+        const existing = machines.find((m: FlyMachine) => m.name === "openclaw");
+        if (existing) {
+          // If stopped, start it
+          if (existing.state === "stopped") {
+            await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${existing.id}/start`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${FLY_API_TOKEN}` },
+            });
+          }
+          return existing;
+        }
+      }
+    }
     throw new Error(`Failed to create machine: ${error}`);
   }
 
@@ -828,10 +850,16 @@ export async function POST() {
     console.log(`[provision] Creating machine for ${appName}`);
     const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId, agentmailInboxId, userPlan);
 
-    // Step 4: Wait for machine to be ready
+    // Step 4: Wait for Fly machine to be ready
     await setStatus("starting");
     console.log(`[provision] Waiting for machine ${machine.id} to start`);
     const readyMachine = await waitForMachine(appName, machine.id);
+
+    // Machine is started but OpenClaw may not be listening yet.
+    // Set status to waiting_for_gateway - the status endpoint will do live
+    // health checks and upgrade to "ready" when the gateway responds.
+    await setStatus("waiting_for_gateway");
+    console.log(`[provision] Machine started, gateway warming up...`);
 
     // Step 5: Store in database
     // Note: Heartbeat config is handled by the Docker image on first boot
@@ -860,8 +888,8 @@ export async function POST() {
       }),
     });
 
-    // Mark provisioning as ready
-    await setStatus("ready");
+    // Don't set "ready" here - the status endpoint does a live health check
+    // and will upgrade waiting_for_gateway → ready when OpenClaw responds
     console.log(`[provision] Successfully created ${appName} with machine ${machine.id}`);
 
     // Send machine ready email (non-blocking)

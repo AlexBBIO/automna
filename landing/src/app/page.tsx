@@ -567,9 +567,6 @@ export default function Home() {
             <button onClick={() => scrollTo('pricing')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Pricing
             </button>
-            <button onClick={() => scrollTo('security')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
-              Security
-            </button>
             <Link href="/sign-in" className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Sign in
             </Link>
@@ -664,10 +661,6 @@ export default function Home() {
                 <span>No API key required</span>
                 <span>•</span>
                 <span>Takes ~60 seconds to start</span>
-                <span>•</span>
-                <button onClick={() => scrollTo('security')} className="hover:text-zinc-700 dark:hover:text-zinc-300 underline underline-offset-2">
-                  Privacy & security
-                </button>
               </div>
             </div>
 
@@ -1096,44 +1089,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Security */}
-        <section id="security" className="container mx-auto px-6 py-10 md:py-24 bg-zinc-50/50 dark:bg-zinc-900/30">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8 md:mb-12">
-              <h2 className="text-2xl md:text-4xl font-bold mb-3 text-zinc-900 dark:text-white">
-                Permissions and control by design.
-              </h2>
-              <p className="text-zinc-500 dark:text-zinc-400 text-base md:text-lg">
-                You decide what the agent can access—and what it&apos;s allowed to do.
-              </p>
-            </div>
-
-            <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/50 rounded-xl p-6 md:p-8">
-              <ul className="space-y-3 md:space-y-4">
-                {[
-                  { title: 'Connect only the tools you want (scoped access)', desc: 'Grant permissions per integration. Revoke anytime.' },
-                  { title: 'Approval-only mode for sensitive actions', desc: 'Review before sending, publishing, or modifying data.' },
-                  { title: 'Review outputs before sending or publishing', desc: 'Drafts queue for your approval. You have final say.' },
-                  { title: 'Revoke access at any time', desc: 'Disconnect tools instantly from your dashboard.' },
-                  { title: 'Action history / audit log', desc: 'See what it did, step by step. Full transparency.' },
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3 md:gap-4">
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center shrink-0">
-                      <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-emerald-600 dark:text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-medium text-zinc-900 dark:text-white text-sm md:text-base">{item.title}</div>
-                      <p className="text-xs md:text-sm text-zinc-600 dark:text-zinc-400">{item.desc}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-
         {/* Pricing */}
         <section id="pricing" className="container mx-auto px-6 py-10 md:py-24">
           <div className="max-w-7xl mx-auto">
@@ -1456,7 +1411,6 @@ export default function Home() {
             <div className="flex flex-wrap gap-x-6 md:gap-x-8 gap-y-3 md:gap-y-4 text-zinc-500 dark:text-zinc-500 text-sm">
               <Link href="/privacy" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Privacy</Link>
               <Link href="/terms" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Terms</Link>
-              <button onClick={() => scrollTo('security')} className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Security</button>
               <a href="mailto:alex@automna.ai" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Contact</a>
             </div>
           </div>
