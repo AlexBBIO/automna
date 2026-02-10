@@ -476,23 +476,44 @@ export default function DashboardPage() {
           setLoadPhase('provisioning');
           wasJustProvisioned = true;
           
-          const provisionRes = await fetch('/api/user/provision', { method: 'POST' });
-          const provisionData = await provisionRes.json();
+          // Fire provision in background — don't await it
+          // Poll provision status in parallel to show real-time progress
+          const provisionPromise = fetch('/api/user/provision', { method: 'POST' })
+            .then(async (res) => {
+              const data = await res.json();
+              console.log('[dashboard] Provision response:', data);
+              if (data.error) {
+                if (data.error === 'subscription_required' || res.status === 402) {
+                  window.location.href = '/pricing?subscribe=true';
+                  return null;
+                }
+                throw new Error(data.error);
+              }
+              return data;
+            });
           
-          console.log('[dashboard] Provision response:', provisionData);
+          // Start polling status immediately (provision writes status as it goes)
+          setLoadPhase('warming');
+          const isReady = await pollProvisionStatus();
           
-          if (provisionData.error) {
-            console.error('[dashboard] Provisioning failed:', provisionData.error);
-            // Subscription required - redirect to pricing
-            if (provisionData.error === 'subscription_required' || provisionRes.status === 402) {
-              window.location.href = '/pricing?subscribe=true';
+          if (!isReady) {
+            // Check if provision itself errored
+            try {
+              const provisionResult = await provisionPromise;
+              if (!provisionResult) return; // redirected
+            } catch (err) {
+              console.error('[dashboard] Provisioning failed:', err);
+              setLoadError(err instanceof Error ? err.message : 'Provisioning failed');
+              setLoadPhase('error');
               return;
             }
-            setLoadError(provisionData.error);
+            console.error('[dashboard] Fresh provision failed to become ready');
+            setLoadError('Your agent is taking longer than expected to start. Please try refreshing the page.');
             setLoadPhase('error');
             return;
           }
           
+          // Provision complete — fetch gateway info
           setLoadPhase('fetching-gateway');
           gatewayRes = await fetch('/api/user/gateway');
           gatewayData = await gatewayRes.json();
@@ -509,21 +530,9 @@ export default function DashboardPage() {
           if (!wasJustProvisioned) {
             // Existing user with a running machine — skip warmup entirely
             console.log('[dashboard] Existing user with gateway, skipping warmup');
-            setLoadPhase('ready');
-          } else {
-            // Fresh provision — poll health until ready
-            setLoadPhase('warming');
-            const isReady = await pollProvisionStatus();
-            
-            if (!isReady) {
-              console.error('[dashboard] Fresh provision failed to become ready');
-              setLoadError('Your agent is taking longer than expected to start. Please try refreshing the page.');
-              setLoadPhase('error');
-              return;
-            }
-            
-            setLoadPhase('ready');
           }
+          
+          setLoadPhase('ready');
         } else {
           console.error('[dashboard] No gatewayUrl in response:', gatewayData);
           setLoadPhase('error');

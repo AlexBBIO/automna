@@ -1198,7 +1198,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Estimated: ~100 messages/mo
+                    Estimated: ~100 tasks/mo
                   </li>
                   <li className="flex items-center gap-2 text-zinc-400 dark:text-gray-500 text-xs md:text-sm italic">
                     <span className="text-yellow-500 dark:text-yellow-400 text-xs flex-shrink-0">⚡</span>
@@ -1248,7 +1248,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Estimated: ~400 messages/mo
+                    Estimated: ~400 tasks/mo
                   </li>
                 </ul>
                 <Link
@@ -1303,7 +1303,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Estimated: ~2,000 messages/mo
+                    Estimated: ~2,000 tasks/mo
                   </li>
                 </ul>
                 <Link
@@ -1366,7 +1366,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Estimated: ~10,000 messages/mo
+                    Estimated: ~10,000 tasks/mo
                   </li>
                 </ul>
                 <Link
