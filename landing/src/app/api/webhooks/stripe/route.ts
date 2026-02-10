@@ -8,6 +8,7 @@ import { machines, machineEvents, phoneNumbers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { provisionPhoneNumber } from '@/lib/twilio';
 import { importNumberToBland, configureInboundNumber } from '@/lib/bland';
+import { trackServerEvent } from '@/lib/analytics';
 
 // Initialize Stripe lazily to avoid build-time errors
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -297,6 +298,13 @@ export async function POST(request: Request) {
           await provisionPhoneForPlan(clerkUserId, plan);
           
           console.log(`[stripe] Upgraded user ${clerkUserId} to ${plan}`);
+
+          // Track subscription in GA4
+          trackServerEvent(clerkUserId, 'subscription_started', {
+            plan,
+            value: Number(session.amount_total || 0) / 100,
+            currency: session.currency || 'usd',
+          });
 
           // Send subscription started email + update audience
           if (session.customer_email) {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useUser, SignInButton } from '@clerk/nextjs';
 import { track } from '@vercel/analytics';
+import { trackEvent } from '@/lib/analytics';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useTheme, ThemeToggle } from '@/components/ThemeToggle';
@@ -279,11 +280,13 @@ export default function PricingPage() {
     hasTrackedView.current = true;
 
     const params = new URLSearchParams(window.location.search);
-    track('pricing_viewed', {
+    const viewParams = {
       source: params.get('subscribe') === 'true' ? 'dashboard_redirect' : 'direct',
       signed_in: !!isSignedIn,
       referrer: document.referrer || 'none',
-    });
+    };
+    track('pricing_viewed', viewParams);
+    trackEvent('pricing_viewed', viewParams);
   }, [isSignedIn]);
 
   useEffect(() => {
@@ -305,12 +308,14 @@ export default function PricingPage() {
     setLoading(plan.name);
 
     const timeToClick = Math.round((Date.now() - pageLoadTime.current) / 1000);
-    track('pricing_checkout_started', {
+    const checkoutParams = {
       plan: plan.name.toLowerCase(),
       price: isAnnual ? plan.annual : plan.price,
       billing: isAnnual ? 'annual' : 'monthly',
       time_to_click_seconds: timeToClick,
-    });
+    };
+    track('pricing_checkout_started', checkoutParams);
+    trackEvent('plan_selected', checkoutParams);
     
     try {
       const response = await fetch('/api/checkout', {

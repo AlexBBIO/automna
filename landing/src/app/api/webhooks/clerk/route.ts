@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { eq, ne, and } from 'drizzle-orm';
 import { sendWelcomeEmail, upsertContact } from '@/lib/email';
+import { trackServerEvent } from '@/lib/analytics';
 
 export async function POST(req: Request) {
   // Get the Svix headers for verification
@@ -104,6 +105,9 @@ export async function POST(req: Request) {
         clerkId: id,
         userGroup: 'users',
       });
+
+      // Track sign_up in GA4
+      trackServerEvent(id, 'sign_up', { method: 'clerk' });
 
       // Send welcome email
       await sendWelcomeEmail(primaryEmail, first_name || undefined);
