@@ -7,7 +7,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users, machines, llmUsage, emailSends, PLAN_LIMITS, PlanType } from "@/lib/db/schema";
+import { users, machines, llmUsage, emailSends, usageEvents, PLAN_LIMITS, PlanType } from "@/lib/db/schema";
 import { eq, gte, and, sql, desc } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
@@ -99,6 +99,22 @@ export async function GET(
 
     const emailsMap = new Map(dailyEmails.map(d => [d.date, Number(d.count)]));
 
+    // Usage breakdown by feature (from usage_events)
+    const usageByType = await db
+      .select({
+        eventType: usageEvents.eventType,
+        count: sql<number>`COUNT(*)`,
+        totalCost: sql<number>`COALESCE(SUM(${usageEvents.costMicrodollars}), 0)`,
+        totalAutomnaTokens: sql<number>`COALESCE(SUM(${usageEvents.automnaTokens}), 0)`,
+      })
+      .from(usageEvents)
+      .where(and(
+        eq(usageEvents.userId, userId),
+        gte(usageEvents.timestamp, monthStartUnix)
+      ))
+      .groupBy(usageEvents.eventType)
+      .orderBy(desc(sql`SUM(${usageEvents.costMicrodollars})`));
+
     // Combine daily usage
     const recentUsage = dailyUsage.map(day => ({
       date: day.date,
@@ -141,6 +157,14 @@ export async function GET(
       },
       
       recentUsage,
+      
+      // Usage breakdown by feature
+      usageByType: usageByType.map(u => ({
+        eventType: u.eventType,
+        count: Number(u.count),
+        costMicro: Number(u.totalCost),
+        automnaTokens: Number(u.totalAutomnaTokens),
+      })),
     });
 
   } catch (error) {

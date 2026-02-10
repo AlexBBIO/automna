@@ -1,5 +1,5 @@
 import { db } from "./db.js";
-import { usageEvents } from "./schema.js";
+import { usageEvents, machines } from "./schema.js";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { MICRODOLLARS_PER_AUTOMNA_TOKEN } from "./cost-constants.js";
 
@@ -42,6 +42,23 @@ export function logUsageEventBackground(input: UsageEventInput): void {
   logUsageEvent(input).catch((error) => {
     console.error("[FLY-PROXY][Usage] Background logging failed:", error);
   });
+}
+
+// Debounced last-active update: only writes if >60s since last update for this machine
+const lastActiveCache = new Map<string, number>();
+const LAST_ACTIVE_DEBOUNCE_MS = 60_000;
+
+export function updateLastActiveBackground(machineId: string): void {
+  const now = Date.now();
+  const lastUpdate = lastActiveCache.get(machineId) || 0;
+  if (now - lastUpdate < LAST_ACTIVE_DEBOUNCE_MS) return;
+
+  lastActiveCache.set(machineId, now);
+  db.update(machines)
+    .set({ lastActiveAt: new Date() })
+    .where(eq(machines.id, machineId))
+    .execute()
+    .catch((err) => console.error("[FLY-PROXY][LastActive] Failed to update:", err));
 }
 
 export async function getUsedAutomnaTokens(userId: string): Promise<number> {

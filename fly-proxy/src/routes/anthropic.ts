@@ -3,7 +3,7 @@ import type { AuthenticatedUser } from "../middleware/auth.js";
 import { extractToken, lookupGatewayToken } from "../middleware/auth.js";
 import { checkRateLimits, rateLimitedResponse } from "../middleware/rate-limit.js";
 import { logUsageBackground } from "../lib/usage.js";
-import { logUsageEventBackground } from "../lib/usage-events.js";
+import { logUsageEventBackground, updateLastActiveBackground } from "../lib/usage-events.js";
 import { calculateCostMicrodollars } from "../lib/pricing.js";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -28,6 +28,9 @@ app.post("/messages", async (c) => {
   if (!auth) return c.json({ type: "error", error: { type: "authentication_error", message: "Invalid token" } }, 401);
 
   log("auth ok", { userId: auth.userId, plan: auth.plan });
+
+  // Update last active (debounced, non-blocking)
+  updateLastActiveBackground(auth.machineId);
 
   // Rate limits
   const rateLimitResult = await checkRateLimits(auth);

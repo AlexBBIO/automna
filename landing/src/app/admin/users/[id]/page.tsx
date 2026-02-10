@@ -17,6 +17,13 @@ import {
   Trash2
 } from "lucide-react";
 
+interface UsageByType {
+  eventType: string;
+  count: number;
+  costMicro: number;
+  automnaTokens: number;
+}
+
 interface UserDetail {
   // User info
   clerkId: string;
@@ -57,6 +64,9 @@ interface UserDetail {
     cost: number;
     emails: number;
   }>;
+  
+  // Usage by feature
+  usageByType: UsageByType[];
 }
 
 function maskToken(token: string | null): string {
@@ -402,6 +412,56 @@ export default function UserDetailPage() {
               label="Emails" 
             />
           </div>
+        </div>
+
+        {/* Usage by Feature */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+          <h2 className="text-lg font-semibold mb-4">Usage by Feature</h2>
+          {user.usageByType && user.usageByType.length > 0 ? (
+            <div className="space-y-3">
+              {user.usageByType.map((item) => {
+                const labels: Record<string, { name: string; icon: string }> = {
+                  llm: { name: "Messages (LLM)", icon: "💬" },
+                  search: { name: "Web Search", icon: "🔍" },
+                  browser: { name: "Browser", icon: "🌐" },
+                  call: { name: "Voice Calls", icon: "📞" },
+                  email: { name: "Email", icon: "📧" },
+                  embedding: { name: "Embeddings", icon: "🧮" },
+                };
+                const label = labels[item.eventType] || { name: item.eventType, icon: "⚡" };
+                const totalCostAll = user.usageByType.reduce((sum, u) => sum + u.costMicro, 0);
+                const percent = totalCostAll > 0 ? (item.costMicro / totalCostAll) * 100 : 0;
+                
+                return (
+                  <div key={item.eventType} className="flex items-center gap-3">
+                    <span className="text-lg w-7 text-center">{label.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-zinc-300">{label.name}</span>
+                        <span className="text-zinc-400 font-mono text-xs">
+                          {item.count.toLocaleString()} calls · ${(item.costMicro / 1_000_000).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500 rounded-full" 
+                          style={{ width: `${Math.max(percent, 1)}%` }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="pt-2 border-t border-zinc-800 flex justify-between text-sm">
+                <span className="text-zinc-500">Total</span>
+                <span className="text-zinc-300 font-mono text-xs">
+                  {user.usageByType.reduce((sum, u) => sum + u.count, 0).toLocaleString()} calls · ${(user.usageByType.reduce((sum, u) => sum + u.costMicro, 0) / 1_000_000).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-zinc-500 text-sm">No usage data yet</p>
+          )}
         </div>
 
         {/* Recent Usage */}
