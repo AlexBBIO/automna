@@ -708,7 +708,7 @@ export default function Home() {
                 <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700"></div>
                 <div className="flex items-center gap-2">
                   <span className="text-lg md:text-xl font-bold text-zinc-800 dark:text-white tabular-nums">{activeAgents.count}</span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">agents online</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">agents working</span>
                 </div>
               </div>
             </div>
