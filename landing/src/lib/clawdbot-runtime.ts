@@ -1168,6 +1168,13 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
     const ws = wsRef.current;
     const sk = canonicalizeSessionKey(cfg.sessionKey || 'main');
 
+    // Report activity (updates lastActiveAt in DB for admin dashboard)
+    fetch('/api/user/sessions/active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionKey: cfg.sessionKey || 'main' }),
+    }).catch(() => {});
+
     // Prefer WebSocket
     if (ws && ws.readyState === WebSocket.OPEN) {
       wsSend('chat.send', { sessionKey: sk, message: text, idempotencyKey: genId() });
