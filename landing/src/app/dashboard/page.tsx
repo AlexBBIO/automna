@@ -450,11 +450,25 @@ export default function DashboardPage() {
           };
           
           ws.onopen = () => {
-            console.log('[warmup] WebSocket connected! Gateway is ready.');
-            resolved = true;
-            clearTimeout(timeout);
-            ws.close();
-            resolve(true);
+            console.log('[warmup] WebSocket connected, waiting for gateway challenge...');
+            // Don't resolve yet - wait for the gateway to actually respond
+          };
+          
+          ws.onmessage = (event) => {
+            // Gateway sends connect.challenge when it's ready
+            // This proves the actual gateway process is running, not just Caddy
+            try {
+              const msg = JSON.parse(event.data);
+              if (msg.method === 'connect.challenge' || msg.type === 'res') {
+                console.log('[warmup] Gateway challenge received! Ready.');
+                resolved = true;
+                clearTimeout(timeout);
+                ws.close();
+                resolve(true);
+              }
+            } catch {
+              // Not JSON, ignore
+            }
           };
           
           ws.onerror = () => {
