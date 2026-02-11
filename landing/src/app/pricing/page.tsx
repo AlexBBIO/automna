@@ -159,15 +159,26 @@ function SubscriptionBanner() {
   );
 }
 
-function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout }: {
+function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout, currentPlan }: {
   plan: typeof plans[0];
   isAnnual: boolean;
   isSignedIn: boolean;
   loading: string | null;
   onCheckout: (plan: typeof plans[0]) => void;
+  currentPlan?: string | null;
 }) {
   const price = isAnnual ? plan.annual : plan.price;
-  const cta = isAnnual ? plan.ctaAnnual : plan.cta;
+  const planKey = plan.name.toLowerCase();
+  const isCurrentPlan = currentPlan === planKey;
+  const planOrder = ['lite', 'starter', 'pro', 'business'];
+  const isDowngrade = currentPlan && planOrder.indexOf(planKey) < planOrder.indexOf(currentPlan);
+  const cta = isCurrentPlan
+    ? 'Current Plan'
+    : isDowngrade
+    ? `Switch to ${plan.name}`
+    : currentPlan && currentPlan !== 'free'
+    ? `Upgrade to ${plan.name}`
+    : isAnnual ? plan.ctaAnnual : plan.cta;
   
   return (
     <div
@@ -221,14 +232,16 @@ function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout }: {
       {isSignedIn ? (
         <button
           onClick={() => onCheckout(plan)}
-          disabled={loading === plan.name || !plan.priceId}
+          disabled={loading === plan.name || !plan.priceId || isCurrentPlan}
           className={`w-full py-3 rounded-xl font-semibold transition-all text-sm md:text-base ${
-            plan.popular
+            isCurrentPlan
+              ? 'bg-green-600/20 text-green-600 dark:text-green-400 border border-green-500/30 cursor-default'
+              : plan.popular
               ? 'bg-purple-600 hover:bg-purple-500 text-white'
               : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white'
           } disabled:opacity-50`}
         >
-          {loading === plan.name ? 'Loading...' : cta}
+          {loading === plan.name ? 'Processing...' : cta}
         </button>
       ) : (
         <SignInButton mode="modal">
@@ -248,13 +261,15 @@ function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout }: {
 }
 
 export default function PricingPage() {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const [loading, setLoading] = useState<string | null>(null);
   const [isAnnual, setIsAnnual] = useState(false);
   const pageLoadTime = useRef(Date.now());
   const hasTrackedView = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   useTheme();
+
+  // user.publicMetadata used directly in handleCheckout and PricingCard
 
   // Auto-scroll to "Most Popular" card on mobile
   useEffect(() => {
@@ -316,29 +331,93 @@ export default function PricingPage() {
     };
     track('pricing_checkout_started', checkoutParams);
     trackEvent('plan_selected', checkoutParams);
-    
-    try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          priceId: isAnnual ? plan.annualPriceId : plan.priceId,
-          plan: plan.name.toLowerCase(),
-          billing: isAnnual ? 'annual' : 'monthly',
-        }),
-      });
 
-      const data = await response.json();
-      
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        console.error('No checkout URL returned');
-        track('pricing_checkout_error', { plan: plan.name.toLowerCase(), error: 'no_url' });
+    const priceId = isAnnual ? plan.annualPriceId : plan.priceId;
+    const planName = plan.name.toLowerCase();
+
+    // Check if user already has a subscription (upgrade flow)
+    const currentPlan = user?.publicMetadata?.plan as string | undefined;
+    const hasSubscription = user?.publicMetadata?.stripeSubscriptionId as string | undefined;
+
+    if (hasSubscription && currentPlan && currentPlan !== 'free') {
+      // Existing subscriber - use upgrade API with proration
+      try {
+        // First preview the proration
+        const previewRes = await fetch('/api/upgrade?preview=true', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceId, plan: planName }),
+        });
+        const preview = await previewRes.json();
+
+        if (preview.error) {
+          if (preview.error.includes('Already on this plan')) {
+            alert('You\'re already on this plan and billing period!');
+            setLoading(null);
+            return;
+          }
+          throw new Error(preview.error);
+        }
+
+        // Build confirmation message based on change type
+        let confirmMsg: string;
+        if (preview.isDowngrade) {
+          confirmMsg = `Switch to ${plan.name}? Your current plan stays active until your next billing date (${new Date(preview.nextBillingDate).toLocaleDateString()}), then you'll pay $${preview.newMonthlyPrice?.toFixed(2)}/mo going forward.`;
+        } else if (preview.isBillingChange) {
+          confirmMsg = `Switch billing period? You'll be charged a prorated amount of $${preview.totalDueNow.toFixed(2)} now.`;
+        } else {
+          confirmMsg = `Upgrade to ${plan.name}? You'll be charged a prorated amount of $${preview.totalDueNow.toFixed(2)} now for the rest of this billing period.`;
+        }
+
+        if (!confirm(confirmMsg)) {
+          setLoading(null);
+          return;
+        }
+
+        // Perform the upgrade
+        const upgradeRes = await fetch('/api/upgrade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceId, plan: planName }),
+        });
+        const result = await upgradeRes.json();
+
+        if (result.success) {
+          track('pricing_upgrade_completed', { from: currentPlan, to: planName, prorated: preview.totalDueNow });
+          window.location.href = '/dashboard?success=true&upgraded=true';
+        } else {
+          throw new Error(result.error || 'Upgrade failed');
+        }
+      } catch (error) {
+        console.error('Upgrade error:', error);
+        track('pricing_upgrade_error', { plan: planName, error: String(error) });
+        alert('Something went wrong with the upgrade. Please try again or contact support.');
       }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      track('pricing_checkout_error', { plan: plan.name.toLowerCase(), error: 'fetch_failed' });
+    } else {
+      // New subscriber - use checkout flow
+      try {
+        const response = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            priceId,
+            plan: planName,
+            billing: isAnnual ? 'annual' : 'monthly',
+          }),
+        });
+
+        const data = await response.json();
+        
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          console.error('No checkout URL returned');
+          track('pricing_checkout_error', { plan: planName, error: 'no_url' });
+        }
+      } catch (error) {
+        console.error('Checkout error:', error);
+        track('pricing_checkout_error', { plan: planName, error: 'fetch_failed' });
+      }
     }
     
     setLoading(null);
@@ -447,6 +526,7 @@ export default function PricingPage() {
                 isSignedIn={!!isSignedIn}
                 loading={loading}
                 onCheckout={handleCheckout}
+                currentPlan={user?.publicMetadata?.plan as string | undefined}
               />
             ))}
           </div>
@@ -461,6 +541,7 @@ export default function PricingPage() {
                 isSignedIn={!!isSignedIn}
                 loading={loading}
                 onCheckout={handleCheckout}
+                currentPlan={user?.publicMetadata?.plan as string | undefined}
               />
             ))}
           </div>

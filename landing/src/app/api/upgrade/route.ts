@@ -1,0 +1,191 @@
+import { NextResponse } from 'next/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
+import Stripe from 'stripe';
+
+const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+// Map price IDs to plan names (reverse lookup)
+const PRICE_TO_PLAN: Record<string, string> = {
+  [process.env.STRIPE_PRICE_LITE!]: 'lite',
+  [process.env.STRIPE_PRICE_STARTER!]: 'starter',
+  [process.env.STRIPE_PRICE_PRO!]: 'pro',
+  [process.env.STRIPE_PRICE_BUSINESS!]: 'business',
+  [process.env.STRIPE_PRICE_LITE_ANNUAL!]: 'lite',
+  [process.env.STRIPE_PRICE_STARTER_ANNUAL!]: 'starter',
+  [process.env.STRIPE_PRICE_PRO_ANNUAL!]: 'pro',
+  [process.env.STRIPE_PRICE_BUSINESS_ANNUAL!]: 'business',
+};
+
+export async function POST(request: Request) {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await currentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const { priceId, plan } = await request.json();
+
+    if (!priceId) {
+      return NextResponse.json({ error: 'Price ID required' }, { status: 400 });
+    }
+
+    const subscriptionId = user.publicMetadata?.stripeSubscriptionId as string | undefined;
+    if (!subscriptionId) {
+      return NextResponse.json(
+        { error: 'No active subscription. Use /api/checkout instead.' },
+        { status: 400 }
+      );
+    }
+
+    const stripe = getStripe();
+
+    // Get current subscription to find the existing item
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+    if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+      return NextResponse.json(
+        { error: 'Subscription is not active. Please resubscribe.' },
+        { status: 400 }
+      );
+    }
+
+    const existingItem = subscription.items.data[0];
+    if (!existingItem) {
+      return NextResponse.json(
+        { error: 'No subscription item found' },
+        { status: 400 }
+      );
+    }
+
+    // Don't allow switching to the exact same price
+    if (existingItem.price.id === priceId) {
+      return NextResponse.json(
+        { error: 'Already on this plan and billing period' },
+        { status: 400 }
+      );
+    }
+
+    // Determine if this is an upgrade, downgrade, or billing period change
+    const planOrder = ['lite', 'starter', 'pro', 'business'];
+    const currentPlan = subscription.metadata?.plan || 'starter';
+    const newPlan = plan || PRICE_TO_PLAN[priceId] || 'starter';
+    const currentRank = planOrder.indexOf(currentPlan);
+    const newRank = planOrder.indexOf(newPlan);
+    const isDowngrade = newRank < currentRank;
+    const isSamePlan = newRank === currentRank; // billing period change only
+
+    // Preview the proration to show the user what they'll be charged
+    const previewMode = new URL(request.url).searchParams.get('preview') === 'true';
+
+    if (previewMode) {
+      const sub = subscription as any;
+      const nextBillingDate = new Date(sub.current_period_end * 1000).toISOString();
+
+      if (isDowngrade) {
+        // Downgrades: no proration, takes effect next billing cycle
+        // Look up the new price to show what they'll pay next
+        const newPrice = await stripe.prices.retrieve(priceId);
+        const newAmount = (newPrice.unit_amount || 0) / 100;
+
+        return NextResponse.json({
+          preview: true,
+          isDowngrade: true,
+          prorationAmount: 0,
+          totalDueNow: 0,
+          newMonthlyPrice: newAmount,
+          nextBillingDate,
+          currency: newPrice.currency,
+        });
+      }
+
+      // Upgrades and billing changes: show prorated amount
+      const invoice = await stripe.invoices.createPreview({
+        customer: subscription.customer as string,
+        subscription: subscriptionId,
+        subscription_details: {
+          items: [
+            {
+              id: existingItem.id,
+              price: priceId,
+            },
+          ],
+          proration_behavior: 'create_prorations',
+        },
+      });
+
+      // Find the proration line items
+      const prorationLines = invoice.lines.data.filter(
+        (line) => (line as any).parent?.subscription_item_details?.proration === true
+      );
+      const prorationAmount = prorationLines.reduce(
+        (sum, line) => sum + line.amount,
+        0
+      );
+
+      return NextResponse.json({
+        preview: true,
+        isDowngrade: false,
+        isBillingChange: isSamePlan,
+        prorationAmount: prorationAmount / 100,
+        totalDueNow: Math.max(0, prorationAmount) / 100,
+        nextBillingDate,
+        currency: invoice.currency,
+      });
+    }
+
+    // Upgrades: immediate with proration
+    // Downgrades: take effect at end of billing period (no proration)
+    // Billing period changes (same plan): immediate with proration
+    const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
+      items: [
+        {
+          id: existingItem.id,
+          price: priceId,
+        },
+      ],
+      proration_behavior: isDowngrade ? 'none' : 'create_prorations',
+      ...(isDowngrade && {
+        // Schedule the downgrade for end of current period
+        cancel_at_period_end: false, // Don't cancel, just change
+        billing_cycle_anchor: 'unchanged' as any,
+      }),
+      metadata: {
+        ...subscription.metadata,
+        plan: newPlan,
+        upgradedAt: new Date().toISOString(),
+        previousPriceId: existingItem.price.id,
+        changeType: isDowngrade ? 'downgrade' : isSamePlan ? 'billing_change' : 'upgrade',
+      },
+    });
+
+    // Update Clerk metadata immediately (don't wait for webhook)
+    const { clerkClient: getClerk } = await import('@clerk/nextjs/server');
+    const client = await getClerk();
+    await client.users.updateUserMetadata(userId, {
+      publicMetadata: {
+        stripeCustomerId: subscription.customer as string,
+        stripeSubscriptionId: subscriptionId,
+        plan: newPlan,
+        subscriptionStatus: updatedSubscription.status,
+      },
+    });
+
+    console.log(`[upgrade] User ${userId} upgraded to ${newPlan} (price: ${priceId})`);
+
+    return NextResponse.json({
+      success: true,
+      plan: newPlan,
+      subscriptionId: updatedSubscription.id,
+      status: updatedSubscription.status,
+    });
+  } catch (error) {
+    console.error('Upgrade error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to upgrade';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

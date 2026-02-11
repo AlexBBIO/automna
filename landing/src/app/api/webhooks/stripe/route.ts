@@ -318,7 +318,6 @@ export async function POST(request: Request) {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
-
         // Find user by Stripe customer ID
         const customer = await stripe.customers.retrieve(customerId);
         if (customer.deleted) break;
@@ -326,10 +325,52 @@ export async function POST(request: Request) {
         const clerkUserId = (customer as Stripe.Customer).metadata?.clerkUserId;
         if (clerkUserId) {
           const client = await clerkClient();
+
+          // Detect plan change via subscription metadata (set by /api/upgrade)
+          // or by checking if price changed via previous_attributes
+          const currentPriceId = subscription.items.data[0]?.price?.id;
+          const previousAttributes = (event.data as any).previous_attributes || {};
+          const previousPriceId = previousAttributes?.items?.data?.[0]?.price?.id;
+          const metadataChanged = previousAttributes?.metadata?.plan !== undefined;
+          const planChanged = (previousPriceId && currentPriceId !== previousPriceId) || metadataChanged;
+
+          // Determine new plan from subscription metadata or price lookup
+          const newPlan = subscription.metadata?.plan || 'starter';
+
+          const metadataUpdate: Record<string, any> = {
+            subscriptionStatus: subscription.status,
+          };
+
+          if (planChanged) {
+            metadataUpdate.plan = newPlan;
+            console.log(`[stripe] Plan changed for ${clerkUserId}: price ${previousPriceId} → ${currentPriceId} (plan: ${newPlan})`);
+
+            // Update machines table for rate limiting
+            await updateMachinePlan(clerkUserId, newPlan);
+
+            // Scale machine to match new plan tier
+            await scaleMachineForPlan(clerkUserId, newPlan);
+
+            // Handle phone provisioning/release
+            await provisionPhoneForPlan(clerkUserId, newPlan);
+            await releasePhoneForPlan(clerkUserId, newPlan);
+
+            // Track upgrade event
+            trackServerEvent(clerkUserId, 'subscription_upgraded', {
+              plan: newPlan,
+              previous_price: previousPriceId,
+              new_price: currentPriceId,
+            });
+
+            // Update email audience
+            const customerEmail = (customer as Stripe.Customer).email;
+            if (customerEmail) {
+              await updateContactPlan(customerEmail, newPlan);
+            }
+          }
+
           await client.users.updateUserMetadata(clerkUserId, {
-            publicMetadata: {
-              subscriptionStatus: subscription.status,
-            },
+            publicMetadata: metadataUpdate,
           });
         }
         break;
