@@ -1,59 +1,76 @@
 # Automna Documentation
 
-## Active Docs
+> Last reorganized: 2026-02-11
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [FLY-MIGRATION-PLAN.md](FLY-MIGRATION-PLAN.md) | **Primary architecture doc** - Fly.io infrastructure, per-user provisioning, OpenClaw config | ✅ Current |
-| [FLY-PROXY-SPEC.md](FLY-PROXY-SPEC.md) | Fly.io API proxy specification | ✅ Current |
-| [AUTOMNA-TOKENS.md](AUTOMNA-TOKENS.md) | Automna Token system — unified billing currency | ✅ Current |
-| [AUTOMNA-TOKENS-IMPL.md](AUTOMNA-TOKENS-IMPL.md) | Automna Tokens implementation details | ✅ Current |
-| [VOICE-CALLING.md](VOICE-CALLING.md) | Voice calling feature (Twilio + Bland.ai) | ✅ Implemented |
-| [EMAIL-SYSTEM.md](EMAIL-SYSTEM.md) | Email system (Agentmail) | ✅ Implemented |
-| [API-PROXIES.md](API-PROXIES.md) | API proxy architecture | ✅ Current |
-| [BYOK-SPEC.md](BYOK-SPEC.md) | Bring Your Own Key specification | 📝 Draft |
-| [AGENT-CONFIG-SYSTEM.md](AGENT-CONFIG-SYSTEM.md) | Agent configuration and workspace setup | ✅ Current |
-| [PER-USER-SETUP.md](PER-USER-SETUP.md) | Per-user provisioning guide | ✅ Current |
-| [OPENCLAW-WEBSOCKET-PROTOCOL.md](OPENCLAW-WEBSOCKET-PROTOCOL.md) | OpenClaw WebSocket protocol reference | ✅ Reference |
-| [STREAMING-SPEC.md](STREAMING-SPEC.md) | Streaming and media rendering | ✅ Current |
-| [FILE-SYSTEM-SPEC.md](FILE-SYSTEM-SPEC.md) | File browser feature specification | ✅ Implemented |
-| [FILE-BROWSER-SPEC.md](FILE-BROWSER-SPEC.md) | File browser UI specification | ✅ Implemented |
-| [SIDEBAR-SPEC.md](SIDEBAR-SPEC.md) | Chat sidebar UI specification | ✅ Implemented |
-| [SECURITY-HARDENING.md](SECURITY-HARDENING.md) | Security hardening documentation | ✅ Current |
-| [REVERSE-PROXY-ARCHITECTURE.md](REVERSE-PROXY-ARCHITECTURE.md) | Caddy reverse proxy architecture | ✅ Current |
-| [HEARTBEAT-IMPLEMENTATION.md](HEARTBEAT-IMPLEMENTATION.md) | Heartbeat system implementation | ✅ Current |
-| [PHONE-CALL-SESSION-PERSISTENCE.md](PHONE-CALL-SESSION-PERSISTENCE.md) | Phone call session routing | ✅ Current |
-| [COST-ANALYSIS.md](COST-ANALYSIS.md) | Cost analysis per user | ✅ Reference |
-| [BROWSERBASE-SPEC.md](BROWSERBASE-SPEC.md) | Browserbase integration spec | ✅ Reference |
-| [WORKFLOW-TEMPLATE.md](WORKFLOW-TEMPLATE.md) | Template for workflow documentation | 📋 Template |
+## How to Use These Docs
 
-## Quick Links
+**Starting a task?** Read in this order:
+1. `STATUS.md` — What's live, what's broken, what's in progress
+2. The relevant section folder for your area of work
+3. `WISHLIST.md` — Feature backlog and priorities
 
-- **Main Spec:** `/SPEC.md` (root of project)
-- **Proxy Source:** `/fly-proxy/` (Fly.io API proxy)
-
-## Architecture Overview
-
-```
-User → automna.ai (Vercel)
-         ↓
-    Clerk Auth → Dashboard
-         ↓
-    /api/user/provision → Creates Fly.io app per user
-         ↓
-    automna-u-{shortId}.fly.dev (OpenClaw Gateway)
-         ↓
-    1GB encrypted volume (/home/node/.openclaw)
-         ↓
-    automna-proxy.fly.dev (API Proxy)
-         ↓
-    Claude API (Anthropic) + Brave + Browserbase + Agentmail
-```
-
-## Archive
-
-Historical docs from earlier iterations (Cloudflare/Moltworker era) are in `./archive/`. These are kept for reference but are **not current**.
+**New to the project?** Read:
+1. `STATUS.md` — Current state
+2. `architecture/OVERVIEW.md` — How everything fits together
+3. `architecture/PROVISIONING.md` — How users get set up
 
 ---
 
-*Last updated: 2026-02-09*
+## Directory Structure
+
+```
+docs/
+├── README.md                  ← You are here
+├── STATUS.md                  ← Current state of everything (what works, what doesn't)
+├── WISHLIST.md                ← Feature backlog, prioritized
+│
+├── architecture/              ← How the system works
+│   ├── OVERVIEW.md            ← Architecture diagram + component map
+│   ├── PROVISIONING.md        ← User signup → running agent flow
+│   ├── REVERSE-PROXY.md       ← Caddy routing (ports, paths)
+│   ├── WEBSOCKET-PROTOCOL.md  ← OpenClaw WS protocol reference
+│   ├── STREAMING.md           ← Chat streaming + media rendering
+│   └── DOCKER.md              ← Docker image, entrypoint, workspace migrations
+│
+├── features/                  ← Feature specs (how each feature works)
+│   ├── CHAT.md                ← Chat UI, message rendering, conversations
+│   ├── FILE-BROWSER.md        ← File tree, upload/download, viewer
+│   ├── INTEGRATIONS.md        ← Integration panel + setup flows
+│   ├── VOICE-CALLING.md       ← Twilio + Bland.ai phone system
+│   ├── EMAIL.md               ← Agentmail system
+│   ├── BROWSERBASE.md         ← Browser automation (persistent contexts)
+│   ├── HEARTBEAT.md           ← Agent periodic checks
+│   ├── CREDITS.md             ← Credit/billing system
+│   ├── ADMIN-PANEL.md         ← Admin dashboard
+│   ├── SECRETS.md             ← User secrets management
+│   └── SETTINGS.md            ← Settings panel, agent info
+│
+├── infrastructure/            ← Ops, deployment, security
+│   ├── FLY-MACHINES.md        ← Per-user Fly apps, machine config
+│   ├── API-PROXY.md           ← Centralized proxy (LLM, Brave, Browserbase, email)
+│   ├── SECURITY.md            ← Security model, hardening, known risks
+│   ├── AGENT-CONFIG.md        ← OpenClaw config generation, workspace setup
+│   ├── COST-ANALYSIS.md       ← Per-user costs, per-action costs
+│   └── DEPLOYMENT.md          ← How to deploy (Vercel, Docker, Fly)
+│
+├── business/                  ← Strategy, pricing, GTM
+│   ├── PRICING.md             ← Tiers, limits, strategy
+│   ├── MARKET-ANALYSIS.md     ← Competitors, positioning
+│   └── GTM.md                 ← Go-to-market plan
+│
+├── postmortems/               ← What went wrong and what we learned
+│   └── AGENT-ACTIVITY-TOGGLE.md
+│
+└── archive/                   ← Historical docs (Cloudflare/Moltworker era)
+    └── (unchanged)
+```
+
+## Quick Reference
+
+| What | Where |
+|------|-------|
+| Main source code | `/landing/src/` |
+| Docker image source | `/docker/` |
+| API proxy source | `/fly-proxy/` |
+| Turso DB schema | `/landing/src/lib/db/schema.ts` |
+| OpenClaw config template | `/docker/entrypoint.sh` (generated at boot) |
