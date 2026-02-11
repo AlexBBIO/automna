@@ -522,6 +522,11 @@ export default function DashboardPage() {
         // give the webhook a moment to process before showing pricing
         const urlParams = new URLSearchParams(window.location.search);
         const justSubscribed = urlParams.get('success') === 'true';
+
+        // Fire Twitter/X conversion pixel on successful subscription
+        if (justSubscribed && typeof window !== 'undefined' && (window as any).twq) {
+          (window as any).twq('event', 'tw-r4twt-r4v7x', {});
+        }
         
         if (!hasActiveSub && !justSubscribed) {
           // No subscription and didn't just come from checkout
