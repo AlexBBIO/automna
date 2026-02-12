@@ -81,23 +81,29 @@ This removes all variable LLM cost risk, stabilizes margins at 45-74%, and makes
 
 ## 2. Authentication
 
-Users must connect their own Anthropic account. Two paths:
+Users connect their own Anthropic credentials. Two paths, with Claude Code strongly recommended:
 
-### Option A: Claude Code OAuth (Preferred)
-- One-click "Sign in with Claude"
-- No API key management for the user
-- Tokens billed to their Claude subscription (Pro/Max)
-- Smoothest UX for non-technical users
+### Path A: Claude Code Setup Token (Recommended — Best Value)
+- User runs `claude setup-token` in their terminal
+- Claude CLI handles browser-based Anthropic login
+- Generates an OAuth token (`sk-ant-oat01-...`) tied to their Claude subscription
+- Token pushed to their Fly machine, OpenClaw talks directly to Anthropic
+- **No extra AI costs** — uses their existing Claude Pro ($20/mo) or Max ($100-200/mo) subscription
+- Requires Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
 
-### Option B: Anthropic API Key
-- User pastes `sk-ant-api03-...` key
-- Key encrypted (AES-256-GCM) and stored server-side
-- Validated on entry and periodically
-- For developers who prefer direct control
+### Path B: Anthropic API Key (Alternative — More Expensive)
+- User gets API key from console.anthropic.com
+- Key pushed to their Fly machine as auth credential
+- **⚠️ Pay-per-use pricing** — costs vary widely, heavy Opus usage can run $100-500+/mo
+- Best for developers who want direct API control or don't have a Claude subscription
 
-**Recommendation:** Default to OAuth, offer API key as "Advanced" option.
+### Architecture
+LLM calls go **direct from the user's machine to Anthropic** — no proxy in the middle. Non-LLM services (search, browser, email, phone) still route through our proxies since those are our API keys and costs.
 
-**Open question:** Claude Code OAuth technical feasibility needs research. If not available for third-party apps, API key becomes the primary path.
+```
+LLM:       User's OpenClaw → Anthropic (direct, user's credentials)
+Services:  User's OpenClaw → Automna proxies (our keys, our costs)
+```
 
 ---
 
@@ -198,22 +204,16 @@ These are generous for normal use but prevent runaway costs. Equivalent to ~$3-5
 ```
 1. Sign up (Clerk auth)
 2. Pick tier → Stripe checkout
-3. "Connect your AI" screen:
-   ┌──────────────────────────────────────────┐
-   │  Connect your Anthropic account          │
-   │                                          │
-   │  [Sign in with Claude]  ← preferred      │
-   │                                          │
-   │  Or paste your API key:                  │
-   │  ┌────────────────────────────────────┐  │
-   │  │ sk-ant-api03-...                   │  │
-   │  └────────────────────────────────────┘  │
-   │  [Validate & Continue]                   │
-   └──────────────────────────────────────────┘
-4. Provision Fly machine
-5. Connect first channel (Discord/Telegram/WhatsApp/web)
-6. Agent is live
+3. "Connect your AI" — choose path:
+   a. Claude Code (recommended): run `claude setup-token`, paste token
+   b. API key: get from console.anthropic.com, paste key
+4. Validate credential
+5. Provision Fly machine + push credential to machine
+6. Connect first channel (Discord/Telegram/WhatsApp/web)
+7. Agent is live
 ```
+
+See `BYOK-IMPLEMENTATION.md` for detailed screen mockups of the onboarding flow.
 
 ---
 
@@ -288,12 +288,13 @@ See existing docs for implementation specifics:
 
 ## 10. Open Questions
 
-1. **Claude Code OAuth** — Is this technically available for third-party apps? Needs research.
+1. **Setup token refresh** — Does OpenClaw auto-refresh `sk-ant-oat01-` tokens? What happens on expiry?
 2. **Browser session limits** — What's reasonable per tier? Browserbase pricing model?
 3. **Enterprise tier** — Should we have a "Contact us" above $40 for teams >2?
 4. **Annual pricing** — Offer discount? (e.g., $16/$25/$33 per month billed annually)
 5. **Free trial** — Any free tier or trial period? Risk: Fly machine cost on free users.
 6. **Multi-provider BYOK** — Anthropic only at launch, but OpenAI/Google later?
+7. **Future paid compute add-on** — If user's subscription runs out, offer metered compute through us?
 
 ---
 
