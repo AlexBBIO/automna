@@ -1,198 +1,247 @@
-# Test Environment Specification
+# Test Environment
 
-> Status: Draft — 2026-02-11
+> Last updated: 2026-02-12
 
-## Overview
+## Quick Reference
 
-A staging environment that mirrors production, allowing us to test changes end-to-end before they hit real users. Every deployable component gets a test counterpart.
+| Component | Name / URL | Status |
+|---|---|---|
+| **Test machine** | `automna-u-test` / `automna-u-test.fly.dev` | ✅ Running (sjc, 2GB) |
+| **Test proxy** | `automna-proxy-test` / `automna-proxy-test.fly.dev` | ⚠️ Stopped (needs start) |
+| **Test DB** | `automna-test` / `libsql://automna-test-alexbbio.aws-us-west-2.turso.io` | ✅ Exists |
+| **Test Docker image** | `registry.fly.io/automna-openclaw-image:test` | ✅ Exists |
+| **Vercel staging** | No `staging` branch yet | ❌ Not set up |
+| **Clerk dev** | Unknown | ❌ Not verified |
 
-## Why
+### Configs
+- **Test DB credentials:** `config/turso-test.json`
+- **Fly API token:** `config/fly.json`
+- **Test gateway token:** `172b058a-5fe8-41f0-9...` (same token used for all proxied services)
 
-Right now, all deploys go straight to production. This means:
-- Docker image changes hit real user machines
-- Vercel deploys hit the live dashboard
-- Proxy deploys could break LLM routing for everyone
-- No safe way to test multi-component changes together
+---
 
 ## Architecture
 
 ```
 PRODUCTION                              TEST
-──────────────────                      ──────────────────
-automna.ai (Vercel)                     test.automna.ai (Vercel preview)
+──────────                              ────
+automna.ai (Vercel)                     (no staging frontend yet)
   │                                       │
-  ├── Turso DB (automna)                  ├── Turso DB (automna-test)
+  ├── Turso: automna                      ├── Turso: automna-test
   │                                       │
-  ├── automna-proxy.fly.dev               ├── automna-proxy-test.fly.dev
-  │   (2 machines, sjc)                   │   (1 machine, sjc)
+  ├── automna-proxy.fly.dev (2 machines)  ├── automna-proxy-test.fly.dev (1 machine, STOPPED)
   │                                       │
-  └── automna-u-{id}.fly.dev             └── automna-test-u-{id}.fly.dev
-      (per-user machines)                     (1 test machine)
+  └── automna-u-{id}.fly.dev             └── automna-u-test.fly.dev
+      (13+ user machines)                     (1 test machine)
 ```
 
-## Components
+---
 
-### 1. Vercel (Dashboard + API)
+## Test Machine Details
 
-**Approach:** Vercel preview deployments with a stable test URL.
+**App:** `automna-u-test`
+**Machine ID:** `68340eef773498`
+**Region:** sjc
+**Specs:** shared-cpu-1x, 2GB RAM, 1GB volume
+**Image:** `registry.fly.io/automna-openclaw-image:test`
+**Gateway URL:** `https://automna-u-test.fly.dev`
+**Gateway token:** `172b058a-5fe8-41f0-9...` (see full value in Fly machine env)
 
-| | Production | Test |
-|---|---|---|
-| URL | `automna.ai` | `test.automna.ai` (or Vercel preview branch URL) |
-| Branch | `main` | `staging` |
-| Clerk | Production instance | Development instance (free) |
-| Turso | `automna` DB | `automna-test` DB |
-| Proxy URL env | `automna-proxy.fly.dev` | `automna-proxy-test.fly.dev` |
+**Environment variables:**
+```
+AGENTMAIL_INBOX_ID=testbot@mail.automna.ai
+ANTHROPIC_API_KEY=<gateway-token>           # Routes through test proxy
+AUTOMNA_PROXY_URL=https://automna-proxy-test.fly.dev
+BRAVE_API_KEY=<gateway-token>
+BRAVE_API_URL=https://automna-proxy-test.fly.dev/api/brave
+BROWSERBASE_API_KEY=<gateway-token>
+BROWSERBASE_API_URL=https://automna-proxy-test.fly.dev/api/browserbase
+BROWSERBASE_PROJECT_ID=d28a2a1f-b953-4fa6-96c8-37e52a0c0520
+GEMINI_API_KEY=<gateway-token>
+GOOGLE_API_BASE_URL=https://automna-proxy-test.fly.dev/api/gemini
+GOOGLE_API_KEY=<gateway-token>
+OPENCLAW_GATEWAY_TOKEN=<gateway-token>
+```
 
-**Setup steps:**
-1. Create `staging` branch in the automna repo
-2. Add Vercel preview environment variables pointing to test infra
-3. Optionally configure `test.automna.ai` domain on the preview branch
-4. Create a separate Clerk "Development" instance (free tier, no extra cost)
+All API keys are the same gateway token — the test proxy authenticates via this token and routes to real API providers.
 
-**Deploy:** Push to `staging` branch → Vercel auto-deploys preview
+---
 
-### 2. Turso Database
+## Common Operations
 
-**Approach:** Separate database for test. Same schema, isolated data.
+### Prerequisites
 
-| | Production | Test |
-|---|---|---|
-| DB name | `automna` | `automna-test` |
-| URL | `libsql://automna-alexbbio...` | `libsql://automna-test-alexbbio...` |
-
-**Setup steps:**
-1. `turso db create automna-test --group default`
-2. Apply schema from `landing/src/lib/db/schema.ts`
-3. Create auth token: `turso db tokens create automna-test`
-4. Seed with 1-2 test users
-
-**Cost:** Free (Turso free tier allows multiple DBs)
-
-### 3. API Proxy
-
-**Approach:** Separate Fly app for the test proxy.
-
-| | Production | Test |
-|---|---|---|
-| App | `automna-proxy` | `automna-proxy-test` |
-| URL | `automna-proxy.fly.dev` | `automna-proxy-test.fly.dev` |
-| Machines | 2 (HA) | 1 (cost saving) |
-| Region | sjc | sjc |
-
-**Setup steps:**
-1. `cd fly-proxy && fly apps create automna-proxy-test`
-2. Copy secrets from prod: Anthropic key, Brave key, Agentmail key, etc.
-3. Set `AUTOMNA_PROXY_URL` to `https://automna-proxy-test.fly.dev`
-4. Set `TURSO_URL` + `TURSO_TOKEN` to test DB
-5. `fly deploy --remote-only -a automna-proxy-test`
-
-**Cost:** ~$3-5/month (1 shared-cpu machine)
-
-### 4. Docker Image
-
-**Approach:** Separate image tag for test.
-
-| | Production | Test |
-|---|---|---|
-| Tag | `registry.fly.io/automna-openclaw-image:latest` | `registry.fly.io/automna-openclaw-image:test` |
-
-**Workflow:**
+All Fly commands need the API token. Either:
 ```bash
-# Build and push test image
-cd docker
+export FLY_API_TOKEN=$(jq -r .token /root/clawd/projects/automna/config/fly.json)
+```
+Or use curl directly against `https://api.machines.dev/v1/`.
+
+Note: `fly` CLI is not logged in on this server. Use the API token from `config/fly.json` with `--access-token` flag or `FLY_API_TOKEN` env var.
+
+### Start/Stop Test Proxy
+
+```bash
+FLY_TOKEN=$(jq -r .token config/fly.json)
+
+# Start
+curl -s -X POST "https://api.machines.dev/v1/apps/automna-proxy-test/machines/d8929e9c626128/start" \
+  -H "Authorization: Bearer $FLY_TOKEN"
+
+# Stop
+curl -s -X POST "https://api.machines.dev/v1/apps/automna-proxy-test/machines/d8929e9c626128/stop" \
+  -H "Authorization: Bearer $FLY_TOKEN"
+```
+
+### Build & Push Test Docker Image
+
+```bash
+cd /root/clawd/projects/automna/docker
+
+# Build
 docker build -t registry.fly.io/automna-openclaw-image:test .
+
+# Push
 docker push registry.fly.io/automna-openclaw-image:test
 
-# Only after testing:
+# Update test machine to use new image
+FLY_TOKEN=$(jq -r .token ../config/fly.json)
+
+# IMPORTANT: GET full config first, then update (Fly does full replacement!)
+FULL_CONFIG=$(curl -s "https://api.machines.dev/v1/apps/automna-u-test/machines/68340eef773498" \
+  -H "Authorization: Bearer $FLY_TOKEN" | python3 -c "
+import sys,json
+m=json.load(sys.stdin)
+c=m['config']
+c['image']='registry.fly.io/automna-openclaw-image:test'
+print(json.dumps({'config':c}))
+")
+
+curl -s -X POST "https://api.machines.dev/v1/apps/automna-u-test/machines/68340eef773498" \
+  -H "Authorization: Bearer $FLY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$FULL_CONFIG"
+```
+
+### Promote Test Image to Production
+
+Only after testing passes:
+```bash
 docker tag registry.fly.io/automna-openclaw-image:test registry.fly.io/automna-openclaw-image:latest
 docker push registry.fly.io/automna-openclaw-image:latest
 ```
 
-**Cost:** Free (Fly registry)
+### SSH into Test Machine
 
-### 5. Test User Machine
+```bash
+FLY_TOKEN=$(jq -r .token config/fly.json)
 
-**Approach:** One persistent Fly machine for testing, using the test image tag.
+# Execute a command
+curl -s -X POST "https://api.machines.dev/v1/apps/automna-u-test/machines/68340eef773498/exec" \
+  -H "Authorization: Bearer $FLY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"command": ["cat", "/home/node/.openclaw/agents/main/agent/auth-profiles.json"]}'
+```
 
-| | Production | Test |
+Or if `fly` CLI is authenticated:
+```bash
+fly ssh console -a automna-u-test -C "cat /home/node/.openclaw/agents/main/agent/auth-profiles.json"
+```
+
+### Check Test Machine Logs
+
+```bash
+fly logs -a automna-u-test --no-tail
+```
+
+### Query Test Database
+
+```bash
+# Using turso CLI (need to be logged in)
+turso db shell automna-test
+
+# Or via libsql URL from config/turso-test.json
+```
+
+---
+
+## Testing the BYOK Pivot
+
+### What to Test
+
+1. **New onboarding flow:**
+   - Create test user in test Clerk + test DB
+   - Go through Stripe checkout (test mode)
+   - Connect credentials (setup-token or API key)
+   - Verify machine provisions and connects to Anthropic directly
+
+2. **Credential push:**
+   - Write auth-profiles.json to test machine
+   - Restart gateway
+   - Verify LLM calls go direct to Anthropic (not through proxy)
+
+3. **Feature gating:**
+   - Starter: no phone, no cron, 1 channel, sleeps idle
+   - Pro: phone works, cron works, 3 channels, always-on
+   - Power: API access, unlimited channels
+
+4. **Migration:**
+   - Simulate plan change on test user
+   - Verify Stripe subscription updates correctly
+   - Verify grace period logic
+
+### Quick Smoke Test (BYOK on Test Machine)
+
+```bash
+# 1. Write a test auth profile with a real setup-token or API key
+FLY_TOKEN=$(jq -r .token config/fly.json)
+
+# 2. SSH in and write auth-profiles.json
+fly ssh console -a automna-u-test -C "sh -c 'cat > /home/node/.openclaw/agents/main/agent/auth-profiles.json << EOF
+{
+  \"version\": 1,
+  \"profiles\": {
+    \"anthropic:default\": {
+      \"type\": \"token\",
+      \"provider\": \"anthropic\",
+      \"token\": \"sk-ant-api03-YOUR-TEST-KEY-HERE\"
+    }
+  },
+  \"order\": { \"anthropic\": [\"anthropic:default\"] },
+  \"lastGood\": { \"anthropic\": \"anthropic:default\" }
+}
+EOF'"
+
+# 3. Update entrypoint to skip proxy for LLM (set BYOK_MODE)
+# This requires a new Docker image build with the BYOK entrypoint changes
+
+# 4. Restart the machine
+curl -s -X POST "https://api.machines.dev/v1/apps/automna-u-test/machines/68340eef773498/restart" \
+  -H "Authorization: Bearer $FLY_TOKEN"
+
+# 5. Check logs to verify direct Anthropic connection
+fly logs -a automna-u-test --no-tail | tail -30
+```
+
+---
+
+## What's Missing (TODO)
+
+| Component | Status | Effort |
 |---|---|---|
-| App pattern | `automna-u-{shortId}` | `automna-test-u-1` |
-| Image | `:latest` | `:test` |
-| Count | 1 per user | 1 total |
+| Vercel staging branch | Not created | ~1h (create branch, set env vars) |
+| Clerk dev instance | Not verified | ~30m (create or verify) |
+| Test proxy env vars | May need update for BYOK | ~15m |
+| Automated E2E tests | Not started | Future effort |
 
-**Setup steps:**
-1. `fly apps create automna-test-u-1`
-2. `fly volumes create openclaw_data -a automna-test-u-1 -s 1 -r sjc`
-3. Create machine with test image + test proxy URL
-4. Register in test Turso DB
+---
 
-**Cost:** ~$7/month (2GB machine + 1GB volume)
+## Cost
 
-## Environment Variables Mapping
-
-Each test component points to its test counterpart:
-
-```
-# Vercel (test preview)
-TURSO_URL=libsql://automna-test-alexbbio...
-TURSO_TOKEN=<test-token>
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=<dev-clerk-key>
-CLERK_SECRET_KEY=<dev-clerk-secret>
-AUTOMNA_PROXY_URL=https://automna-proxy-test.fly.dev
-FLY_APP_PREFIX=automna-test-u
-
-# Proxy (test)
-TURSO_URL=libsql://automna-test-alexbbio...
-TURSO_TOKEN=<test-token>
-ANTHROPIC_API_KEY=<same as prod - it's just proxying>
-AUTOMNA_PROXY_URL=https://automna-proxy-test.fly.dev
-
-# User machine (test)
-AUTOMNA_PROXY_URL=https://automna-proxy-test.fly.dev
-OPENCLAW_GATEWAY_TOKEN=<test-token>
-```
-
-## Deployment Workflow
-
-```
-1. Make changes in code
-2. Build + push Docker image with :test tag
-3. Push to staging branch → Vercel auto-deploys
-4. Deploy test proxy if proxy changes: fly deploy -a automna-proxy-test
-5. Update test machine if Docker changes: fly machines update ... --image ...:test
-6. Test everything end-to-end on test.automna.ai
-7. If good:
-   a. Merge staging → main (Vercel prod auto-deploys)
-   b. Tag Docker image as :latest and push
-   c. Deploy prod proxy: fly deploy -a automna-proxy
-   d. Roll out to user machines one by one
-```
-
-## Total Additional Cost
-
-| Component | Monthly Cost |
-|-----------|-------------|
-| Vercel preview | Free |
-| Turso test DB | Free |
-| Test proxy (1 machine) | ~$3-5 |
-| Test user machine | ~$7 |
+| Component | Monthly |
+|---|---|
+| Test machine (2GB, always-on) | ~$7 |
+| Test proxy (1 machine, start/stop as needed) | ~$1-3 |
+| Test DB (Turso) | Free |
 | Docker registry | Free |
-| Clerk dev instance | Free |
-| **Total** | **~$10-12/month** |
-
-## What This Enables
-
-- **Docker image testing** — Push `:test`, validate on test machine, then promote to `:latest`
-- **Dashboard testing** — Full auth flow with dev Clerk, real chat with test machine
-- **Proxy testing** — Route changes, new endpoints, rate limit tweaks
-- **Schema migrations** — Run against test DB first
-- **Multi-component changes** — Test dashboard + proxy + image changes together before any hits prod
-- **Safe experimentation** — Try new OpenClaw versions, config changes, etc.
-
-## What This Doesn't Cover (Yet)
-
-- **Automated tests / CI** — This is manual testing infra only. Automated E2E tests (Playwright, etc.) would be a separate effort.
-- **Load testing** — Single test machine, not for performance testing
-- **Multiple test users** — One test machine. If we need multi-user testing, provision more.
-- **Separate Stripe** — Uses Stripe test mode (already built into Clerk dev). No separate Stripe account needed.
+| **Total** | **~$8-10/mo** |
