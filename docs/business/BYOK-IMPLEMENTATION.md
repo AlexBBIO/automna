@@ -166,109 +166,70 @@ async function testAnthropicKey(apiKey: string): Promise<boolean> {
 
 ---
 
-### Phase 1C: LLM Proxy — Smart Routing (~0.5 day)
+### Phase 1C: Direct-to-Anthropic Architecture (~0.5 day)
 
-The proxy stays for ALL users but routes differently based on auth mode:
+**No LLM proxy.** User's OpenClaw machine talks directly to Anthropic with their own key.
 
 ```
-User's OpenClaw → LLM Proxy (always)
-                      │
-                      ├─ BYOK (API key)? → Forward with user's key → Anthropic
-                      ├─ BYOK (OAuth)?   → Forward with user's OAuth token → Anthropic
-                      └─ Overage/add-on? → Forward with OUR key → Anthropic (future)
-                      
-All paths: log analytics, enforce RPM, detect errors
-BYOK paths: no credit billing
-Overage path: metered billing (future feature)
+LLM calls:      OpenClaw → Anthropic (direct, user's key/OAuth)
+Service calls:   OpenClaw → Our proxies (search, browser, email, phone)
 ```
 
-**Why keep the proxy:**
-- Analytics on all usage regardless of billing mode
-- Future overage/add-on compute billing (infrastructure already in place)
-- Centralized error detection (expired keys, revoked OAuth tokens)
-- Light RPM abuse prevention
-- Non-LLM proxies (Browserbase, Perplexity, Bland) stay as-is
+**On the user's Fly machine:**
 
-**Modify `/api/llm/v1/messages/route.ts`:**
+```bash
+# API key mode:
+ANTHROPIC_API_KEY=sk-ant-api03-...
+# No ANTHROPIC_BASE_URL (defaults to api.anthropic.com)
 
-```typescript
-const auth = await authenticateGatewayToken(request);
-
-// Determine which credential to use
-let anthropicAuth: { header: string; value: string };
-let billingMode: 'byok' | 'overage' = 'byok';
-
-if (auth.byokProvider === 'anthropic_oauth') {
-  // OAuth mode: use stored OAuth token
-  const token = await getSecret(auth.userId, 'anthropic_oauth_token');
-  if (!token) {
-    return anthropicError(403, 'oauth_expired',
-      'Your Claude connection has expired. Please reconnect in Settings.');
-  }
-  anthropicAuth = { header: 'Authorization', value: `Bearer ${token}` };
-
-} else if (auth.byokProvider === 'anthropic_api_key') {
-  // API key mode: use stored API key
-  const apiKey = await getSecret(auth.userId, 'anthropic_api_key');
-  if (!apiKey) {
-    return anthropicError(403, 'api_key_missing',
-      'No API key found. Please add your key in Settings.');
-  }
-  anthropicAuth = { header: 'x-api-key', value: apiKey };
-
-} else {
-  // No BYOK configured
-  return anthropicError(403, 'byok_required',
-    'An Anthropic API key or Claude account is required. Set up in Settings.');
-}
-
-// RPM rate limit only (no credit budget check for BYOK)
-const rateCheck = await checkRpmOnly(auth);
-if (!rateCheck.allowed) return rateLimited(rateCheck);
-
-// Forward to Anthropic with appropriate auth
-const headers: Record<string, string> = {
-  [anthropicAuth.header]: anthropicAuth.value,
-  'anthropic-version': request.headers.get('anthropic-version') || '2023-06-01',
-  'content-type': 'application/json',
-};
-
-const response = await fetch(ANTHROPIC_API_URL, {
-  method: 'POST',
-  headers,
-  body: await request.text(),
-});
-
-// Handle auth failures gracefully
-if (response.status === 401) {
-  // Key/token is invalid or expired
-  await markByokInvalid(auth.userId);
-  return anthropicError(401, 'upstream_auth_error',
-    'Your Anthropic credentials are invalid or expired. Please update in Settings.');
-}
-
-// Log usage for analytics (no billing for BYOK)
-logUsageEventBackground({
-  userId: auth.userId,
-  eventType: 'llm',
-  costMicrodollars: calculatedCost,
-  metadata: { byok: true, provider: auth.byokProvider },
-});
+# OAuth mode (future):
+# OAuth token injected, OpenClaw uses it directly
 ```
 
-**Update `rate-limit.ts`:**
-- Add `checkRpmOnly()` — RPM limit only, skip credit budget check
-- Keep existing `checkRateLimits()` for non-LLM service caps (search, browser, etc.)
+**What this means:**
+- Zero latency overhead on LLM calls
+- OAuth works naturally (token on machine, direct to Anthropic)
+- No LLM proxy to scale or maintain
+- User sees Anthropic errors directly (expired key, quota exceeded, etc.)
+- Non-LLM proxies stay as-is (Browserbase, Perplexity, Bland — our API keys, our costs)
 
-**Update `auth.ts`:**
-- Add `byokEnabled` and `byokProvider` to `AuthenticatedUser` interface
-- Pull from machines table (already queried)
+**How the key gets to the machine:**
 
-**Future: Overage add-on**
-When a BYOK user's Claude subscription runs out (Anthropic returns 429/quota), we can offer:
-"Out of Claude tokens? Add compute through us — $X per 100K tokens."
-The proxy detects the upstream 429, checks if user has an overage add-on, and retries with our key.
-Infrastructure is already in place — just needs a billing toggle.
+During onboarding or key update:
+1. User enters API key in dashboard
+2. Dashboard validates key against Anthropic
+3. Dashboard encrypts + stores key in secrets table (for backup/recovery)
+4. Dashboard pushes key to user's Fly machine via SSH or Machines API:
+   ```typescript
+   // Update machine env var
+   await flyApi.updateMachineEnv(machineId, {
+     ANTHROPIC_API_KEY: decryptedKey,
+   });
+   // Restart machine to pick up new env
+   await flyApi.restartMachine(machineId);
+   ```
+
+**Analytics:** OpenClaw logs usage locally. Dashboard can pull stats from machines via gateway API for usage display. Not in the critical path.
+
+**Bad key handling:** When Anthropic returns 401, the user sees the error in chat. Dashboard can poll machine health periodically and show a banner prompting key update.
+
+**What we remove:**
+- `/api/llm/v1/messages/route.ts` — no longer needed for BYOK users
+- `/api/llm/_lib/rate-limit.ts` — LLM rate limiting removed (Anthropic handles their own)
+- `/api/llm/_lib/auth.ts` — gateway token auth for LLM proxy removed
+- `/api/llm/_lib/usage.ts` — LLM usage logging from proxy removed
+- Credit budget system — fully removed
+
+**What we keep:**
+- Non-LLM proxy routes (Browserbase, search, email, phone)
+- Service usage caps (enforced in those proxy routes)
+- Gateway token auth (still used for non-LLM proxies + dashboard API)
+
+**Future: Paid compute add-on**
+If we ever want to sell overage compute, it would be a manual opt-in:
+User runs out of Claude tokens → dashboard offers "Buy compute" → user accepts →
+machine config switches to our proxy URL + our key → metered billing kicks in.
+This is a future feature, not MVP. Architecture doesn't need to support it now.
 
 ---
 
@@ -597,9 +558,9 @@ Post-launch:  Remove legacy credit/billing code
 | File | Changes |
 |---|---|
 | `src/lib/db/schema.ts` | New PLAN_LIMITS, add byok columns to machines |
-| `src/app/api/llm/v1/messages/route.ts` | BYOK key routing |
-| `src/app/api/llm/_lib/auth.ts` | Add byokEnabled to AuthenticatedUser |
-| `src/app/api/llm/_lib/rate-limit.ts` | Add checkRpmOnly(), remove credit checks |
+| `src/app/api/llm/v1/messages/route.ts` | Remove or deprecate (no longer needed for BYOK) |
+| `src/app/api/llm/_lib/auth.ts` | Keep for non-LLM proxy auth only |
+| `src/app/api/llm/_lib/rate-limit.ts` | Remove LLM rate limiting (keep service caps) |
 | `src/app/api/checkout/route.ts` | New price IDs |
 | `src/app/api/webhooks/stripe/route.ts` | Handle new plan names, remove scaling logic |
 | `src/app/api/user/provision/route.ts` | Starter = no phone, auto-stop config |
