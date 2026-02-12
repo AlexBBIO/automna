@@ -151,5 +151,17 @@ This is dramatically more stable than the current credit model.
 
 ---
 
-## Market Scan: OpenClaw Wrappers
-I still owe a clean scan of OpenClaw wrappers and pricing. I will add this section next and send an update.
+## Market Scan: OpenClaw Wrappers (Preliminary)
+**Status:** Initial scan found *hosting providers and setup guides* more than true SaaS "wrappers." If there are specific competitors you care about, send names and I will dig deeper.
+
+**What exists (so far):**
+- **Managed OpenClaw hosting** advertised around **$24–$50/mo** for the server layer, *plus* the user’s model/API costs (often $20–$60/mo in examples). This puts “all‑in” cost for a managed host around **$44–$84/mo** in many guides.
+- **DIY VPS hosting** spans **$2–$70/mo** depending on provider and specs, with the same API costs layered on top.
+- Many articles emphasize **OpenClaw is free software**, pricing is really **hosting + API usage**.
+
+**Implication for Automna:**
+- We are not competing on “cheap VPS hosting.”
+- We should position as **managed automation + integrations** with a clean user experience, not as “hosted OpenClaw.”
+- A **$29/mo platform fee** is competitive versus managed hosting alone once you add Claude Pro/Max.
+
+**Next step:** If you want a true competitor scan, I’ll focus on *named* products (not generic hosting blog posts) and validate pricing directly from their sites.
