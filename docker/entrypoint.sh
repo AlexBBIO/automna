@@ -785,8 +785,10 @@ const defaults = {
     defaults: {
       workspace: '/home/node/.openclaw/workspace',
       model: { primary: 'automna/claude-opus-4-5' },
+      imageModel: { primary: 'automna/claude-opus-4-5' },
       verboseDefault: 'on',
       userTimezone: 'America/Los_Angeles',
+      timeoutSeconds: 3600,
       heartbeat: {
         every: '30m',
         activeHours: { start: '08:00', end: '23:00' },
