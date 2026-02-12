@@ -166,55 +166,93 @@ async function testAnthropicKey(apiKey: string): Promise<boolean> {
 
 ---
 
-### Phase 1C: LLM Proxy BYOK Routing (~0.5 day)
+### Phase 1C: LLM Proxy — Smart Routing (~0.5 day)
+
+The proxy stays for ALL users but routes differently based on auth mode:
+
+```
+User's OpenClaw → LLM Proxy (always)
+                      │
+                      ├─ BYOK (API key)? → Forward with user's key → Anthropic
+                      ├─ BYOK (OAuth)?   → Forward with user's OAuth token → Anthropic
+                      └─ Overage/add-on? → Forward with OUR key → Anthropic (future)
+                      
+All paths: log analytics, enforce RPM, detect errors
+BYOK paths: no credit billing
+Overage path: metered billing (future feature)
+```
+
+**Why keep the proxy:**
+- Analytics on all usage regardless of billing mode
+- Future overage/add-on compute billing (infrastructure already in place)
+- Centralized error detection (expired keys, revoked OAuth tokens)
+- Light RPM abuse prevention
+- Non-LLM proxies (Browserbase, Perplexity, Bland) stay as-is
 
 **Modify `/api/llm/v1/messages/route.ts`:**
 
 ```typescript
-// After auth, check BYOK status
 const auth = await authenticateGatewayToken(request);
 
-let anthropicKey: string;
-let isByok = false;
+// Determine which credential to use
+let anthropicAuth: { header: string; value: string };
+let billingMode: 'byok' | 'overage' = 'byok';
 
-if (auth.byokEnabled) {
-  // Fetch user's encrypted key from secrets table
-  const secret = await getSecret(auth.userId, 'anthropic_api_key');
-  if (secret) {
-    anthropicKey = secret;
-    isByok = true;
-  } else {
-    // BYOK enabled but no key found — fall back to error
-    return anthropicError(403, 'api_key_missing',
-      'BYOK is enabled but no API key found. Please add your key in Settings.');
+if (auth.byokProvider === 'anthropic_oauth') {
+  // OAuth mode: use stored OAuth token
+  const token = await getSecret(auth.userId, 'anthropic_oauth_token');
+  if (!token) {
+    return anthropicError(403, 'oauth_expired',
+      'Your Claude connection has expired. Please reconnect in Settings.');
   }
+  anthropicAuth = { header: 'Authorization', value: `Bearer ${token}` };
+
+} else if (auth.byokProvider === 'anthropic_api_key') {
+  // API key mode: use stored API key
+  const apiKey = await getSecret(auth.userId, 'anthropic_api_key');
+  if (!apiKey) {
+    return anthropicError(403, 'api_key_missing',
+      'No API key found. Please add your key in Settings.');
+  }
+  anthropicAuth = { header: 'x-api-key', value: apiKey };
+
 } else {
-  // This shouldn't happen in BYOK-only model, but handle gracefully
+  // No BYOK configured
   return anthropicError(403, 'byok_required',
-    'An Anthropic API key is required. Please add your key in Settings.');
+    'An Anthropic API key or Claude account is required. Set up in Settings.');
 }
 
-// Rate limit (RPM only, no credit budget check)
+// RPM rate limit only (no credit budget check for BYOK)
 const rateCheck = await checkRpmOnly(auth);
 if (!rateCheck.allowed) return rateLimited(rateCheck);
 
-// Forward to Anthropic with user's key
+// Forward to Anthropic with appropriate auth
+const headers: Record<string, string> = {
+  [anthropicAuth.header]: anthropicAuth.value,
+  'anthropic-version': request.headers.get('anthropic-version') || '2023-06-01',
+  'content-type': 'application/json',
+};
+
 const response = await fetch(ANTHROPIC_API_URL, {
   method: 'POST',
-  headers: {
-    'x-api-key': anthropicKey,
-    'anthropic-version': request.headers.get('anthropic-version') || '2023-06-01',
-    'content-type': 'application/json',
-  },
+  headers,
   body: await request.text(),
 });
 
-// Log usage for analytics (but don't bill)
+// Handle auth failures gracefully
+if (response.status === 401) {
+  // Key/token is invalid or expired
+  await markByokInvalid(auth.userId);
+  return anthropicError(401, 'upstream_auth_error',
+    'Your Anthropic credentials are invalid or expired. Please update in Settings.');
+}
+
+// Log usage for analytics (no billing for BYOK)
 logUsageEventBackground({
   userId: auth.userId,
   eventType: 'llm',
   costMicrodollars: calculatedCost,
-  metadata: { byok: true },
+  metadata: { byok: true, provider: auth.byokProvider },
 });
 ```
 
@@ -223,8 +261,14 @@ logUsageEventBackground({
 - Keep existing `checkRateLimits()` for non-LLM service caps (search, browser, etc.)
 
 **Update `auth.ts`:**
-- Add `byokEnabled` to `AuthenticatedUser` interface
+- Add `byokEnabled` and `byokProvider` to `AuthenticatedUser` interface
 - Pull from machines table (already queried)
+
+**Future: Overage add-on**
+When a BYOK user's Claude subscription runs out (Anthropic returns 429/quota), we can offer:
+"Out of Claude tokens? Add compute through us — $X per 100K tokens."
+The proxy detects the upstream 429, checks if user has an overage add-on, and retries with our key.
+Infrastructure is already in place — just needs a billing toggle.
 
 ---
 
