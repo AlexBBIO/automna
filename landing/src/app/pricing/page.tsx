@@ -64,11 +64,21 @@ const plans = [
   },
 ];
 
+// Old plan names that need migration
+const LEGACY_PLANS = ['free', 'lite', 'business'];
+const OLD_PLAN_PRICES: Record<string, number> = {
+  lite: 20, starter: 79, pro: 149, business: 299,
+};
+
 function SubscriptionBanner() {
   const searchParams = useSearchParams();
+  const { user } = useUser();
   const needsSubscription = searchParams.get('subscribe') === 'true';
   const isWelcome = searchParams.get('welcome') === 'true';
   const wasCanceled = searchParams.get('canceled') === 'true';
+  const currentPlan = user?.publicMetadata?.plan as string | undefined;
+  const isLegacy = currentPlan && (LEGACY_PLANS.includes(currentPlan) || OLD_PLAN_PRICES[currentPlan]);
+  const hasSubscription = !!user?.publicMetadata?.stripeSubscriptionId;
 
   useEffect(() => {
     if (wasCanceled) {
@@ -82,6 +92,31 @@ function SubscriptionBanner() {
         <div className="bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-300 dark:border-zinc-600/50 rounded-lg p-4 text-center">
           <p className="text-zinc-600 dark:text-zinc-300">
             No worries! Take your time. Pick a plan when you&apos;re ready.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Migration banner for existing users on old plans
+  if (isLegacy && hasSubscription) {
+    const oldPrice = OLD_PLAN_PRICES[currentPlan!];
+    return (
+      <div className="container mx-auto px-4 md:px-6">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 border border-green-300 dark:border-green-500/50 rounded-lg p-5 text-center">
+          <p className="text-green-800 dark:text-green-200 font-semibold mb-1">
+            🎉 We&apos;re simplifying pricing — and your bill is going down.
+          </p>
+          <p className="text-green-700 dark:text-green-300 text-sm mb-2">
+            {oldPrice ? (
+              <>Your current plan (${oldPrice}/mo) is being replaced with cheaper, simpler tiers.</>
+            ) : (
+              <>We&apos;re moving to a bring-your-own-key model with lower prices.</>
+            )}
+          </p>
+          <p className="text-green-600 dark:text-green-400 text-sm">
+            Pick a new plan below. You&apos;ll connect your own Claude account — no more usage caps from us.
+            Your agent keeps working during the switch.
           </p>
         </div>
       </div>
@@ -122,10 +157,13 @@ function PricingCard({ plan, isSignedIn, loading, onCheckout, currentPlan }: {
 }) {
   const planKey = plan.name.toLowerCase();
   const isCurrentPlan = currentPlan === planKey;
+  const isLegacyPlan = currentPlan && LEGACY_PLANS.includes(currentPlan);
   const planOrder = ['starter', 'pro', 'power'];
-  const isDowngrade = currentPlan && planOrder.indexOf(planKey) < planOrder.indexOf(currentPlan);
+  const isDowngrade = !isLegacyPlan && currentPlan && planOrder.indexOf(planKey) < planOrder.indexOf(currentPlan);
   const cta = isCurrentPlan
     ? 'Current Plan'
+    : isLegacyPlan
+    ? `Switch to ${plan.name}`
     : isDowngrade
     ? `Switch to ${plan.name}`
     : currentPlan && currentPlan !== 'free'
