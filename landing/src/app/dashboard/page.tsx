@@ -528,8 +528,8 @@ export default function DashboardPage() {
           (window as any).twq('event', 'tw-r4twt-r4v7x', {});
         }
         
-        // BYOK gate: if user has active subscription but no credentials, send to setup
-        // Check for BYOK plans (starter/pro/power with BYOK pricing)
+        // BYOK gate: if user has active subscription but hasn't chosen a connection method, send to setup
+        // Users must either: connect Claude credentials (BYOK) OR explicitly choose proxy mode
         const currentPlan = user.publicMetadata?.plan as string | undefined;
         const isByokPlan = currentPlan && ['starter', 'pro', 'power'].includes(currentPlan);
         
@@ -537,8 +537,9 @@ export default function DashboardPage() {
           try {
             const byokCheck = await fetch('/api/user/byok');
             const byokData = await byokCheck.json().catch(() => ({}));
-            if (!byokData.enabled) {
-              console.log('[dashboard] BYOK plan but no credentials, redirecting to setup');
+            // Allow through if: BYOK enabled (has credentials) OR proxy mode selected (byokProvider === 'proxy')
+            if (!byokData.enabled && byokData.type !== 'proxy') {
+              console.log('[dashboard] No connection method chosen, redirecting to setup');
               window.location.href = '/setup/connect';
               return;
             }

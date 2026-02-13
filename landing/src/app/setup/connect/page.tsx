@@ -87,6 +87,34 @@ export default function ConnectPage() {
               <span className="text-zinc-500 group-hover:text-white transition mt-2">→</span>
             </div>
           </Link>
+
+          {/* Bill me as I go Option */}
+          <button
+            onClick={async () => {
+              try {
+                // Mark user as proxy mode (no BYOK), then go to dashboard
+                await fetch('/api/user/byok/proxy', { method: 'POST' });
+                router.push('/dashboard');
+              } catch {
+                router.push('/dashboard');
+              }
+            }}
+            className="block w-full text-left bg-white/5 border border-white/10 hover:border-emerald-500/50 rounded-2xl p-6 transition-all group"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex-1">
+                <h2 className="text-xl font-bold mb-2">Bill me as I go</h2>
+                <p className="text-zinc-400 text-sm mb-3">
+                  Skip connecting Claude. We&apos;ll handle the AI and bill you based on usage.
+                  Your plan includes a monthly credit allowance for AI calls.
+                </p>
+                <div className="flex items-center gap-2 text-emerald-400 text-sm">
+                  <span>💳 Easiest setup — just start chatting</span>
+                </div>
+              </div>
+              <span className="text-zinc-500 group-hover:text-emerald-400 transition mt-2">→</span>
+            </div>
+          </button>
         </div>
 
         <p className="text-center text-zinc-500 text-sm mt-8">

@@ -360,6 +360,7 @@ export async function GET() {
       enabled: machine?.byokEnabled === 1,
       type: machine?.byokProvider ?? null,
       lastValidated: secret?.updatedAt ? new Date(secret.updatedAt).toISOString() : null,
+      isProxy: machine?.byokProvider === 'proxy',
     });
   } catch (error) {
     console.error('[byok] GET error:', error);
