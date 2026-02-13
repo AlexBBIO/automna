@@ -187,6 +187,7 @@ export async function POST(request: Request) {
         ...subscription.metadata,
         plan: newPlan,
         upgradedAt: new Date().toISOString(),
+        previousPlan: currentPlan,
         previousPriceId: existingItem.price.id,
         changeType: isDowngrade ? 'downgrade' : isSamePlan ? 'billing_change' : 'upgrade',
       },

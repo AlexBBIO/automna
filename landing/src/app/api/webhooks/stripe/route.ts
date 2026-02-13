@@ -201,6 +201,38 @@ export async function POST(request: Request) {
             metadataUpdate.plan = newPlan;
             console.log(`[stripe] Plan changed for ${clerkUserId}: price ${previousPriceId} → ${currentPriceId} (plan: ${newPlan})`);
 
+            // Check if this is a downgrade — if so, preserve old plan limits until period ends
+            const previousPlan = previousAttributes?.metadata?.plan || subscription.metadata?.previousPlan;
+            const planRank: Record<string, number> = { free: 0, lite: 1, starter: 1, pro: 2, power: 3, business: 3 };
+            const oldRank = planRank[previousPlan as string] ?? 1;
+            const newRank = planRank[newPlan] ?? 1;
+            
+            if (oldRank > newRank && previousPlan) {
+              // Downgrade: keep old plan limits until current period ends
+              const periodEnd = subscription.current_period_end;
+              try {
+                await db.update(machines)
+                  .set({
+                    effectivePlan: previousPlan as string,
+                    effectivePlanUntil: periodEnd,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(machines.userId, clerkUserId));
+                console.log(`[stripe] Downgrade: preserving ${previousPlan} limits until ${new Date(periodEnd * 1000).toISOString()}`);
+              } catch (e) {
+                console.error(`[stripe] Failed to set effectivePlan:`, e);
+              }
+            } else {
+              // Upgrade or same tier: clear any effective plan override
+              try {
+                await db.update(machines)
+                  .set({ effectivePlan: null, effectivePlanUntil: null, updatedAt: new Date() })
+                  .where(eq(machines.userId, clerkUserId));
+              } catch (e) {
+                console.error(`[stripe] Failed to clear effectivePlan:`, e);
+              }
+            }
+
             // Update machines table for rate limiting
             await updateMachinePlan(clerkUserId, newPlan);
 

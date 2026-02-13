@@ -31,8 +31,18 @@ export async function GET() {
       );
     }
 
-    const plan = (userMachine.plan || "starter") as PlanType;
+    // Determine effective plan for limits
+    // If there's a pending downgrade, use the higher plan until the period ends
+    let plan = (userMachine.plan || "starter") as PlanType;
+    const now_ts = Math.floor(Date.now() / 1000);
+    if (userMachine.effectivePlan && userMachine.effectivePlanUntil && userMachine.effectivePlanUntil > now_ts) {
+      plan = userMachine.effectivePlan as PlanType;
+    }
     const limits = LEGACY_PLAN_LIMITS[plan as keyof typeof LEGACY_PLAN_LIMITS] || LEGACY_PLAN_LIMITS.starter;
+    
+    // BYOK users (with their own credentials) don't consume proxy credits for LLM calls
+    // They still consume credits for proxy services (search, browser, email, phone)
+    const isByok = userMachine.byokEnabled === 1;
 
     // Current billing period: 1st of current month to 1st of next month (UTC)
     const now = new Date();
@@ -61,6 +71,8 @@ export async function GET() {
       limit: limits.monthlyAutomnaCredits,
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
+      isByok,
+      isProxy: userMachine.byokProvider === 'proxy',
     });
   } catch (error) {
     console.error("[api/user/usage] Error:", error);

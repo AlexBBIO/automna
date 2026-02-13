@@ -28,8 +28,10 @@ export const machines = sqliteTable("machines", {
   browserbaseContextId: text("browserbase_context_id"), // Browserbase persistent context for this user
   agentmailInboxId: text("agentmail_inbox_id"), // Agentmail inbox for this user (e.g., automna-abc123@agentmail.to)
   plan: text("plan").default("starter"), // User's subscription plan: starter, pro, power
-  byokProvider: text("byok_provider"), // 'anthropic_oauth' | 'anthropic_api_key' | null
+  byokProvider: text("byok_provider"), // 'anthropic_oauth' | 'anthropic_api_key' | 'proxy' | null
   byokEnabled: integer("byok_enabled").default(0),
+  effectivePlan: text("effective_plan"), // Higher plan to honor until effectivePlanUntil (for downgrades)
+  effectivePlanUntil: integer("effective_plan_until"), // Unix timestamp - use effectivePlan limits until this time
   lastSessionKey: text("last_session_key").default("main"), // Last active conversation key (for webhook routing)
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
