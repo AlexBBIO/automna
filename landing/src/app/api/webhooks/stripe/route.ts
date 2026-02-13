@@ -21,6 +21,7 @@ const FLY_API_BASE = 'https://api.machines.dev/v1';
 
 /**
  * Update machine auto_stop config based on plan's sleep behavior.
+ * Only applies to BYOK/proxy users (new plans). Legacy users stay always-on.
  * Pro/Power run 24/7, Starter/Free sleep when idle.
  */
 async function updateMachineSleepConfig(userId: string, plan: string): Promise<void> {
@@ -29,6 +30,12 @@ async function updateMachineSleepConfig(userId: string, plan: string): Promise<v
       where: eq(machines.userId, userId),
     });
     if (!machine?.appName) return;
+
+    // Legacy users (no byokProvider) keep always-on behavior regardless of plan
+    if (!machine.byokProvider) {
+      console.log(`[stripe] Skipping sleep config for legacy user ${userId}`);
+      return;
+    }
 
     const sleepEnabled = shouldSleepWhenIdle(plan);
     const autoStopValue = sleepEnabled ? 'stop' : 'off';
