@@ -19,7 +19,7 @@ import Stripe from "stripe";
 import { sendMachineReady } from "@/lib/email";
 import { provisionPhoneNumber } from "@/lib/twilio";
 import { importNumberToBland, configureInboundNumber } from "@/lib/bland";
-import { canUsePhone } from "@/lib/feature-gates";
+import { canUsePhone, shouldSleepWhenIdle } from "@/lib/feature-gates";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 import { eq, and, ne } from "drizzle-orm";
@@ -487,7 +487,10 @@ async function createMachine(
     // Note: AGENTMAIL_API_KEY intentionally NOT passed to enforce rate limits via our proxy
   }
 
-  const config = {
+  // Determine if machine should sleep when idle (starter/free plans)
+  const sleepEnabled = shouldSleepWhenIdle(plan);
+
+  const config: Record<string, unknown> = {
     image: OPENCLAW_IMAGE,
     guest: {
       cpu_kind: "shared",
@@ -506,6 +509,11 @@ async function createMachine(
         ],
         protocol: "tcp",
         internal_port: 18789,
+        // Auto-start: Fly proxy holds incoming requests and boots the machine
+        auto_start: true,
+        // Auto-stop: machine stops after idle period (no active connections)
+        // Only enabled for plans with sleepWhenIdle (starter, free)
+        auto_stop: sleepEnabled ? "stop" : "off",
       },
     ],
     env,

@@ -9,12 +9,77 @@ import { eq, sql } from 'drizzle-orm';
 import { provisionPhoneNumber } from '@/lib/twilio';
 import { importNumberToBland, configureInboundNumber } from '@/lib/bland';
 import { trackServerEvent } from '@/lib/analytics';
-import { canUsePhone } from '@/lib/feature-gates';
+import { canUsePhone, shouldSleepWhenIdle } from '@/lib/feature-gates';
 
 // Initialize Stripe lazily to avoid build-time errors
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
+const FLY_API_BASE = 'https://api.machines.dev/v1';
+
 // All BYOK machines are same size: 1 shared CPU, 2GB RAM
+
+/**
+ * Update machine auto_stop config based on plan's sleep behavior.
+ * Pro/Power run 24/7, Starter/Free sleep when idle.
+ */
+async function updateMachineSleepConfig(userId: string, plan: string): Promise<void> {
+  try {
+    const machine = await db.query.machines.findFirst({
+      where: eq(machines.userId, userId),
+    });
+    if (!machine?.appName) return;
+
+    const sleepEnabled = shouldSleepWhenIdle(plan);
+    const autoStopValue = sleepEnabled ? 'stop' : 'off';
+
+    // Get current machine config (FULL config — never partial!)
+    const getRes = await fetch(`${FLY_API_BASE}/apps/${machine.appName}/machines/${machine.id}`, {
+      headers: { Authorization: `Bearer ${FLY_API_TOKEN}` },
+    });
+    if (!getRes.ok) {
+      console.error(`[stripe] Failed to get machine config for sleep update: ${getRes.status}`);
+      return;
+    }
+
+    const machineData = await getRes.json();
+    const services = machineData.config?.services;
+    if (!services?.length) return;
+
+    // Check if auto_stop already matches
+    const currentAutoStop = services[0].auto_stop || 'off';
+    if (currentAutoStop === autoStopValue) {
+      console.log(`[stripe] Machine ${machine.appName} auto_stop already ${autoStopValue}`);
+      return;
+    }
+
+    // Update service config
+    const updatedConfig = { ...machineData.config };
+    updatedConfig.services = services.map((svc: Record<string, unknown>) => ({
+      ...svc,
+      auto_stop: autoStopValue,
+      auto_start: true,
+    }));
+
+    const updateRes = await fetch(`${FLY_API_BASE}/apps/${machine.appName}/machines/${machine.id}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${FLY_API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ config: updatedConfig }),
+    });
+
+    if (!updateRes.ok) {
+      console.error(`[stripe] Failed to update machine sleep config: ${updateRes.status}`);
+      return;
+    }
+
+    console.log(`[stripe] Updated ${machine.appName} auto_stop=${autoStopValue} for plan ${plan}`);
+  } catch (error) {
+    console.error(`[stripe] Error updating machine sleep config:`, error);
+  }
+}
 
 /**
  * Update the user's plan in the machines table.
@@ -189,6 +254,9 @@ export async function POST(request: Request) {
           // Update machines table (used for rate limiting)
           await updateMachinePlan(clerkUserId, plan);
           
+          // Update machine sleep config (starter sleeps, pro/power always-on)
+          await updateMachineSleepConfig(clerkUserId, plan);
+          
           // Provision phone number for calling-enabled plans (pro/power only)
           await provisionPhoneForPlan(clerkUserId, plan);
           
@@ -245,8 +313,9 @@ export async function POST(request: Request) {
             const planRank: Record<string, number> = { free: 0, lite: 1, starter: 1, pro: 2, power: 3, business: 3 };
             const oldRank = planRank[previousPlan as string] ?? 1;
             const newRank = planRank[newPlan] ?? 1;
+            const isDowngrade = oldRank > newRank && !!previousPlan;
             
-            if (oldRank > newRank && previousPlan) {
+            if (isDowngrade) {
               // Downgrade: keep old plan limits until current period ends
               const periodEnd = (subscription as any).current_period_end as number;
               try {
@@ -274,6 +343,13 @@ export async function POST(request: Request) {
 
             // Update machines table for rate limiting
             await updateMachinePlan(clerkUserId, newPlan);
+
+            // Update machine sleep config based on new plan
+            // For downgrades: keep always-on until effective plan expires (handled by effectivePlan)
+            // We use the actual new plan here so the machine config reflects what they'll get
+            if (!isDowngrade) {
+              await updateMachineSleepConfig(clerkUserId, newPlan);
+            }
 
             // Handle phone provisioning/release
             await provisionPhoneForPlan(clerkUserId, newPlan);
@@ -321,6 +397,9 @@ export async function POST(request: Request) {
           
           // Update machines table (rate limiting will revert to free tier)
           await updateMachinePlan(clerkUserId, 'free');
+          
+          // Enable auto-stop so machine sleeps when idle (saves Fly costs)
+          await updateMachineSleepConfig(clerkUserId, 'free');
           
           console.log(`[stripe] Canceled subscription for user ${clerkUserId}`);
 
