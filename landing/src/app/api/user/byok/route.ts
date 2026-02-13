@@ -25,11 +25,12 @@ function detectCredentialType(credential: string): CredentialType | null {
 }
 
 function buildAuthProfilesJson(credential: string, type: CredentialType): string {
-  // Setup tokens use OAuth format, API keys use token format
-  // This matches how OpenClaw stores credentials from `claude setup-token`
+  // Both setup tokens and API keys use the same format in OpenClaw.
+  // Setup tokens: type "token" with the raw token (same as `openclaw onboard` stores them)
+  // API keys: type "api_key" with the key
   const profile: Record<string, unknown> = type === 'setup_token'
-    ? { type: 'oauth', provider: 'anthropic', access: credential }
-    : { type: 'token', provider: 'anthropic', token: credential };
+    ? { type: 'token', provider: 'anthropic', token: credential }
+    : { type: 'api_key', provider: 'anthropic', key: credential };
 
   return JSON.stringify({
     version: 1,
@@ -181,13 +182,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate against Anthropic API
-    const validation = await validateCredential(credential, type);
-    if (!validation.valid) {
-      return NextResponse.json(
-        { error: validation.error || 'Credential validation failed. Please check that your key is active and valid.' },
-        { status: 422 }
-      );
+    // Validate credential
+    // Setup tokens (sk-ant-oat) are OAuth access tokens scoped to Claude Code.
+    // They can't call /v1/messages directly - only OpenClaw knows how to use them.
+    // So we only validate API keys against the Anthropic API.
+    if (type === 'api_key') {
+      const validation = await validateCredential(credential, type);
+      if (!validation.valid) {
+        return NextResponse.json(
+          { error: validation.error || 'Credential validation failed. Please check that your key is active and valid.' },
+          { status: 422 }
+        );
+      }
     }
 
     // Encrypt and store

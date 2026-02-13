@@ -535,10 +535,18 @@ export default function DashboardPage() {
           const gatewayCheckData = await gatewayCheck.json();
           
           if (gatewayCheckData.needsProvisioning || gatewayCheck.status === 404) {
-            // Confirmed: no subscription, no machine. Show inline pricing.
-            console.log('[dashboard] No active subscription, redirecting to pricing');
-            window.location.href = '/pricing?subscribe=true';
-            return;
+            // Check BYOK status - if they have credentials saved, skip subscription check
+            const byokCheck = await fetch('/api/user/byok');
+            const byokData = await byokCheck.json().catch(() => ({}));
+            if (byokData.enabled) {
+              console.log('[dashboard] BYOK user without subscription, proceeding to provision');
+              // Fall through to normal provisioning flow
+            } else {
+              // Confirmed: no subscription, no machine, no BYOK. Show inline pricing.
+              console.log('[dashboard] No active subscription, redirecting to pricing');
+              window.location.href = '/pricing?subscribe=true';
+              return;
+            }
           }
           // If they DO have a gateway URL already, proceed normally
           // (subscription might have been set up before we tracked status)
