@@ -166,7 +166,7 @@ function PricingCard({ plan, isSignedIn, loading, onCheckout, currentPlan }: {
   const planOrder = ['starter', 'pro', 'power'];
   const isDowngrade = !isLegacyPlan && currentPlan && planOrder.indexOf(planKey) < planOrder.indexOf(currentPlan);
   const cta = isCurrentPlan
-    ? 'Current Plan'
+    ? 'Continue — Connect Claude →'
     : isLegacyPlan
     ? `Switch to ${plan.name}`
     : isDowngrade
@@ -219,19 +219,26 @@ function PricingCard({ plan, isSignedIn, loading, onCheckout, currentPlan }: {
       </ul>
 
       {isSignedIn ? (
-        <button
-          onClick={() => onCheckout(plan)}
-          disabled={loading === plan.name || !plan.priceId || isCurrentPlan}
-          className={`w-full py-3 rounded-xl font-semibold transition-all text-sm md:text-base ${
-            isCurrentPlan
-              ? 'bg-green-600/20 text-green-600 dark:text-green-400 border border-green-500/30 cursor-default'
-              : plan.popular
-              ? 'bg-purple-600 hover:bg-purple-500 text-white'
-              : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white'
-          } disabled:opacity-50`}
-        >
-          {loading === plan.name ? 'Processing...' : cta}
-        </button>
+        isCurrentPlan ? (
+          <Link
+            href="/setup/connect"
+            className="w-full py-3 rounded-xl font-semibold transition-all text-sm md:text-base text-center block bg-green-600 hover:bg-green-500 text-white"
+          >
+            {cta}
+          </Link>
+        ) : (
+          <button
+            onClick={() => onCheckout(plan)}
+            disabled={loading === plan.name || !plan.priceId}
+            className={`w-full py-3 rounded-xl font-semibold transition-all text-sm md:text-base ${
+              plan.popular
+                ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white'
+            } disabled:opacity-50`}
+          >
+            {loading === plan.name ? 'Processing...' : cta}
+          </button>
+        )
       ) : (
         <SignInButton mode="modal">
           <button
