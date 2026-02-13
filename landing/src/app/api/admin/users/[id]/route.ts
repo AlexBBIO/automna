@@ -7,7 +7,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users, machines, llmUsage, emailSends, usageEvents, PLAN_LIMITS, PlanType } from "@/lib/db/schema";
+import { users, machines, llmUsage, emailSends, usageEvents, LEGACY_PLAN_LIMITS, PlanType } from "@/lib/db/schema";
 import { eq, gte, and, sql, desc } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
@@ -44,7 +44,7 @@ export async function GET(
 
     // Get plan limits
     const plan = (machine?.plan || "starter") as PlanType;
-    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
+    const limits = LEGACY_PLAN_LIMITS[plan as keyof typeof LEGACY_PLAN_LIMITS] || LEGACY_PLAN_LIMITS.starter;
 
     // Get usage this month
     const [tokenUsage] = await db

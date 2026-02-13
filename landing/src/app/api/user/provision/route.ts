@@ -19,6 +19,7 @@ import Stripe from "stripe";
 import { sendMachineReady } from "@/lib/email";
 import { provisionPhoneNumber } from "@/lib/twilio";
 import { importNumberToBland, configureInboundNumber } from "@/lib/bland";
+import { canUsePhone } from "@/lib/feature-gates";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 import { eq, and, ne } from "drizzle-orm";
@@ -416,20 +417,7 @@ function cleanEnvValue(value: string | undefined): string {
   return (value || "").replace(/[\r\n]+$/, "");
 }
 
-/**
- * Get machine specs based on plan tier.
- * Fly.io shared-cpu-1x maxes at 2048MB, so 4GB requires 2 shared CPUs.
- * Starter: 1 shared CPU + 2GB, Pro/Business: 2 shared CPUs + 4GB
- */
-function getMachineSpecsForPlan(plan: string): { cpus: number; memory_mb: number } {
-  switch (plan) {
-    case "pro":
-    case "business":
-      return { cpus: 2, memory_mb: 4096 };
-    default:
-      return { cpus: 1, memory_mb: 2048 };
-  }
-}
+// All BYOK machines are same size: 1 shared CPU, 2GB RAM
 
 /**
  * Create and start a machine in the app
@@ -463,12 +451,13 @@ async function createMachine(
     // Gateway auth
     OPENCLAW_GATEWAY_TOKEN: gatewayToken,
     
+    // BYOK mode - user provides their own Claude credentials
+    BYOK_MODE: "true",
+    
     // Proxy URL (entrypoint reads this to configure clawdbot.json)
     AUTOMNA_PROXY_URL: "https://automna-proxy.fly.dev",
 
-    // Anthropic proxy (OpenClaw's anthropic provider uses these)
-    ANTHROPIC_API_KEY: gatewayToken,
-    // ANTHROPIC_BASE_URL set in entrypoint.sh from AUTOMNA_PROXY_URL
+    // No ANTHROPIC_API_KEY or ANTHROPIC_BASE_URL - BYOK handles this via auth-profiles.json
     
     // Gemini proxy
     GEMINI_API_KEY: gatewayToken,
@@ -498,13 +487,12 @@ async function createMachine(
     // Note: AGENTMAIL_API_KEY intentionally NOT passed to enforce rate limits via our proxy
   }
 
-  const specs = getMachineSpecsForPlan(plan);
   const config = {
     image: OPENCLAW_IMAGE,
     guest: {
       cpu_kind: "shared",
-      cpus: specs.cpus,
-      memory_mb: specs.memory_mb,
+      cpus: 1,
+      memory_mb: 2048,
     },
     // Initialize session structure with canonical key, then start gateway
     // This fixes the session key mismatch bug where "main" != "agent:main:main"
@@ -721,10 +709,12 @@ export async function POST() {
           })
           .where(eq(machines.id, existingMachine.id));
         
-        // Ensure phone number exists (fallback if Stripe webhook missed it)
-        ensurePhoneNumber(userId).catch((err) =>
-          console.error("[provision] Background phone provision failed:", err)
-        );
+        // Ensure phone number exists for pro/power plans
+        if (canUsePhone(existingMachine.plan || 'starter')) {
+          ensurePhoneNumber(userId).catch((err) =>
+            console.error("[provision] Background phone provision failed:", err)
+          );
+        }
         
         return NextResponse.json({
           appName: existingMachine.appName,
@@ -738,10 +728,12 @@ export async function POST() {
         // Machine exists and is running
         console.log(`[provision] Machine ${existingMachine.id} already running`);
         
-        // Ensure phone number exists (fallback if Stripe webhook missed it)
-        ensurePhoneNumber(userId).catch((err) =>
-          console.error("[provision] Background phone provision failed:", err)
-        );
+        // Ensure phone number exists for pro/power plans
+        if (canUsePhone(existingMachine.plan || 'starter')) {
+          ensurePhoneNumber(userId).catch((err) =>
+            console.error("[provision] Background phone provision failed:", err)
+          );
+        }
         
         return NextResponse.json({
           appName: existingMachine.appName,
@@ -820,15 +812,15 @@ export async function POST() {
           
           // Map Stripe price ID to plan name
           const priceIdToPlan: Record<string, string> = {};
-          if (process.env.STRIPE_PRICE_LITE) priceIdToPlan[process.env.STRIPE_PRICE_LITE] = "lite";
+          // BYOK tier prices
+          if (process.env.STRIPE_PRICE_STARTER_BYOK) priceIdToPlan[process.env.STRIPE_PRICE_STARTER_BYOK] = "starter";
+          if (process.env.STRIPE_PRICE_PRO_BYOK) priceIdToPlan[process.env.STRIPE_PRICE_PRO_BYOK] = "pro";
+          if (process.env.STRIPE_PRICE_POWER_BYOK) priceIdToPlan[process.env.STRIPE_PRICE_POWER_BYOK] = "power";
+          // Legacy prices (for existing subscribers during transition)
+          if (process.env.STRIPE_PRICE_LITE) priceIdToPlan[process.env.STRIPE_PRICE_LITE] = "starter";
           if (process.env.STRIPE_PRICE_STARTER) priceIdToPlan[process.env.STRIPE_PRICE_STARTER] = "starter";
           if (process.env.STRIPE_PRICE_PRO) priceIdToPlan[process.env.STRIPE_PRICE_PRO] = "pro";
-          if (process.env.STRIPE_PRICE_BUSINESS) priceIdToPlan[process.env.STRIPE_PRICE_BUSINESS] = "business";
-          // Annual prices map to the same plan names
-          if (process.env.STRIPE_PRICE_LITE_ANNUAL) priceIdToPlan[process.env.STRIPE_PRICE_LITE_ANNUAL] = "lite";
-          if (process.env.STRIPE_PRICE_STARTER_ANNUAL) priceIdToPlan[process.env.STRIPE_PRICE_STARTER_ANNUAL] = "starter";
-          if (process.env.STRIPE_PRICE_PRO_ANNUAL) priceIdToPlan[process.env.STRIPE_PRICE_PRO_ANNUAL] = "pro";
-          if (process.env.STRIPE_PRICE_BUSINESS_ANNUAL) priceIdToPlan[process.env.STRIPE_PRICE_BUSINESS_ANNUAL] = "business";
+          if (process.env.STRIPE_PRICE_BUSINESS) priceIdToPlan[process.env.STRIPE_PRICE_BUSINESS] = "power";
           
           const stripePlan = priceId ? priceIdToPlan[priceId] : null;
           
@@ -857,8 +849,7 @@ export async function POST() {
     const shortId = shortUserId(userId);
     const appName = `automna-u-${shortId}`;
     
-    const planSpecs = getMachineSpecsForPlan(userPlan);
-    console.log(`[provision] Creating new app ${appName} for user ${userId} (plan: ${userPlan}, cpus: ${planSpecs.cpus}, memory: ${planSpecs.memory_mb}MB)`);
+    console.log(`[provision] Creating new app ${appName} for user ${userId} (plan: ${userPlan}, BYOK mode)`);
 
     // Helper to write provisioning status (non-fatal if it fails)
     const setStatus = async (status: string, error?: string) => {
@@ -955,8 +946,8 @@ export async function POST() {
     // and will upgrade waiting_for_gateway → ready when OpenClaw responds
     console.log(`[provision] Successfully created ${appName} with machine ${machine.id}`);
 
-    // Ensure phone number exists (fallback if Stripe webhook didn't provision one)
-    const phoneNumber = await ensurePhoneNumber(userId);
+    // Ensure phone number exists for pro/power plans
+    const phoneNumber = canUsePhone(userPlan) ? await ensurePhoneNumber(userId) : null;
 
     // Send machine ready email (non-blocking)
     const userEmail = user.emailAddresses?.[0]?.emailAddress;

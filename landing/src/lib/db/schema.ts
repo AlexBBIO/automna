@@ -27,7 +27,9 @@ export const machines = sqliteTable("machines", {
   gatewayToken: text("gateway_token"), // Per-user gateway auth token
   browserbaseContextId: text("browserbase_context_id"), // Browserbase persistent context for this user
   agentmailInboxId: text("agentmail_inbox_id"), // Agentmail inbox for this user (e.g., automna-abc123@agentmail.to)
-  plan: text("plan").default("starter"), // User's subscription plan: free, starter, pro, business
+  plan: text("plan").default("starter"), // User's subscription plan: starter, pro, power
+  byokProvider: text("byok_provider"), // 'anthropic_oauth' | 'anthropic_api_key' | null
+  byokEnabled: integer("byok_enabled").default(0),
   lastSessionKey: text("last_session_key").default("main"), // Last active conversation key (for webhook routing)
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
@@ -146,52 +148,59 @@ export const usageEvents = sqliteTable("usage_events", {
   eventTypeIdx: index("idx_usage_events_type").on(table.eventType),
 }));
 
-// Plan limits (stored in code for simplicity)
-// monthlyAutomnaCredits = cost cap / $0.0001 (1 AC = 100 microdollars)
+// ============================================
+// BYOK PLAN LIMITS
+// ============================================
+// Users bring their own Claude key. We charge for infrastructure + services.
 export const PLAN_LIMITS = {
-  free: {
-    monthlyAutomnaCredits: 10_000,   // $1 real cost cap
-    monthlyTokens: 100_000,         // LEGACY — remove after migration
-    monthlyCostCents: 100,          // LEGACY — remove after migration
-    requestsPerMinute: 5,
-    tokensPerMinute: 10_000,
+  starter: {  // $20/mo - sleeps idle, 1 channel, no phone, no cron
+    monthlySearches: 500,
+    monthlyBrowserMinutes: 60,
+    monthlyEmails: 100,
     monthlyCallMinutes: 0,
+    maxChannels: 1,
+    cronEnabled: false,
+    customSkills: false,
+    fileBrowser: false,
+    apiAccess: false,
+    sleepWhenIdle: true,
   },
-  lite: {
-    monthlyAutomnaCredits: 50_000,   // $5 real cost cap
-    monthlyTokens: 50_000,          // LEGACY — remove after migration
-    monthlyCostCents: 500,          // LEGACY — remove after migration
-    requestsPerMinute: 10,
-    tokensPerMinute: 25_000,
-    monthlyCallMinutes: 30,
+  pro: {  // $30/mo - always-on, 3 channels, phone, cron
+    monthlySearches: 2000,
+    monthlyBrowserMinutes: 300,
+    monthlyEmails: 500,
+    monthlyCallMinutes: 60,
+    maxChannels: 3,
+    cronEnabled: true,
+    customSkills: true,
+    fileBrowser: true,
+    apiAccess: false,
+    sleepWhenIdle: false,
   },
-  starter: {
-    monthlyAutomnaCredits: 200_000,  // $20 real cost cap
-    monthlyTokens: 500_000,         // LEGACY — remove after migration
-    monthlyCostCents: 2000,         // LEGACY — remove after migration
-    requestsPerMinute: 20,
-    tokensPerMinute: 50_000,
-    monthlyCallMinutes: 30,
-  },
-  pro: {
-    monthlyAutomnaCredits: 1_000_000, // $100 real cost cap
-    monthlyTokens: 2_000_000,        // LEGACY — remove after migration
-    monthlyCostCents: 10000,         // LEGACY — remove after migration
-    requestsPerMinute: 60,
-    tokensPerMinute: 150_000,
-    monthlyCallMinutes: 60,           // 60 minutes/month
-  },
-  business: {
-    monthlyAutomnaCredits: 5_000_000, // $500 real cost cap
-    monthlyTokens: 10_000_000,       // LEGACY — remove after migration
-    monthlyCostCents: 50000,         // LEGACY — remove after migration
-    requestsPerMinute: 120,
-    tokensPerMinute: 300_000,
-    monthlyCallMinutes: 300,       // 300 minutes/month
+  power: {  // $40/mo - unlimited channels, API, team
+    monthlySearches: 10000,
+    monthlyBrowserMinutes: 1000,
+    monthlyEmails: 2000,
+    monthlyCallMinutes: 120,
+    maxChannels: -1,
+    cronEnabled: true,
+    customSkills: true,
+    fileBrowser: true,
+    apiAccess: true,
+    sleepWhenIdle: false,
   },
 } as const;
 
 export type PlanType = keyof typeof PLAN_LIMITS;
+
+// Legacy plan limits (kept for migration compatibility)
+export const LEGACY_PLAN_LIMITS = {
+  free: { monthlyAutomnaCredits: 10_000, monthlyTokens: 100_000, monthlyCostCents: 100, requestsPerMinute: 5, tokensPerMinute: 10_000, monthlyCallMinutes: 0 },
+  lite: { monthlyAutomnaCredits: 50_000, monthlyTokens: 50_000, monthlyCostCents: 500, requestsPerMinute: 10, tokensPerMinute: 25_000, monthlyCallMinutes: 30 },
+  starter: { monthlyAutomnaCredits: 200_000, monthlyTokens: 500_000, monthlyCostCents: 2000, requestsPerMinute: 20, tokensPerMinute: 50_000, monthlyCallMinutes: 30 },
+  pro: { monthlyAutomnaCredits: 1_000_000, monthlyTokens: 2_000_000, monthlyCostCents: 10000, requestsPerMinute: 60, tokensPerMinute: 150_000, monthlyCallMinutes: 60 },
+  business: { monthlyAutomnaCredits: 5_000_000, monthlyTokens: 10_000_000, monthlyCostCents: 50000, requestsPerMinute: 120, tokensPerMinute: 300_000, monthlyCallMinutes: 300 },
+} as const;
 
 // ============================================
 // ANNOUNCEMENTS (Onboarding + Updates)

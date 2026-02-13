@@ -9,28 +9,12 @@ import { eq } from 'drizzle-orm';
 import { provisionPhoneNumber } from '@/lib/twilio';
 import { importNumberToBland, configureInboundNumber } from '@/lib/bland';
 import { trackServerEvent } from '@/lib/analytics';
+import { canUsePhone } from '@/lib/feature-gates';
 
 // Initialize Stripe lazily to avoid build-time errors
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-const FLY_API_TOKEN = process.env.FLY_API_TOKEN;
-const FLY_API_BASE = "https://api.machines.dev/v1";
-
-/**
- * Get machine specs based on plan tier.
- * Must match the logic in provision/route.ts.
- * Fly.io shared-cpu-1x maxes at 2048MB, so 4GB requires 2 shared CPUs.
- * Starter: 1 shared CPU + 2GB, Pro/Business: 2 shared CPUs + 4GB
- */
-function getMachineSpecsForPlan(plan: string): { cpus: number; memory_mb: number } {
-  switch (plan) {
-    case "pro":
-    case "business":
-      return { cpus: 2, memory_mb: 4096 };
-    default:
-      return { cpus: 1, memory_mb: 2048 };
-  }
-}
+// All BYOK machines are same size: 1 shared CPU, 2GB RAM
 
 /**
  * Update the user's plan in the machines table.
@@ -49,139 +33,14 @@ async function updateMachinePlan(userId: string, plan: string): Promise<void> {
   }
 }
 
-/**
- * Scale a user's Fly machine memory to match their plan tier.
- * Fetches current machine config, updates memory_mb, and logs the event.
- * Non-fatal: logs errors but doesn't fail the webhook.
- */
-async function scaleMachineForPlan(userId: string, plan: string): Promise<void> {
-  const targetSpecs = getMachineSpecsForPlan(plan);
-  
-  try {
-    // Find user's machine
-    const machine = await db.query.machines.findFirst({
-      where: eq(machines.userId, userId),
-    });
-
-    if (!machine || !machine.appName) {
-      console.log(`[stripe] No machine found for ${userId}, skipping scale`);
-      return;
-    }
-
-    // Get current machine config from Fly
-    const statusRes = await fetch(`${FLY_API_BASE}/apps/${machine.appName}/machines/${machine.id}`, {
-      headers: { Authorization: `Bearer ${FLY_API_TOKEN}` },
-    });
-
-    if (!statusRes.ok) {
-      console.error(`[stripe] Failed to get machine status for ${machine.appName}/${machine.id}: ${statusRes.status} ${await statusRes.text()}`);
-      await db.insert(machineEvents).values({
-        machineId: machine.id,
-        eventType: "scale_error",
-        details: JSON.stringify({
-          action: "get_status",
-          plan,
-          targetSpecs,
-          error: `HTTP ${statusRes.status}`,
-        }),
-      });
-      return;
-    }
-
-    const flyMachine = await statusRes.json();
-    const currentMemory = flyMachine.config?.guest?.memory_mb || 2048;
-    const currentCpus = flyMachine.config?.guest?.cpus || 1;
-
-    if (currentMemory === targetSpecs.memory_mb && currentCpus === targetSpecs.cpus) {
-      console.log(`[stripe] Machine ${machine.id} already at ${targetSpecs.cpus} CPUs / ${targetSpecs.memory_mb}MB, no scale needed`);
-      return;
-    }
-
-    console.log(`[stripe] Scaling machine ${machine.id} (${machine.appName}): ${currentCpus} CPUs/${currentMemory}MB → ${targetSpecs.cpus} CPUs/${targetSpecs.memory_mb}MB (plan: ${plan})`);
-
-    // Update the machine config with new CPU + memory
-    // Fly shared-cpu-1x maxes at 2048MB, need 2 CPUs for 4GB
-    const updatedConfig = {
-      ...flyMachine.config,
-      guest: {
-        ...flyMachine.config.guest,
-        cpus: targetSpecs.cpus,
-        memory_mb: targetSpecs.memory_mb,
-      },
-    };
-
-    const updateRes = await fetch(`${FLY_API_BASE}/apps/${machine.appName}/machines/${machine.id}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${FLY_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ config: updatedConfig }),
-    });
-
-    if (!updateRes.ok) {
-      const errorText = await updateRes.text();
-      console.error(`[stripe] Failed to scale machine ${machine.id}: ${updateRes.status} ${errorText}`);
-      await db.insert(machineEvents).values({
-        machineId: machine.id,
-        eventType: "scale_error",
-        details: JSON.stringify({
-          action: "update_specs",
-          plan,
-          fromCpus: currentCpus,
-          fromMemory: currentMemory,
-          targetSpecs,
-          error: `HTTP ${updateRes.status}: ${errorText.slice(0, 500)}`,
-        }),
-      });
-      return;
-    }
-
-    console.log(`[stripe] Successfully scaled machine ${machine.id} to ${targetSpecs.cpus} CPUs / ${targetSpecs.memory_mb}MB`);
-
-    // Log success
-    await db.insert(machineEvents).values({
-      machineId: machine.id,
-      eventType: "scaled",
-      details: JSON.stringify({
-        plan,
-        fromCpus: currentCpus,
-        fromMemory: currentMemory,
-        toCpus: targetSpecs.cpus,
-        toMemory: targetSpecs.memory_mb,
-        triggeredBy: "stripe-webhook",
-      }),
-    });
-  } catch (error) {
-    console.error(`[stripe] Error scaling machine for ${userId}:`, error);
-    // Best-effort event logging
-    try {
-      const machine = await db.query.machines.findFirst({
-        where: eq(machines.userId, userId),
-      });
-      if (machine) {
-        await db.insert(machineEvents).values({
-          machineId: machine.id,
-          eventType: "scale_error",
-          details: JSON.stringify({
-            plan,
-            targetSpecs,
-            error: error instanceof Error ? error.message : String(error),
-          }),
-        });
-      }
-    } catch { /* ignore logging failures */ }
-  }
-}
+// Machine scaling removed - all BYOK machines are same size (1 CPU, 2GB)
 
 /**
  * Provision a phone number for users upgrading to calling-enabled plans.
  * Non-fatal: logs errors but doesn't fail the webhook.
  */
-const PLANS_WITH_CALLING = ["lite", "starter", "pro", "business"];
-
 async function provisionPhoneForPlan(userId: string, plan: string): Promise<void> {
-  if (!PLANS_WITH_CALLING.includes(plan)) return;
+  if (!canUsePhone(plan)) return;
 
   try {
     // Check if user already has a number
@@ -236,7 +95,7 @@ including their name, what it's regarding, and a callback number. Keep responses
  * Non-fatal.
  */
 async function releasePhoneForPlan(userId: string, newPlan: string): Promise<void> {
-  if (PLANS_WITH_CALLING.includes(newPlan)) return; // Still on calling plan
+  if (canUsePhone(newPlan)) return; // Still on calling plan
 
   try {
     const userPhone = await db.query.phoneNumbers.findFirst({
@@ -291,10 +150,7 @@ export async function POST(request: Request) {
           // Update machines table (used for rate limiting)
           await updateMachinePlan(clerkUserId, plan);
           
-          // Scale machine memory to match plan tier (non-blocking, non-fatal)
-          await scaleMachineForPlan(clerkUserId, plan);
-          
-          // Provision phone number for calling-enabled plans
+          // Provision phone number for calling-enabled plans (pro/power only)
           await provisionPhoneForPlan(clerkUserId, plan);
           
           console.log(`[stripe] Upgraded user ${clerkUserId} to ${plan}`);
@@ -348,9 +204,6 @@ export async function POST(request: Request) {
             // Update machines table for rate limiting
             await updateMachinePlan(clerkUserId, newPlan);
 
-            // Scale machine to match new plan tier
-            await scaleMachineForPlan(clerkUserId, newPlan);
-
             // Handle phone provisioning/release
             await provisionPhoneForPlan(clerkUserId, newPlan);
             await releasePhoneForPlan(clerkUserId, newPlan);
@@ -397,9 +250,6 @@ export async function POST(request: Request) {
           
           // Update machines table (rate limiting will revert to free tier)
           await updateMachinePlan(clerkUserId, 'free');
-          
-          // Scale machine memory down to starter tier
-          await scaleMachineForPlan(clerkUserId, 'free');
           
           console.log(`[stripe] Canceled subscription for user ${clerkUserId}`);
 

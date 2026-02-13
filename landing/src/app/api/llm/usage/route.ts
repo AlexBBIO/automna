@@ -10,7 +10,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
-import { usageEvents, machines, PLAN_LIMITS } from '@/lib/db/schema';
+import { usageEvents, machines, LEGACY_PLAN_LIMITS } from '@/lib/db/schema';
 import { eq, sql, and, gte } from 'drizzle-orm';
 import { authenticateGatewayToken } from '../_lib/auth';
 import type { PlanType } from '@/lib/db/schema';
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
-  const limits = PLAN_LIMITS[plan];
+  const limits = LEGACY_PLAN_LIMITS[plan as keyof typeof LEGACY_PLAN_LIMITS];
   
   // Get start of current month (UTC)
   const monthStart = new Date();

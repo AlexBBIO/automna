@@ -8,10 +8,9 @@ const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
 // Price IDs - these will be created in Stripe dashboard
 // For now, we'll create them dynamically or use price lookup
 const PRICES = {
-  lite: process.env.STRIPE_PRICE_LITE,
-  starter: process.env.STRIPE_PRICE_STARTER,
-  pro: process.env.STRIPE_PRICE_PRO,
-  business: process.env.STRIPE_PRICE_BUSINESS,
+  starter: process.env.STRIPE_PRICE_STARTER_BYOK,
+  pro: process.env.STRIPE_PRICE_PRO_BYOK,
+  power: process.env.STRIPE_PRICE_POWER_BYOK,
 };
 
 export async function POST(request: Request) {
@@ -60,7 +59,7 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://automna.ai'}/dashboard?success=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://automna.ai'}/setup/connect`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://automna.ai'}/pricing?canceled=true`,
       metadata: {
         clerkUserId: userId,

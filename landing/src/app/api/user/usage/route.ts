@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { machines, usageEvents, PLAN_LIMITS } from "@/lib/db/schema";
+import { machines, usageEvents, LEGACY_PLAN_LIMITS } from "@/lib/db/schema";
 import type { PlanType } from "@/lib/db/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 
@@ -32,7 +32,7 @@ export async function GET() {
     }
 
     const plan = (userMachine.plan || "starter") as PlanType;
-    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
+    const limits = LEGACY_PLAN_LIMITS[plan as keyof typeof LEGACY_PLAN_LIMITS] || LEGACY_PLAN_LIMITS.starter;
 
     // Current billing period: 1st of current month to 1st of next month (UTC)
     const now = new Date();

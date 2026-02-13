@@ -118,6 +118,109 @@ function UsageSection() {
   );
 }
 
+interface BYOKStatus {
+  enabled: boolean;
+  type: string | null;
+  lastValidated: string | null;
+}
+
+function AIConnectionSection() {
+  const [status, setStatus] = useState<BYOKStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/user/byok')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setStatus(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect your AI credentials? Your agent will stop working until you reconnect.')) return;
+    setDisconnecting(true);
+    try {
+      await fetch('/api/user/byok', { method: 'DELETE' });
+      setStatus({ enabled: false, type: null, lastValidated: null });
+    } catch {
+      // ignore
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <section className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6 mb-6">
+        <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600" />
+          <span>Loading AI connection...</span>
+        </div>
+      </section>
+    );
+  }
+
+  const connectionLabel = status?.type === 'anthropic_oauth' ? 'Claude Subscription' : status?.type === 'anthropic_api_key' ? 'API Key' : null;
+
+  return (
+    <section className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6 mb-6">
+      <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">AI Connection</h2>
+      
+      {status?.enabled ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-1 rounded text-sm">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Connected
+            </span>
+            <span className="text-sm text-zinc-600 dark:text-zinc-400">via {connectionLabel}</span>
+          </div>
+          {status.lastValidated && (
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Last validated: {new Date(status.lastValidated).toLocaleDateString()}
+            </p>
+          )}
+          <div className="flex gap-2 mt-2">
+            <a
+              href="/setup/connect"
+              className="px-3 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition text-zinc-700 dark:text-zinc-300"
+            >
+              Change
+            </a>
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition disabled:opacity-50"
+            >
+              {disconnecting ? 'Disconnecting...' : 'Disconnect'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-1 rounded text-sm">
+              ⚠️ Not connected
+            </span>
+          </div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Connect your Claude account to start using your agent.
+          </p>
+          <a
+            href="/setup/connect"
+            className="inline-block px-4 py-2 text-sm bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition font-medium"
+          >
+            Connect AI
+          </a>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function SettingsPanel() {
   const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
   const [loadingAgent, setLoadingAgent] = useState(true);
@@ -158,6 +261,9 @@ export function SettingsPanel() {
   return (
     <div className="h-full overflow-y-auto bg-zinc-50 dark:bg-zinc-950">
       <div className="max-w-3xl mx-auto px-6 py-8">
+        {/* AI Connection */}
+        <AIConnectionSection />
+
         {/* Usage Section */}
         <UsageSection />
 

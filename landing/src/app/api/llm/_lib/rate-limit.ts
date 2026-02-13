@@ -6,7 +6,7 @@
  */
 
 import { db } from '@/lib/db';
-import { llmRateLimits, PLAN_LIMITS } from '@/lib/db/schema';
+import { llmRateLimits, LEGACY_PLAN_LIMITS } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import type { AuthenticatedUser } from './auth';
 import { getUsedAutomnaCredits } from '@/app/api/_lib/usage-events';
@@ -27,7 +27,7 @@ export interface RateLimitResult {
 export async function checkRateLimits(
   user: AuthenticatedUser,
 ): Promise<RateLimitResult> {
-  const limits = PLAN_LIMITS[user.plan];
+  const limits = LEGACY_PLAN_LIMITS[user.plan as keyof typeof LEGACY_PLAN_LIMITS];
   const now = Math.floor(Date.now() / 1000);
   const currentMinute = Math.floor(now / 60);
   

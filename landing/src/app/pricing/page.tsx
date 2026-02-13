@@ -10,103 +10,59 @@ import { useTheme, ThemeToggle } from '@/components/ThemeToggle';
 
 const plans = [
   {
-    name: 'Lite',
-    price: 20,
-    annual: 16,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_LITE,
-    annualPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_LITE_ANNUAL,
-    description: 'Experience the magic',
-    tagline: 'Everything. Just a taste.',
-    features: [
-      'Full AI agent (Claude Opus)',
-      'Dedicated phone number',
-      'Personal email inbox',
-      'All integrations',
-      'Browser access',
-      '50K credits/month',
-      'Estimated: ~100 tasks/mo',
-    ],
-    footnote: 'Machine sleeps when idle',
-    cta: 'Try for $20',
-    ctaAnnual: 'Try for $16',
-  },
-  {
     name: 'Starter',
-    price: 79,
-    annual: 63,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER,
-    annualPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER_ANNUAL,
-    description: 'Your always-on assistant',
-    tagline: 'Never sleeps. Never forgets.',
+    price: 20,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER_BYOK,
+    description: 'Get started with your own AI agent',
+    tagline: 'Bring your own Claude. We handle the rest.',
     features: [
-      'Full AI agent (Claude Opus)',
-      'Dedicated phone number',
-      'Personal email inbox',
-      'All integrations',
-      'Browser access',
-      'Always-on (24/7 uptime)',
-      'Proactive monitoring & alerts',
-      'Long-term memory',
-      '200K credits/month',
-      'Estimated: ~400 tasks/mo',
+      'Full AI agent (bring your own Claude)',
+      '1 connected channel',
+      'Browser & web search',
+      'Email (send/receive)',
+      'Persistent memory',
     ],
-    cta: 'Get Starter',
-    ctaAnnual: 'Get Starter',
-    popular: true,
+    limitations: [
+      'Machine sleeps when idle',
+      'No phone calling',
+      'No scheduled tasks',
+    ],
+    cta: 'Get Started — $20/mo',
   },
   {
     name: 'Pro',
-    price: 149,
-    annual: 119,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO,
-    annualPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL,
-    description: 'For power users',
-    tagline: 'Built for heavy use.',
+    price: 30,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_BYOK,
+    description: 'Always-on with full capabilities',
+    tagline: 'Never sleeps. Never forgets.',
     features: [
-      'Full AI agent (Claude Opus)',
-      'Dedicated phone number',
-      'Personal email inbox',
-      'All integrations',
-      'Browser access',
-      'Always-on (24/7 uptime)',
-      'Proactive monitoring & alerts',
-      'Long-term memory',
-      'Higher rate limits',
+      'Everything in Starter',
+      'Always-on 24/7',
+      '3 simultaneous channels',
+      'Phone calling (60 min/mo)',
+      'Scheduled tasks & cron',
       'Custom skills',
-      'Email support',
-      '1M credits/month',
-      'Estimated: ~2,000 tasks/mo',
+      'File browser',
     ],
-    cta: 'Go Pro',
-    ctaAnnual: 'Go Pro',
+    limitations: [],
+    cta: 'Go Pro — $30/mo',
+    popular: true,
   },
   {
-    name: 'Business',
-    price: 299,
-    annual: 239,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_BUSINESS,
-    annualPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_BUSINESS_ANNUAL,
-    description: 'Unlimited power',
-    tagline: 'For all-day, every-day use.',
+    name: 'Power',
+    price: 40,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_POWER_BYOK,
+    description: 'Unlimited power for heavy users',
+    tagline: 'No limits. Full control.',
     features: [
-      'Full AI agent (Claude Opus)',
-      'Dedicated phone number',
-      'Personal email inbox',
-      'All integrations',
-      'Browser access',
-      'Always-on (24/7 uptime)',
-      'Proactive monitoring & alerts',
-      'Long-term memory',
-      'Highest rate limits',
-      'Custom skills',
+      'Everything in Pro',
+      'Unlimited channels',
+      'Phone calling (120 min/mo)',
       'API access',
-      'Analytics dashboard',
-      'Dedicated support',
-      '5M credits/month',
-      'Estimated: ~10,000 tasks/mo',
+      'Team sharing (+1 seat)',
     ],
-    cta: 'Go Business',
-    ctaAnnual: 'Go Business',
+    limitations: [],
+    cta: 'Go Power — $40/mo',
   },
 ];
 
@@ -139,7 +95,7 @@ function SubscriptionBanner() {
       <div className="container mx-auto px-4 md:px-6">
         <div className="bg-purple-50 dark:bg-purple-900/50 border border-purple-300 dark:border-purple-500/50 rounded-lg p-4 text-center">
           <p className="text-purple-800 dark:text-purple-200">
-            <span className="font-semibold">Account created! 🎉</span> Pick a plan to activate your AI agent. It&apos;ll be ready in about 60 seconds.
+            <span className="font-semibold">Account created! 🎉</span> Pick a plan to get started. You&apos;ll connect your Claude account next.
           </p>
         </div>
       </div>
@@ -159,18 +115,16 @@ function SubscriptionBanner() {
   );
 }
 
-function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout, currentPlan }: {
+function PricingCard({ plan, isSignedIn, loading, onCheckout, currentPlan }: {
   plan: typeof plans[0];
-  isAnnual: boolean;
   isSignedIn: boolean;
   loading: string | null;
   onCheckout: (plan: typeof plans[0]) => void;
   currentPlan?: string | null;
 }) {
-  const price = isAnnual ? plan.annual : plan.price;
   const planKey = plan.name.toLowerCase();
   const isCurrentPlan = currentPlan === planKey;
-  const planOrder = ['lite', 'starter', 'pro', 'business'];
+  const planOrder = ['starter', 'pro', 'power'];
   const isDowngrade = currentPlan && planOrder.indexOf(planKey) < planOrder.indexOf(currentPlan);
   const cta = isCurrentPlan
     ? 'Current Plan'
@@ -178,11 +132,11 @@ function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout, currentP
     ? `Switch to ${plan.name}`
     : currentPlan && currentPlan !== 'free'
     ? `Upgrade to ${plan.name}`
-    : isAnnual ? plan.ctaAnnual : plan.cta;
+    : plan.cta;
   
   return (
     <div
-      className={`relative rounded-2xl p-6 md:p-8 flex flex-col min-w-[280px] w-[85vw] md:w-auto snap-center ${
+      className={`relative rounded-2xl p-6 md:p-8 flex flex-col ${
         plan.popular
           ? 'bg-gradient-to-b from-purple-100 to-purple-50 dark:from-purple-500/20 dark:to-purple-900/20 border-2 border-purple-500'
           : 'bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10'
@@ -200,15 +154,9 @@ function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout, currentP
       </div>
 
       <div className="mb-1">
-        <span className="text-4xl md:text-5xl font-bold">${price}</span>
+        <span className="text-4xl md:text-5xl font-bold">${plan.price}</span>
         <span className="text-zinc-500 dark:text-gray-400 text-sm">/mo</span>
       </div>
-      
-      {isAnnual && (
-        <p className="text-green-600 dark:text-green-400 text-xs mb-1">
-          Save ${(plan.price - plan.annual!) * 12}/yr
-        </p>
-      )}
       
       <p className="text-purple-600 dark:text-purple-300 text-xs md:text-sm font-medium mb-4 md:mb-6">
         {plan.tagline}
@@ -221,12 +169,12 @@ function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout, currentP
             <span className="text-zinc-600 dark:text-gray-300 text-xs md:text-sm">{feature}</span>
           </li>
         ))}
-        {plan.footnote && (
-          <li className="flex items-start gap-2 md:gap-3">
-            <span className="text-yellow-500 dark:text-yellow-400 mt-0.5 flex-shrink-0 text-xs">⚡</span>
-            <span className="text-zinc-400 dark:text-gray-500 text-xs md:text-sm italic">{plan.footnote}</span>
+        {plan.limitations.map((limitation, i) => (
+          <li key={`lim-${i}`} className="flex items-start gap-2 md:gap-3">
+            <span className="text-zinc-400 dark:text-zinc-500 mt-0.5 flex-shrink-0 text-xs">—</span>
+            <span className="text-zinc-400 dark:text-gray-500 text-xs md:text-sm">{limitation}</span>
           </li>
-        )}
+        ))}
       </ul>
 
       {isSignedIn ? (
@@ -252,7 +200,7 @@ function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout, currentP
                 : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white'
             }`}
           >
-            {cta}
+            {plan.cta}
           </button>
         </SignInButton>
       )}
@@ -263,37 +211,14 @@ function PricingCard({ plan, isAnnual, isSignedIn, loading, onCheckout, currentP
 export default function PricingPage() {
   const { isSignedIn, user } = useUser();
   const [loading, setLoading] = useState<string | null>(null);
-  const [isAnnual, setIsAnnual] = useState(false);
   const pageLoadTime = useRef(Date.now());
   const hasTrackedView = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   useTheme();
 
-  // user.publicMetadata used directly in handleCheckout and PricingCard
-
-  // Auto-scroll to "Most Popular" card on mobile
-  useEffect(() => {
-    if (scrollRef.current && window.innerWidth < 768) {
-      const popularIndex = plans.findIndex(p => p.popular);
-      if (popularIndex >= 0) {
-        const cards = scrollRef.current.children;
-        if (cards[popularIndex]) {
-          setTimeout(() => {
-            (cards[popularIndex] as HTMLElement).scrollIntoView({
-              behavior: 'smooth',
-              inline: 'center',
-              block: 'nearest',
-            });
-          }, 300);
-        }
-      }
-    }
-  }, []);
-
   useEffect(() => {
     if (hasTrackedView.current) return;
     hasTrackedView.current = true;
-
     const params = new URLSearchParams(window.location.search);
     const viewParams = {
       source: params.get('subscribe') === 'true' ? 'dashboard_redirect' : 'direct',
@@ -304,119 +229,75 @@ export default function PricingPage() {
     trackEvent('pricing_viewed', viewParams);
   }, [isSignedIn]);
 
-  useEffect(() => {
-    const handleLeave = () => {
-      const timeOnPage = Math.round((Date.now() - pageLoadTime.current) / 1000);
-      track('pricing_exit', {
-        time_on_page_seconds: timeOnPage,
-        signed_in: !!isSignedIn,
-      });
-    };
-
-    window.addEventListener('beforeunload', handleLeave);
-    return () => window.removeEventListener('beforeunload', handleLeave);
-  }, [isSignedIn]);
-
   const handleCheckout = async (plan: typeof plans[0]) => {
     if (!isSignedIn) return;
-    
     setLoading(plan.name);
 
     const timeToClick = Math.round((Date.now() - pageLoadTime.current) / 1000);
-    const checkoutParams = {
-      plan: plan.name.toLowerCase(),
-      price: isAnnual ? plan.annual : plan.price,
-      billing: isAnnual ? 'annual' : 'monthly',
-      time_to_click_seconds: timeToClick,
-    };
-    track('pricing_checkout_started', checkoutParams);
-    trackEvent('plan_selected', checkoutParams);
-
-    const priceId = isAnnual ? plan.annualPriceId : plan.priceId;
     const planName = plan.name.toLowerCase();
+    track('pricing_checkout_started', { plan: planName, price: plan.price, time_to_click_seconds: timeToClick });
+    trackEvent('plan_selected', { plan: planName, price: plan.price });
 
     // Check if user already has a subscription (upgrade flow)
     const currentPlan = user?.publicMetadata?.plan as string | undefined;
     const hasSubscription = user?.publicMetadata?.stripeSubscriptionId as string | undefined;
 
     if (hasSubscription && currentPlan && currentPlan !== 'free') {
-      // Existing subscriber - use upgrade API with proration
       try {
-        // First preview the proration
         const previewRes = await fetch('/api/upgrade?preview=true', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priceId, plan: planName }),
+          body: JSON.stringify({ priceId: plan.priceId, plan: planName }),
         });
         const preview = await previewRes.json();
 
         if (preview.error) {
           if (preview.error.includes('Already on this plan')) {
-            alert('You\'re already on this plan and billing period!');
+            alert('You\'re already on this plan!');
             setLoading(null);
             return;
           }
           throw new Error(preview.error);
         }
 
-        // Build confirmation message based on change type
-        let confirmMsg: string;
-        if (preview.isDowngrade) {
-          confirmMsg = `Switch to ${plan.name}? Your current plan stays active until your next billing date (${new Date(preview.nextBillingDate).toLocaleDateString()}), then you'll pay $${preview.newMonthlyPrice?.toFixed(2)}/mo going forward.`;
-        } else if (preview.isBillingChange) {
-          confirmMsg = `Switch billing period? You'll be charged a prorated amount of $${preview.totalDueNow.toFixed(2)} now.`;
-        } else {
-          confirmMsg = `Upgrade to ${plan.name}? You'll be charged a prorated amount of $${preview.totalDueNow.toFixed(2)} now for the rest of this billing period.`;
-        }
+        const confirmMsg = preview.isDowngrade
+          ? `Switch to ${plan.name}? Changes take effect at next billing date.`
+          : `Upgrade to ${plan.name}? Prorated charge of $${preview.totalDueNow.toFixed(2)} now.`;
 
         if (!confirm(confirmMsg)) {
           setLoading(null);
           return;
         }
 
-        // Perform the upgrade
         const upgradeRes = await fetch('/api/upgrade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priceId, plan: planName }),
+          body: JSON.stringify({ priceId: plan.priceId, plan: planName }),
         });
         const result = await upgradeRes.json();
 
         if (result.success) {
-          track('pricing_upgrade_completed', { from: currentPlan, to: planName, prorated: preview.totalDueNow });
           window.location.href = '/dashboard?success=true&upgraded=true';
         } else {
           throw new Error(result.error || 'Upgrade failed');
         }
       } catch (error) {
         console.error('Upgrade error:', error);
-        track('pricing_upgrade_error', { plan: planName, error: String(error) });
-        alert('Something went wrong with the upgrade. Please try again or contact support.');
+        alert('Something went wrong with the upgrade. Please try again.');
       }
     } else {
-      // New subscriber - use checkout flow
       try {
         const response = await fetch('/api/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            priceId,
-            plan: planName,
-            billing: isAnnual ? 'annual' : 'monthly',
-          }),
+          body: JSON.stringify({ priceId: plan.priceId, plan: planName }),
         });
-
         const data = await response.json();
-        
         if (data.url) {
           window.location.href = data.url;
-        } else {
-          console.error('No checkout URL returned');
-          track('pricing_checkout_error', { plan: planName, error: 'no_url' });
         }
       } catch (error) {
         console.error('Checkout error:', error);
-        track('pricing_checkout_error', { plan: planName, error: 'fetch_failed' });
       }
     }
     
@@ -445,99 +326,50 @@ export default function PricingPage() {
         </div>
       </nav>
 
-      {/* Subscription Required Banner */}
       <Suspense fallback={null}>
         <SubscriptionBanner />
       </Suspense>
 
-      {/* Header */}
       <main className="py-8 md:py-16">
-        <div className="text-center mb-6 px-4 md:px-6">
+        <div className="text-center mb-8 md:mb-12 px-4 md:px-6">
           <h1 className="text-3xl md:text-6xl font-bold mb-3 md:mb-4">
-            One agent. Your rules.
+            Bring your own Claude account.
           </h1>
-          <p className="text-base md:text-xl text-zinc-500 dark:text-gray-400 max-w-2xl mx-auto">
-            Every plan gets the same core agent — Claude Opus, phone calls, email, integrations.
-            Higher tiers add always-on uptime, memory, and more credits.
+          <p className="text-base md:text-xl text-zinc-500 dark:text-gray-400 max-w-2xl mx-auto mb-2">
+            We handle everything else — infrastructure, tools, integrations, memory.
+          </p>
+          <p className="text-sm text-zinc-400 dark:text-zinc-500 max-w-xl mx-auto">
+            Use your Claude subscription or API key. No markup on AI usage.
           </p>
         </div>
 
-        {/* What every plan includes */}
-        <div className="max-w-3xl mx-auto mb-8 md:mb-12 px-4 md:px-6">
-          <div className="bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl md:rounded-2xl p-4 md:p-8">
-            <h3 className="text-base md:text-xl font-bold mb-3 md:mb-4 text-center">What every plan includes</h3>
-            <div className="grid grid-cols-4 gap-2 md:gap-4 text-center">
-              <div className="p-1 md:p-3">
-                <div className="text-xl md:text-2xl mb-1">🧠</div>
-                <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Claude Opus</div>
-                <div className="text-zinc-400 dark:text-gray-500 text-xs hidden md:block">Latest model</div>
-              </div>
-              <div className="p-1 md:p-3">
-                <div className="text-xl md:text-2xl mb-1">📞</div>
-                <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Phone</div>
-                <div className="text-zinc-400 dark:text-gray-500 text-xs hidden md:block">Calls in & out</div>
-              </div>
-              <div className="p-1 md:p-3">
-                <div className="text-xl md:text-2xl mb-1">📧</div>
-                <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Email</div>
-                <div className="text-zinc-400 dark:text-gray-500 text-xs hidden md:block">Send & receive</div>
-              </div>
-              <div className="p-1 md:p-3">
-                <div className="text-xl md:text-2xl mb-1">🌐</div>
-                <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Browser</div>
-                <div className="text-zinc-400 dark:text-gray-500 text-xs hidden md:block">Research & browse</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Monthly / Annual toggle */}
-        <div className="flex justify-center items-center gap-3 mb-8 md:mb-12 px-4">
-          <span className={`text-sm ${!isAnnual ? 'text-zinc-900 dark:text-white font-medium' : 'text-zinc-400 dark:text-gray-500'}`}>Monthly</span>
-          <button
-            onClick={() => setIsAnnual(!isAnnual)}
-            className={`relative w-14 h-7 rounded-full transition-colors ${
-              isAnnual ? 'bg-purple-600' : 'bg-zinc-300 dark:bg-white/20'
-            }`}
-          >
-            <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white transition-transform ${
-              isAnnual ? 'translate-x-7' : 'translate-x-0.5'
-            }`} />
-          </button>
-          <span className={`text-sm ${isAnnual ? 'text-zinc-900 dark:text-white font-medium' : 'text-zinc-400 dark:text-gray-500'}`}>
-            Annual
-            <span className="ml-1 text-green-600 dark:text-green-400 text-xs font-medium">Save 20%</span>
-          </span>
-        </div>
-
-        {/* Pricing Cards - horizontal scroll on mobile, grid on desktop */}
-        <div className="md:px-6">
+        {/* Pricing Cards */}
+        <div className="px-4 md:px-6">
           {/* Mobile: horizontal scroll */}
           <div
             ref={scrollRef}
-            className="flex md:hidden gap-4 overflow-x-auto snap-x snap-mandatory px-4 pb-4 scrollbar-hide"
+            className="flex md:hidden gap-4 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-hide"
             style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
           >
             {plans.map((plan) => (
-              <PricingCard
-                key={plan.name}
-                plan={plan}
-                isAnnual={isAnnual}
-                isSignedIn={!!isSignedIn}
-                loading={loading}
-                onCheckout={handleCheckout}
-                currentPlan={user?.publicMetadata?.plan as string | undefined}
-              />
+              <div key={plan.name} className="min-w-[280px] w-[85vw] snap-center">
+                <PricingCard
+                  plan={plan}
+                  isSignedIn={!!isSignedIn}
+                  loading={loading}
+                  onCheckout={handleCheckout}
+                  currentPlan={user?.publicMetadata?.plan as string | undefined}
+                />
+              </div>
             ))}
           </div>
 
           {/* Desktop: grid */}
-          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+          <div className="hidden md:grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {plans.map((plan) => (
               <PricingCard
                 key={plan.name}
                 plan={plan}
-                isAnnual={isAnnual}
                 isSignedIn={!!isSignedIn}
                 loading={loading}
                 onCheckout={handleCheckout}
@@ -547,38 +379,38 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Scroll hint on mobile */}
-        <div className="flex md:hidden justify-center mt-4 gap-1.5">
-          {plans.map((plan, i) => (
-            <div
-              key={i}
-              className={`w-2 h-2 rounded-full ${
-                plan.popular ? 'bg-purple-500' : 'bg-zinc-300 dark:bg-white/20'
-              }`}
-            />
-          ))}
+        {/* How it works */}
+        <div className="mt-12 md:mt-20 max-w-3xl mx-auto px-4 md:px-6">
+          <h2 className="text-xl md:text-2xl font-bold text-center mb-6">How it works</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 text-center">
+              <div className="text-2xl mb-2">1️⃣</div>
+              <h3 className="font-semibold mb-1">Pick a plan</h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Choose your infrastructure tier</p>
+            </div>
+            <div className="bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 text-center">
+              <div className="text-2xl mb-2">2️⃣</div>
+              <h3 className="font-semibold mb-1">Connect Claude</h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Use your Claude subscription or API key</p>
+            </div>
+            <div className="bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 text-center">
+              <div className="text-2xl mb-2">3️⃣</div>
+              <h3 className="font-semibold mb-1">Start chatting</h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Your agent is ready in ~60 seconds</p>
+            </div>
+          </div>
         </div>
 
-        {/* Lite callout */}
-        <div className="mt-10 md:mt-16 max-w-3xl mx-auto text-center px-4 md:px-6">
-          <p className="text-zinc-400 dark:text-gray-500 text-xs md:text-sm">
-            Not sure yet? <span className="text-purple-600 dark:text-purple-400">Lite at ${isAnnual ? '16' : '20'}/mo</span> gives you the same core agent and tools,
-            but runs on-demand (sleeps when idle) with lower limits. Upgrade anytime.
-          </p>
-        </div>
-
-        {/* Footer */}
         <div className="mt-8 md:mt-12 text-center px-4 md:px-6">
           <p className="text-zinc-500 dark:text-gray-400 text-sm">
-            All plans include Claude AI. No API key needed.{' '}
-            <Link href="/dashboard" className="text-purple-600 dark:text-purple-400 hover:underline">
-              Start chatting →
-            </Link>
+            Questions?{' '}
+            <a href="mailto:hello@automna.ai" className="text-purple-600 dark:text-purple-400 hover:underline">
+              hello@automna.ai
+            </a>
           </p>
         </div>
       </main>
 
-      {/* Hide scrollbar globally for the carousel */}
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
