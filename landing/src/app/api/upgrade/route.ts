@@ -5,16 +5,21 @@ import Stripe from 'stripe';
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 // Map price IDs to plan names (reverse lookup)
-const PRICE_TO_PLAN: Record<string, string> = {
-  [process.env.STRIPE_PRICE_LITE!]: 'lite',
-  [process.env.STRIPE_PRICE_STARTER!]: 'starter',
-  [process.env.STRIPE_PRICE_PRO!]: 'pro',
-  [process.env.STRIPE_PRICE_BUSINESS!]: 'business',
-  [process.env.STRIPE_PRICE_LITE_ANNUAL!]: 'lite',
-  [process.env.STRIPE_PRICE_STARTER_ANNUAL!]: 'starter',
-  [process.env.STRIPE_PRICE_PRO_ANNUAL!]: 'pro',
-  [process.env.STRIPE_PRICE_BUSINESS_ANNUAL!]: 'business',
-};
+// Includes both legacy and new BYOK price IDs
+const PRICE_TO_PLAN: Record<string, string> = {};
+// Legacy prices
+if (process.env.STRIPE_PRICE_LITE) PRICE_TO_PLAN[process.env.STRIPE_PRICE_LITE] = 'lite';
+if (process.env.STRIPE_PRICE_STARTER) PRICE_TO_PLAN[process.env.STRIPE_PRICE_STARTER] = 'starter';
+if (process.env.STRIPE_PRICE_PRO) PRICE_TO_PLAN[process.env.STRIPE_PRICE_PRO] = 'pro';
+if (process.env.STRIPE_PRICE_BUSINESS) PRICE_TO_PLAN[process.env.STRIPE_PRICE_BUSINESS] = 'business';
+if (process.env.STRIPE_PRICE_LITE_ANNUAL) PRICE_TO_PLAN[process.env.STRIPE_PRICE_LITE_ANNUAL] = 'lite';
+if (process.env.STRIPE_PRICE_STARTER_ANNUAL) PRICE_TO_PLAN[process.env.STRIPE_PRICE_STARTER_ANNUAL] = 'starter';
+if (process.env.STRIPE_PRICE_PRO_ANNUAL) PRICE_TO_PLAN[process.env.STRIPE_PRICE_PRO_ANNUAL] = 'pro';
+if (process.env.STRIPE_PRICE_BUSINESS_ANNUAL) PRICE_TO_PLAN[process.env.STRIPE_PRICE_BUSINESS_ANNUAL] = 'business';
+// BYOK prices
+if (process.env.STRIPE_PRICE_STARTER_BYOK) PRICE_TO_PLAN[process.env.STRIPE_PRICE_STARTER_BYOK] = 'starter';
+if (process.env.STRIPE_PRICE_PRO_BYOK) PRICE_TO_PLAN[process.env.STRIPE_PRICE_PRO_BYOK] = 'pro';
+if (process.env.STRIPE_PRICE_POWER_BYOK) PRICE_TO_PLAN[process.env.STRIPE_PRICE_POWER_BYOK] = 'power';
 
 export async function POST(request: Request) {
   try {
@@ -71,13 +76,16 @@ export async function POST(request: Request) {
     }
 
     // Determine if this is an upgrade, downgrade, or billing period change
-    const planOrder = ['lite', 'starter', 'pro', 'business'];
+    // Combined order: legacy plans map into BYOK equivalents for ranking
+    const planRank: Record<string, number> = {
+      free: 0, lite: 1, starter: 1, pro: 2, power: 3, business: 3,
+    };
     const currentPlan = subscription.metadata?.plan || 'starter';
     const newPlan = plan || PRICE_TO_PLAN[priceId] || 'starter';
-    const currentRank = planOrder.indexOf(currentPlan);
-    const newRank = planOrder.indexOf(newPlan);
+    const currentRank = planRank[currentPlan] ?? 1;
+    const newRank = planRank[newPlan] ?? 1;
     const isDowngrade = newRank < currentRank;
-    const isSamePlan = newRank === currentRank; // billing period change only
+    const isSamePlan = newRank === currentRank;
 
     // Preview the proration to show the user what they'll be charged
     const previewMode = new URL(request.url).searchParams.get('preview') === 'true';
