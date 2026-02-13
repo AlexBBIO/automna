@@ -44,17 +44,15 @@ function buildAuthProfilesJson(credential: string, type: CredentialType): string
   });
 }
 
-async function validateCredential(credential: string): Promise<boolean> {
+async function validateCredential(credential: string): Promise<{ valid: boolean; error?: string }> {
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'x-api-key': credential,
-      'anthropic-version': '2023-06-01',
-    };
-
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': credential,
+        'anthropic-version': '2023-06-01',
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1,
@@ -62,10 +60,18 @@ async function validateCredential(credential: string): Promise<boolean> {
       }),
     });
 
-    // 200 = valid, 401/403 = invalid
-    return res.ok;
-  } catch {
-    return false;
+    // 401/403 = invalid credentials. Everything else means the key is valid
+    // (200 = success, 400 = bad request, 429 = rate limited, 529 = overloaded)
+    if (res.status === 401 || res.status === 403) {
+      const body = await res.text().catch(() => '');
+      console.log(`[byok] Credential validation failed: ${res.status} ${body.slice(0, 200)}`);
+      return { valid: false, error: `Authentication failed (${res.status})` };
+    }
+
+    return { valid: true };
+  } catch (err) {
+    console.error('[byok] Credential validation error:', err);
+    return { valid: false, error: 'Could not reach Anthropic API' };
   }
 }
 
@@ -137,10 +143,10 @@ export async function POST(request: Request) {
     }
 
     // Validate against Anthropic API
-    const isValid = await validateCredential(credential);
-    if (!isValid) {
+    const validation = await validateCredential(credential);
+    if (!validation.valid) {
       return NextResponse.json(
-        { error: 'Credential validation failed. Please check that your key is active and valid.' },
+        { error: validation.error || 'Credential validation failed. Please check that your key is active and valid.' },
         { status: 422 }
       );
     }
