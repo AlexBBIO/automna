@@ -292,32 +292,19 @@ export default function PricingPage() {
 
     if (hasSubscription && currentPlan && currentPlan !== 'free') {
       try {
-        // Switch plan directly - no preview/confirm step
-        const upgradeRes = await fetch('/api/upgrade', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priceId: plan.priceId, plan: planName }),
-        });
-        const result = await upgradeRes.json();
+        // Send to Stripe's hosted portal for plan changes
+        const portalRes = await fetch('/api/portal', { method: 'POST' });
+        const portal = await portalRes.json();
 
-        if (result.error) {
-          if (result.error.includes('Already on this plan')) {
-            setLoading(null);
-            window.location.href = '/setup/connect';
-            return;
-          }
-          throw new Error(result.error);
-        }
-
-        if (result.success) {
-          window.location.href = '/setup/connect';
+        if (portal.url) {
+          window.location.href = portal.url;
         } else {
-          throw new Error('Upgrade failed');
+          throw new Error(portal.error || 'Failed to open billing portal');
         }
       } catch (error) {
-        console.error('Upgrade error:', error);
+        console.error('Portal error:', error);
         const msg = error instanceof Error ? error.message : 'Unknown error';
-        alert(`Upgrade failed: ${msg}`);
+        alert(`Could not open billing portal: ${msg}`);
       }
     } else {
       try {
