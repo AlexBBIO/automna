@@ -152,6 +152,9 @@ async function ensureMachineByokMode(appName: string, machineId: string): Promis
     // Clear init.cmd so Docker ENTRYPOINT runs
     updatedConfig.init = {};
 
+    // Always pull latest image (ensures BYOK entrypoint + CORS fixes are present)
+    updatedConfig.image = 'registry.fly.io/automna-openclaw-image:latest';
+
     // Update machine (this triggers a restart with new image + env)
     const updateRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}`, {
       method: 'POST',
