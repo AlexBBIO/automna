@@ -219,6 +219,8 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Upgrade error:', error);
     const message = error instanceof Error ? error.message : 'Failed to upgrade';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Include Stripe error details if available
+    const stripeError = (error as any)?.raw?.message || (error as any)?.message;
+    return NextResponse.json({ error: stripeError || message }, { status: 500 });
   }
 }

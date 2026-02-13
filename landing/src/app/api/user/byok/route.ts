@@ -370,6 +370,80 @@ export async function GET() {
   }
 }
 
+/**
+ * Revert a Fly machine from BYOK mode back to legacy proxy mode.
+ * Removes BYOK_MODE env, sets ANTHROPIC_BASE_URL back to proxy,
+ * deletes auth-profiles.json, and restarts with latest image.
+ */
+async function revertMachineToProxyMode(appName: string, machineId: string): Promise<boolean> {
+  try {
+    const getRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}`, {
+      headers: { Authorization: `Bearer ${FLY_API_TOKEN}` },
+    });
+    if (!getRes.ok) {
+      console.error(`[byok] Failed to get machine config for revert: ${getRes.status}`);
+      return false;
+    }
+
+    const machine = await getRes.json();
+    const env = { ...machine.config.env };
+
+    // Remove BYOK mode, restore proxy URL
+    delete env.BYOK_MODE;
+    const proxyUrl = env.AUTOMNA_PROXY_URL || 'https://automna-proxy.fly.dev';
+    env.ANTHROPIC_BASE_URL = `${proxyUrl}/api/llm`;
+
+    const updatedConfig = { ...machine.config, env };
+    updatedConfig.image = 'registry.fly.io/automna-openclaw-image:latest';
+
+    // Delete auth-profiles.json before restart
+    await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}/exec`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${FLY_API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ command: ['sh', '-c', 'rm -f /home/node/.openclaw/agents/main/agent/auth-profiles.json'] }),
+    });
+
+    // Update machine (triggers restart with legacy entrypoint)
+    const updateRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${FLY_API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ config: updatedConfig }),
+    });
+
+    if (!updateRes.ok) {
+      console.error(`[byok] Failed to revert machine: ${updateRes.status} ${await updateRes.text()}`);
+      return false;
+    }
+
+    // Wait for machine to come back
+    for (let i = 0; i < 12; i++) {
+      await new Promise(r => setTimeout(r, 5000));
+      const stateRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}`, {
+        headers: { Authorization: `Bearer ${FLY_API_TOKEN}` },
+      });
+      if (stateRes.ok) {
+        const state = await stateRes.json();
+        if (state.state === 'started') {
+          console.log(`[byok] Machine reverted to proxy mode (took ~${(i + 1) * 5}s)`);
+          return true;
+        }
+      }
+    }
+
+    console.warn('[byok] Machine revert restart timed out (60s)');
+    return true;
+  } catch (error) {
+    console.error('[byok] Error reverting machine to proxy mode:', error);
+    return false;
+  }
+}
+
 export async function DELETE() {
   try {
     const { userId } = await auth();
@@ -390,7 +464,23 @@ export async function DELETE() {
       .set({ byokProvider: null, byokEnabled: 0, updatedAt: new Date() })
       .where(eq(machines.userId, userId));
 
-    return NextResponse.json({ success: true });
+    // Revert machine to proxy mode
+    const machine = await db.query.machines.findFirst({
+      where: eq(machines.userId, userId),
+    });
+
+    let revertedMachine = false;
+    if (machine?.appName) {
+      revertedMachine = await revertMachineToProxyMode(machine.appName, machine.id);
+
+      await db.insert(machineEvents).values({
+        machineId: machine.id,
+        eventType: 'byok_removed',
+        details: JSON.stringify({ revertedMachine }),
+      });
+    }
+
+    return NextResponse.json({ success: true, revertedMachine });
   } catch (error) {
     console.error('[byok] DELETE error:', error);
     return NextResponse.json(

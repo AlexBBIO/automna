@@ -331,7 +331,8 @@ export default function PricingPage() {
         }
       } catch (error) {
         console.error('Upgrade error:', error);
-        alert('Something went wrong with the upgrade. Please try again.');
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        alert(`Upgrade failed: ${msg}`);
       }
     } else {
       try {
