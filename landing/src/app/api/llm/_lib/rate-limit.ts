@@ -6,7 +6,7 @@
  */
 
 import { db } from '@/lib/db';
-import { llmRateLimits, LEGACY_PLAN_LIMITS } from '@/lib/db/schema';
+import { llmRateLimits, creditBalances, LEGACY_PLAN_LIMITS } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import type { AuthenticatedUser } from './auth';
 import { getUsedAutomnaCredits } from '@/app/api/_lib/usage-events';
@@ -27,22 +27,51 @@ export interface RateLimitResult {
 export async function checkRateLimits(
   user: AuthenticatedUser,
 ): Promise<RateLimitResult> {
-  const limits = LEGACY_PLAN_LIMITS[user.plan as keyof typeof LEGACY_PLAN_LIMITS];
+  // Determine effective plan (respect downgrade grace period)
+  let effectivePlan = user.plan;
   const now = Math.floor(Date.now() / 1000);
+  if (user.effectivePlan && user.effectivePlanUntil && user.effectivePlanUntil > now) {
+    effectivePlan = user.effectivePlan as typeof user.plan;
+  }
+
+  const limits = LEGACY_PLAN_LIMITS[effectivePlan as keyof typeof LEGACY_PLAN_LIMITS] 
+    || LEGACY_PLAN_LIMITS[user.plan as keyof typeof LEGACY_PLAN_LIMITS];
   const currentMinute = Math.floor(now / 60);
   
-  // 1. Check monthly Automna Credit budget
-  const usedAutomnaCredits = await getUsedAutomnaCredits(user.userId);
+  // 1. Check credit budget
+  const isProxy = user.byokProvider === 'proxy';
   
-  if (usedAutomnaCredits >= limits.monthlyAutomnaCredits) {
-    return {
-      allowed: false,
-      reason: `Monthly credit limit reached (${usedAutomnaCredits.toLocaleString()} / ${limits.monthlyAutomnaCredits.toLocaleString()})`,
-      limits: {
-        monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: limits.monthlyAutomnaCredits },
-        requestsPerMinute: { used: 0, limit: limits.requestsPerMinute },
-      },
-    };
+  if (isProxy) {
+    // Proxy users: check prepaid credit balance (hard block at $0)
+    const bal = await db.query.creditBalances.findFirst({
+      where: eq(creditBalances.userId, user.userId),
+    });
+    const creditBalance = bal?.balance ?? 0;
+    
+    if (creditBalance <= 0) {
+      return {
+        allowed: false,
+        reason: 'No credits remaining. Purchase more credits to continue.',
+        limits: {
+          monthlyAutomnaCredits: { used: 0, limit: 0 },
+          requestsPerMinute: { used: 0, limit: limits.requestsPerMinute },
+        },
+      };
+    }
+  } else {
+    // Legacy/subscription users: check monthly Automna Credit budget
+    const usedAutomnaCredits = await getUsedAutomnaCredits(user.userId);
+    
+    if (usedAutomnaCredits >= limits.monthlyAutomnaCredits) {
+      return {
+        allowed: false,
+        reason: `Monthly credit limit reached (${usedAutomnaCredits.toLocaleString()} / ${limits.monthlyAutomnaCredits.toLocaleString()})`,
+        limits: {
+          monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: limits.monthlyAutomnaCredits },
+          requestsPerMinute: { used: 0, limit: limits.requestsPerMinute },
+        },
+      };
+    }
   }
   
   // 2. Check per-minute rate limit (RPM)

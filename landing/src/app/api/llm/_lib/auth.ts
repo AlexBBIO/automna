@@ -7,6 +7,9 @@ export interface AuthenticatedUser {
   appName: string;
   machineId: string;
   plan: PlanType;
+  byokProvider: string | null;
+  effectivePlan: string | null;
+  effectivePlanUntil: number | null;
 }
 
 /**
@@ -41,7 +44,7 @@ export async function authenticateGatewayToken(
   try {
     const machine = await db.query.machines.findFirst({
       where: eq(machines.gatewayToken, token),
-      columns: { id: true, userId: true, appName: true, plan: true },
+      columns: { id: true, userId: true, appName: true, plan: true, byokProvider: true, effectivePlan: true, effectivePlanUntil: true },
     });
 
     if (!machine) {
@@ -53,6 +56,9 @@ export async function authenticateGatewayToken(
       appName: machine.appName ?? "unknown",
       machineId: machine.id,
       plan: (machine.plan as PlanType) ?? "starter",
+      byokProvider: machine.byokProvider ?? null,
+      effectivePlan: machine.effectivePlan ?? null,
+      effectivePlanUntil: machine.effectivePlanUntil ?? null,
     };
   } catch (error) {
     console.error("[LLM Proxy] Auth error:", error);

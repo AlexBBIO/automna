@@ -14,9 +14,10 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { AnnouncementModal } from "@/components/AnnouncementModal";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { IntegrationsPanel } from "@/components/IntegrationsPanel";
+import { CreditsPanel } from "@/components/CreditsPanel";
 import { subscribeUnread, clearUnread } from "@/lib/clawdbot-runtime";
 
-type TabView = 'chat' | 'files' | 'settings' | 'integrations';
+type TabView = 'chat' | 'files' | 'settings' | 'integrations' | 'credits';
 
 interface Conversation {
   key: string;
@@ -79,7 +80,14 @@ export default function DashboardPage() {
   const [resetStatus, setResetStatus] = useState<string | null>(null);
   
   // Tab state
-  const [activeTab, setActiveTab] = useState<TabView>('chat');
+  const [activeTab, setActiveTab] = useState<TabView>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'credits') return 'credits';
+      if (params.get('credits') === 'purchased') return 'credits';
+    }
+    return 'chat';
+  });
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   
   // Usage tracking (shared between banner and chat)
@@ -935,6 +943,16 @@ export default function DashboardPage() {
                 >
                   🔌 Integrations
                 </button>
+                <button
+                  onClick={() => setActiveTab('credits')}
+                  className={`px-4 py-3 text-sm font-medium transition-colors ${
+                    activeTab === 'credits'
+                      ? 'text-zinc-900 dark:text-white border-b-2 border-purple-600 dark:border-purple-400'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                  }`}
+                >
+                  💳 Credits
+                </button>
               </div>
               
               {/* Tab content */}
@@ -992,6 +1010,9 @@ export default function DashboardPage() {
                       setActiveTab('chat');
                     }}
                   />
+                )}
+                {activeTab === 'credits' && (
+                  <CreditsPanel />
                 )}
               </div>
             </div>
