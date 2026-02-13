@@ -867,6 +867,12 @@ if (!config.plugins) config.plugins = {};
 if (!config.plugins.entries) config.plugins.entries = {};
 config.plugins.entries['voice-call'] = { enabled: false };
 
+// In BYOK mode, remove the automna LLM provider (we go direct to Anthropic)
+if (byokMode && config.models && config.models.providers && config.models.providers.automna) {
+  delete config.models.providers.automna;
+  console.log('[automna] BYOK mode: removed automna LLM provider');
+}
+
 // Fix any stale model references
 let configStr = JSON.stringify(config);
 if (!byokMode) {
