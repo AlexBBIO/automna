@@ -112,15 +112,93 @@ async function validateCredential(credential: string, type: CredentialType): Pro
   return { valid: false, error: detail || 'Authentication failed. Please check that your key is active and valid.' };
 }
 
+/**
+ * Ensure the Fly machine is in BYOK mode.
+ * If the machine doesn't have BYOK_MODE env var, update its config and restart.
+ * This handles legacy→BYOK migration: the machine needs a full restart for the
+ * entrypoint to regenerate config in BYOK mode.
+ */
+async function ensureMachineByokMode(appName: string, machineId: string): Promise<boolean> {
+  try {
+    // Get current machine config
+    const getRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}`, {
+      headers: { Authorization: `Bearer ${FLY_API_TOKEN}` },
+    });
+    if (!getRes.ok) {
+      console.error(`[byok] Failed to get machine config: ${getRes.status}`);
+      return false;
+    }
+
+    const machine = await getRes.json();
+    const env = machine.config?.env || {};
+
+    // Already in BYOK mode? Just need to clear init.cmd if present
+    const needsEnvUpdate = env.BYOK_MODE !== 'true' || env.ANTHROPIC_BASE_URL;
+    const needsInitClear = machine.config?.init?.cmd?.length > 0;
+
+    if (!needsEnvUpdate && !needsInitClear) {
+      console.log('[byok] Machine already in BYOK mode');
+      return true;
+    }
+
+    console.log(`[byok] Migrating machine to BYOK mode (envUpdate=${needsEnvUpdate}, initClear=${needsInitClear})`);
+
+    // Build updated config (FULL config — never partial!)
+    const updatedConfig = { ...machine.config };
+    updatedConfig.env = { ...env, BYOK_MODE: 'true' };
+    delete updatedConfig.env.ANTHROPIC_BASE_URL;
+    delete updatedConfig.env.ANTHROPIC_API_KEY;
+    
+    // Clear init.cmd so Docker ENTRYPOINT runs
+    updatedConfig.init = {};
+
+    // Update machine (this triggers a restart with new image + env)
+    const updateRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${FLY_API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ config: updatedConfig }),
+    });
+
+    if (!updateRes.ok) {
+      console.error(`[byok] Failed to update machine: ${updateRes.status} ${await updateRes.text()}`);
+      return false;
+    }
+
+    // Wait for machine to come back up (up to 90 seconds)
+    for (let i = 0; i < 18; i++) {
+      await new Promise(r => setTimeout(r, 5000));
+      const stateRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}`, {
+        headers: { Authorization: `Bearer ${FLY_API_TOKEN}` },
+      });
+      if (stateRes.ok) {
+        const state = await stateRes.json();
+        if (state.state === 'started') {
+          console.log(`[byok] Machine restarted in BYOK mode (took ~${(i + 1) * 5}s)`);
+          return true;
+        }
+      }
+    }
+
+    console.warn('[byok] Machine restart timed out (90s), continuing anyway');
+    return true; // Credentials are saved in DB, machine will pick them up eventually
+  } catch (error) {
+    console.error('[byok] Error migrating machine to BYOK mode:', error);
+    return false;
+  }
+}
+
 async function pushCredentialToMachine(
   appName: string,
   machineId: string,
   authProfilesJson: string
 ): Promise<boolean> {
   try {
-    // Write auth-profiles.json via exec
-    const escapedJson = authProfilesJson.replace(/'/g, "'\\''");
-    const cmd = `mkdir -p /home/node/.openclaw/agents/main/agent && printf '${escapedJson}' > /home/node/.openclaw/agents/main/agent/auth-profiles.json`;
+    // Write auth-profiles.json via exec using base64 to avoid shell escaping issues
+    const b64 = Buffer.from(authProfilesJson).toString('base64');
+    const cmd = `mkdir -p /home/node/.openclaw/agents/main/agent && echo ${b64} | base64 -d > /home/node/.openclaw/agents/main/agent/auth-profiles.json`;
 
     const execRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}/exec`, {
       method: 'POST',
@@ -128,7 +206,7 @@ async function pushCredentialToMachine(
         Authorization: `Bearer ${FLY_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ cmd: ['sh', '-c', cmd] }),
+      body: JSON.stringify({ command: ['sh', '-c', cmd] }),
     });
 
     if (!execRes.ok) {
@@ -136,14 +214,14 @@ async function pushCredentialToMachine(
       return false;
     }
 
-    // Signal gateway restart
+    // Signal gateway restart to pick up new credentials
     const restartRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machineId}/exec`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${FLY_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ cmd: ['sh', '-c', 'kill -USR1 1'] }),
+      body: JSON.stringify({ command: ['sh', '-c', 'kill -USR1 $(pgrep -f openclaw-gateway || pgrep -f entry.js || echo 1)'] }),
     });
 
     if (!restartRes.ok) {

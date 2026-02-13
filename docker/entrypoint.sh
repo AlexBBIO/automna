@@ -722,6 +722,11 @@ for arg in "$@"; do
     fi
 done
 
+# Fallback to env var if no token in args
+if [ -z "$GATEWAY_TOKEN" ] && [ -n "$OPENCLAW_GATEWAY_TOKEN" ]; then
+    GATEWAY_TOKEN="$OPENCLAW_GATEWAY_TOKEN"
+fi
+
 # Create/migrate config file
 CONFIG_FILE="$OPENCLAW_DIR/clawdbot.json"
 
@@ -764,26 +769,36 @@ const managed = {
   }
 };
 
-// In BYOK mode, don't add automna LLM provider — use anthropic directly
-// In legacy mode, add the proxy provider
-if (!byokMode) {
-  managed.models = {
-    providers: {
-      automna: {
-        baseUrl: proxyUrl + '/api/llm',
-        apiKey: gatewayToken,
-        api: 'anthropic-messages',
-        models: [
-          { id: 'claude-opus-4-5', name: 'Claude Opus 4.5' },
-          { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }
-        ]
-      }
+// Always add automna provider — it's the proxy fallback (future: overages)
+// In BYOK mode, user's auth-profiles.json credential takes priority for anthropic
+// In legacy mode, automna is the only LLM provider
+managed.models = {
+  providers: {
+    automna: {
+      baseUrl: proxyUrl + '/api/llm',
+      apiKey: gatewayToken,
+      api: 'anthropic-messages',
+      models: [
+        { id: 'claude-opus-4-5', name: 'Claude Opus 4.5' },
+        { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }
+      ]
     }
-  };
-}
+  }
+};
 
 // Default model depends on mode
 const defaultModel = byokMode ? 'anthropic/claude-opus-4-5' : 'automna/claude-opus-4-5';
+
+// In BYOK mode, force the model refs to anthropic (managed, not defaulted)
+// This ensures existing configs from legacy mode get updated
+if (byokMode) {
+  managed.agents = {
+    defaults: {
+      model: { primary: defaultModel },
+      imageModel: { primary: defaultModel }
+    }
+  };
+}
 
 // Defaults - only set if not already present in existing config
 const defaults = {
@@ -867,26 +882,23 @@ if (!config.plugins) config.plugins = {};
 if (!config.plugins.entries) config.plugins.entries = {};
 config.plugins.entries['voice-call'] = { enabled: false };
 
-// In BYOK mode, remove the automna LLM provider (we go direct to Anthropic)
-if (byokMode && config.models && config.models.providers && config.models.providers.automna) {
-  delete config.models.providers.automna;
-  console.log('[automna] BYOK mode: removed automna LLM provider');
+// In BYOK mode: keep automna provider (for future overages), but default model points to anthropic
+// Auth-profiles.json credential takes priority for the anthropic provider
+// In legacy mode: automna provider is the primary, model refs use automna/
+if (byokMode) {
+  console.log('[automna] BYOK mode: keeping automna provider as fallback, default model uses anthropic');
 }
 
 // Fix any stale model references
 let configStr = JSON.stringify(config);
 if (!byokMode) {
-  // Legacy mode: rewrite anthropic → automna provider
+  // Legacy mode: ensure all model refs go through automna proxy
   configStr = configStr
     .replace(/\"anthropic\/claude-opus-4-5\"/g, '\"automna/claude-opus-4-5\"')
     .replace(/\"anthropic\/claude-sonnet-4\"/g, '\"automna/claude-opus-4-5\"')
     .replace(/\"claude-3-5-sonnet-[0-9]+\"/g, '\"claude-opus-4-5\"');
-} else {
-  // BYOK mode: rewrite automna → anthropic provider (direct)
-  configStr = configStr
-    .replace(/\"automna\/claude-opus-4-5\"/g, '\"anthropic/claude-opus-4-5\"')
-    .replace(/\"automna\/claude-sonnet-4\"/g, '\"anthropic/claude-sonnet-4\"');
 }
+// BYOK mode: no model ref rewriting needed — default model already set to anthropic/
 const fixed = configStr;
 
 // Remove unsupported top-level 'heartbeat' key (moved to agents.defaults.heartbeat)

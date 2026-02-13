@@ -494,11 +494,10 @@ async function createMachine(
       cpus: 1,
       memory_mb: 2048,
     },
-    // Initialize session structure with canonical key, then start gateway
-    // This fixes the session key mismatch bug where "main" != "agent:main:main"
-    init: {
-      cmd: buildInitCommand(gatewayToken),
-    },
+    // Let the Docker ENTRYPOINT handle startup (automna-entrypoint.sh)
+    // The entrypoint manages config merging, BYOK mode, Caddy proxy, etc.
+    // Gateway token is passed via OPENCLAW_GATEWAY_TOKEN env var
+    init: {},
     services: [
       {
         ports: [
