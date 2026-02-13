@@ -72,6 +72,7 @@ async function validateCredential(credential: string, type: CredentialType): Pro
     });
   }
 
+  let lastError = '';
   for (const method of methods) {
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -82,8 +83,12 @@ async function validateCredential(credential: string, type: CredentialType): Pro
 
       console.log(`[byok] Validation attempt (${method.name}): ${res.status}`);
 
+      const resBody = await res.text().catch(() => '');
+      console.log(`[byok] Validation (${method.name}): status=${res.status} body=${resBody.slice(0, 300)}`);
+
       // 401/403 = invalid with this auth method, try next
       if (res.status === 401 || res.status === 403) {
+        lastError = resBody;
         continue;
       }
 
@@ -91,11 +96,19 @@ async function validateCredential(credential: string, type: CredentialType): Pro
       return { valid: true };
     } catch (err) {
       console.error(`[byok] Validation error with ${method.name}:`, err);
+      lastError = err instanceof Error ? err.message : String(err);
       continue;
     }
   }
 
-  return { valid: false, error: 'Authentication failed. Please check that your key is active and valid.' };
+  // Parse the Anthropic error message if possible
+  let detail = '';
+  try {
+    const parsed = JSON.parse(lastError);
+    detail = parsed?.error?.message || '';
+  } catch { /* not json */ }
+
+  return { valid: false, error: detail || 'Authentication failed. Please check that your key is active and valid.' };
 }
 
 async function pushCredentialToMachine(
@@ -151,10 +164,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { credential } = await request.json();
-    if (!credential || typeof credential !== 'string') {
+    const { credential: rawCredential } = await request.json();
+    if (!rawCredential || typeof rawCredential !== 'string') {
       return NextResponse.json({ error: 'Credential required' }, { status: 400 });
     }
+
+    // Trim whitespace/newlines that can sneak in from copy-paste
+    const credential = rawCredential.trim();
 
     // Detect type
     const type = detectCredentialType(credential);
