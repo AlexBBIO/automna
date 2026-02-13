@@ -308,6 +308,10 @@ export async function POST(request: Request) {
 
     let pushedToMachine = false;
     if (machine?.appName) {
+      // First, ensure the machine is in BYOK mode (sets env vars, clears init.cmd, restarts)
+      const migrated = await ensureMachineByokMode(machine.appName, machine.id);
+      console.log(`[byok] Machine migration: ${migrated ? 'success' : 'skipped/failed'}`);
+
       const authProfilesJson = buildAuthProfilesJson(credential, type);
       pushedToMachine = await pushCredentialToMachine(machine.appName, machine.id, authProfilesJson);
 
