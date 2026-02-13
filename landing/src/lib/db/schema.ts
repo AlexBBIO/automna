@@ -201,6 +201,7 @@ export const LEGACY_PLAN_LIMITS = {
   lite: { monthlyAutomnaCredits: 50_000, monthlyTokens: 50_000, monthlyCostCents: 500, requestsPerMinute: 10, tokensPerMinute: 25_000, monthlyCallMinutes: 30 },
   starter: { monthlyAutomnaCredits: 200_000, monthlyTokens: 500_000, monthlyCostCents: 2000, requestsPerMinute: 20, tokensPerMinute: 50_000, monthlyCallMinutes: 30 },
   pro: { monthlyAutomnaCredits: 1_000_000, monthlyTokens: 2_000_000, monthlyCostCents: 10000, requestsPerMinute: 60, tokensPerMinute: 150_000, monthlyCallMinutes: 60 },
+  power: { monthlyAutomnaCredits: 5_000_000, monthlyTokens: 10_000_000, monthlyCostCents: 50000, requestsPerMinute: 120, tokensPerMinute: 300_000, monthlyCallMinutes: 120 },
   business: { monthlyAutomnaCredits: 5_000_000, monthlyTokens: 10_000_000, monthlyCostCents: 50000, requestsPerMinute: 120, tokensPerMinute: 300_000, monthlyCallMinutes: 300 },
 } as const;
 

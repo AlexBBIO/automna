@@ -55,14 +55,27 @@ export async function logUsageEvent(input: UsageEventInput): Promise<void> {
     // This runs for all proxy usage (LLM, search, browser, etc.)
     if (automnaCredits > 0 && !input.error) {
       try {
-        const bal = await db.query.creditBalances.findFirst({
-          where: eq(creditBalances.userId, input.userId),
-        });
-        if (bal && bal.balance > 0) {
-          const newBalance = Math.max(0, bal.balance - automnaCredits);
-          await db.update(creditBalances)
-            .set({ balance: newBalance, updatedAt: new Date() })
-            .where(eq(creditBalances.userId, input.userId));
+        // Atomic decrement with floor at 0 to prevent race conditions
+        const result = await db.update(creditBalances)
+          .set({
+            balance: sql`MAX(0, ${creditBalances.balance} - ${automnaCredits})`,
+            updatedAt: new Date(),
+          })
+          .where(and(
+            eq(creditBalances.userId, input.userId),
+            sql`${creditBalances.balance} > 0`
+          ))
+          .returning({ newBalance: creditBalances.balance });
+
+        // Log the deduction in transaction history
+        if (result.length > 0) {
+          await db.insert(creditTransactions).values({
+            userId: input.userId,
+            type: 'usage',
+            amount: -automnaCredits,
+            balanceAfter: result[0].newBalance,
+            description: `${input.eventType} usage`,
+          });
         }
       } catch (e) {
         // Non-fatal: don't block usage logging if credit deduction fails

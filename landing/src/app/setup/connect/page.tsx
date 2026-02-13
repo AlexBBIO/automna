@@ -106,10 +106,10 @@ export default function ConnectPage() {
                 <h2 className="text-xl font-bold mb-2">Bill me as I go</h2>
                 <p className="text-zinc-400 text-sm mb-3">
                   Skip connecting Claude. We&apos;ll handle the AI and bill you based on usage.
-                  Your plan includes a monthly credit allowance for AI calls.
+                  Buy prepaid credits and only pay for what you use.
                 </p>
                 <div className="flex items-center gap-2 text-emerald-400 text-sm">
-                  <span>💳 Easiest setup — just start chatting</span>
+                  <span>💳 Easiest setup — buy credits and start chatting</span>
                 </div>
               </div>
               <span className="text-zinc-500 group-hover:text-emerald-400 transition mt-2">→</span>
