@@ -251,8 +251,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Credential required' }, { status: 400 });
     }
 
-    // Trim whitespace/newlines that can sneak in from copy-paste
-    const credential = rawCredential.trim();
+    // Strip ALL whitespace (spaces, newlines, tabs) that can sneak in from copy-paste
+    // Tokens/keys should never contain whitespace, so this is safe
+    const credential = rawCredential.replace(/\s+/g, '');
 
     // Detect type
     const type = detectCredentialType(credential);
