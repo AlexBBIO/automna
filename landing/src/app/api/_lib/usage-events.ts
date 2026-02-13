@@ -8,7 +8,7 @@
  */
 
 import { db } from "@/lib/db";
-import { usageEvents } from "@/lib/db/schema";
+import { usageEvents, creditBalances, creditTransactions } from "@/lib/db/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { MICRODOLLARS_PER_AUTOMNA_CREDIT } from "./cost-constants";
 
@@ -50,6 +50,25 @@ export async function logUsageEvent(input: UsageEventInput): Promise<void> {
       metadata: input.metadata ? JSON.stringify(input.metadata) : null,
       error: input.error ?? null,
     });
+
+    // Deduct from prepaid credit balance if user has one
+    // This runs for all proxy usage (LLM, search, browser, etc.)
+    if (automnaCredits > 0 && !input.error) {
+      try {
+        const bal = await db.query.creditBalances.findFirst({
+          where: eq(creditBalances.userId, input.userId),
+        });
+        if (bal && bal.balance > 0) {
+          const newBalance = Math.max(0, bal.balance - automnaCredits);
+          await db.update(creditBalances)
+            .set({ balance: newBalance, updatedAt: new Date() })
+            .where(eq(creditBalances.userId, input.userId));
+        }
+      } catch (e) {
+        // Non-fatal: don't block usage logging if credit deduction fails
+        console.error("[Usage] Credit deduction failed:", e);
+      }
+    }
   } catch (error) {
     console.error("[Usage] Failed to log event:", error);
   }
