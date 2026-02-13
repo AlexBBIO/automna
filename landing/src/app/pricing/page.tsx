@@ -325,7 +325,7 @@ export default function PricingPage() {
         const result = await upgradeRes.json();
 
         if (result.success) {
-          window.location.href = '/dashboard?success=true&upgraded=true';
+          window.location.href = '/setup/connect';
         } else {
           throw new Error(result.error || 'Upgrade failed');
         }
