@@ -17,7 +17,7 @@ const plans = [
     tagline: 'Bring your own Claude. We handle the rest.',
     features: [
       'Full AI agent (bring your own Claude)',
-      '1 connected channel',
+      'All integrations (Discord, Telegram, WhatsApp, web)',
       'Browser & web search',
       'Email (send/receive)',
       'Persistent memory',
@@ -38,7 +38,6 @@ const plans = [
     features: [
       'Everything in Starter',
       'Always-on 24/7',
-      '3 simultaneous channels',
       'Phone calling (60 min/mo)',
       'Scheduled tasks & cron',
       'Custom skills',
@@ -56,7 +55,6 @@ const plans = [
     tagline: 'No limits. Full control.',
     features: [
       'Everything in Pro',
-      'Unlimited channels',
       'Phone calling (120 min/mo)',
       'API access',
       'Team sharing (+1 seat)',

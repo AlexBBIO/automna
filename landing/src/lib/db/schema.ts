@@ -153,24 +153,24 @@ export const usageEvents = sqliteTable("usage_events", {
 // ============================================
 // Users bring their own Claude key. We charge for infrastructure + services.
 export const PLAN_LIMITS = {
-  starter: {  // $20/mo - sleeps idle, 1 channel, no phone, no cron
+  starter: {  // $20/mo - sleeps idle, no phone, no cron
     monthlySearches: 500,
     monthlyBrowserMinutes: 60,
     monthlyEmails: 100,
     monthlyCallMinutes: 0,
-    maxChannels: 1,
+    maxChannels: -1,
     cronEnabled: false,
     customSkills: false,
     fileBrowser: false,
     apiAccess: false,
     sleepWhenIdle: true,
   },
-  pro: {  // $30/mo - always-on, 3 channels, phone, cron
+  pro: {  // $30/mo - always-on, phone, cron
     monthlySearches: 2000,
     monthlyBrowserMinutes: 300,
     monthlyEmails: 500,
     monthlyCallMinutes: 60,
-    maxChannels: 3,
+    maxChannels: -1,
     cronEnabled: true,
     customSkills: true,
     fileBrowser: true,
