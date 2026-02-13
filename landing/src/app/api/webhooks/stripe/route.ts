@@ -209,7 +209,7 @@ export async function POST(request: Request) {
             
             if (oldRank > newRank && previousPlan) {
               // Downgrade: keep old plan limits until current period ends
-              const periodEnd = subscription.current_period_end;
+              const periodEnd = (subscription as any).current_period_end as number;
               try {
                 await db.update(machines)
                   .set({
