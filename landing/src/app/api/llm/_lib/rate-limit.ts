@@ -6,7 +6,7 @@
  */
 
 import { db } from '@/lib/db';
-import { llmRateLimits, creditBalances, LEGACY_PLAN_LIMITS } from '@/lib/db/schema';
+import { llmRateLimits, creditBalances, LEGACY_PLAN_LIMITS, PLAN_LIMITS } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import type { AuthenticatedUser } from './auth';
 import { getUsedAutomnaCredits } from '@/app/api/_lib/usage-events';
@@ -34,8 +34,19 @@ export async function checkRateLimits(
     effectivePlan = user.effectivePlan as typeof user.plan;
   }
 
-  const limits = LEGACY_PLAN_LIMITS[effectivePlan as keyof typeof LEGACY_PLAN_LIMITS] 
+  const legacyLimits = LEGACY_PLAN_LIMITS[effectivePlan as keyof typeof LEGACY_PLAN_LIMITS] 
     || LEGACY_PLAN_LIMITS[user.plan as keyof typeof LEGACY_PLAN_LIMITS];
+  
+  // BYOK users (own credentials) get small service credit allowances from new PLAN_LIMITS
+  // Legacy users (no byokProvider) keep their existing generous allowances
+  const isByok = user.byokProvider === 'anthropic_oauth' || user.byokProvider === 'anthropic_api_key';
+  const byokPlanLimits = PLAN_LIMITS[effectivePlan as keyof typeof PLAN_LIMITS]
+    || PLAN_LIMITS[user.plan as keyof typeof PLAN_LIMITS];
+  const monthlyCreditsLimit = isByok && byokPlanLimits
+    ? byokPlanLimits.monthlyServiceCredits
+    : legacyLimits.monthlyAutomnaCredits;
+  const rpmLimit = legacyLimits.requestsPerMinute; // RPM same for all
+  
   const currentMinute = Math.floor(now / 60);
   
   // 1. Check credit budget
@@ -55,21 +66,21 @@ export async function checkRateLimits(
         reason: 'No credits remaining. Purchase more credits to continue.',
         limits: {
           monthlyAutomnaCredits: { used: 0, limit: 0 },
-          requestsPerMinute: { used: 0, limit: limits.requestsPerMinute },
+          requestsPerMinute: { used: 0, limit: rpmLimit },
         },
       };
     }
   } else {
-    // Legacy/subscription users: check monthly Automna Credit budget
+    // BYOK and legacy users: check monthly credit budget
     usedAutomnaCredits = await getUsedAutomnaCredits(user.userId);
     
-    if (usedAutomnaCredits >= limits.monthlyAutomnaCredits) {
+    if (usedAutomnaCredits >= monthlyCreditsLimit) {
       return {
         allowed: false,
-        reason: `Monthly credit limit reached (${usedAutomnaCredits.toLocaleString()} / ${limits.monthlyAutomnaCredits.toLocaleString()})`,
+        reason: `Monthly service credit limit reached (${usedAutomnaCredits.toLocaleString()} / ${monthlyCreditsLimit.toLocaleString()}). You can purchase additional credits.`,
         limits: {
-          monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: limits.monthlyAutomnaCredits },
-          requestsPerMinute: { used: 0, limit: limits.requestsPerMinute },
+          monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: monthlyCreditsLimit },
+          requestsPerMinute: { used: 0, limit: rpmLimit },
         },
       };
     }
@@ -112,15 +123,15 @@ export async function checkRateLimits(
   }
   
   // Check requests per minute
-  if (rateLimit.requestsThisMinute >= limits.requestsPerMinute) {
+  if (rateLimit.requestsThisMinute >= rpmLimit) {
     const secondsUntilReset = 60 - (now % 60);
     return {
       allowed: false,
-      reason: `Rate limit exceeded (${rateLimit.requestsThisMinute}/${limits.requestsPerMinute} requests/min)`,
+      reason: `Rate limit exceeded (${rateLimit.requestsThisMinute}/${rpmLimit} requests/min)`,
       retryAfter: secondsUntilReset,
       limits: {
-        monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: limits.monthlyAutomnaCredits },
-        requestsPerMinute: { used: rateLimit.requestsThisMinute, limit: limits.requestsPerMinute },
+        monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: monthlyCreditsLimit },
+        requestsPerMinute: { used: rateLimit.requestsThisMinute, limit: rpmLimit },
       },
     };
   }
@@ -136,8 +147,8 @@ export async function checkRateLimits(
   return {
     allowed: true,
     limits: {
-      monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: limits.monthlyAutomnaCredits },
-      requestsPerMinute: { used: rateLimit.requestsThisMinute + 1, limit: limits.requestsPerMinute },
+      monthlyAutomnaCredits: { used: usedAutomnaCredits, limit: monthlyCreditsLimit },
+      requestsPerMinute: { used: rateLimit.requestsThisMinute + 1, limit: rpmLimit },
     },
   };
 }
