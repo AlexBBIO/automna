@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { usageEvents, creditBalances, creditTransactions } from "@/lib/db/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { MICRODOLLARS_PER_AUTOMNA_CREDIT } from "./cost-constants";
+import { checkAutoRefillBackground } from "./auto-refill";
 
 export type UsageEventType = 'llm' | 'search' | 'browser' | 'call' | 'email' | 'embedding';
 
@@ -76,6 +77,9 @@ export async function logUsageEvent(input: UsageEventInput): Promise<void> {
             balanceAfter: result[0].newBalance,
             description: `${input.eventType} usage`,
           });
+
+          // Check if auto-refill needed (fire and forget)
+          checkAutoRefillBackground(input.userId);
         }
       } catch (e) {
         // Non-fatal: don't block usage logging if credit deduction fails
