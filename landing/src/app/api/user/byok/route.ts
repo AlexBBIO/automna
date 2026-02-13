@@ -25,16 +25,11 @@ function detectCredentialType(credential: string): CredentialType | null {
 }
 
 function buildAuthProfilesJson(credential: string, type: CredentialType): string {
-  const profile: Record<string, unknown> = {
-    type: 'token',
-    provider: 'anthropic',
-  };
-
-  if (type === 'setup_token') {
-    profile.access = credential;
-  } else {
-    profile.token = credential;
-  }
+  // Setup tokens use OAuth format, API keys use token format
+  // This matches how OpenClaw stores credentials from `claude setup-token`
+  const profile: Record<string, unknown> = type === 'setup_token'
+    ? { type: 'oauth', provider: 'anthropic', access: credential }
+    : { type: 'token', provider: 'anthropic', token: credential };
 
   return JSON.stringify({
     version: 1,
@@ -44,35 +39,53 @@ function buildAuthProfilesJson(credential: string, type: CredentialType): string
   });
 }
 
-async function validateCredential(credential: string): Promise<{ valid: boolean; error?: string }> {
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': credential,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1,
-        messages: [{ role: 'user', content: 'hi' }],
-      }),
-    });
+async function validateCredential(credential: string, type: CredentialType): Promise<{ valid: boolean; error?: string }> {
+  const body = JSON.stringify({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1,
+    messages: [{ role: 'user', content: 'hi' }],
+  });
 
-    // 401/403 = invalid credentials. Everything else means the key is valid
-    // (200 = success, 400 = bad request, 429 = rate limited, 529 = overloaded)
-    if (res.status === 401 || res.status === 403) {
-      const body = await res.text().catch(() => '');
-      console.log(`[byok] Credential validation failed: ${res.status} ${body.slice(0, 200)}`);
-      return { valid: false, error: `Authentication failed (${res.status})` };
+  // Try x-api-key first (works for both API keys and most setup tokens)
+  // Then try Authorization: Bearer (some OAuth tokens need this)
+  const authHeaders = type === 'setup_token'
+    ? [
+        { 'x-api-key': credential },
+        { 'Authorization': `Bearer ${credential}` },
+      ]
+    : [
+        { 'x-api-key': credential },
+      ];
+
+  for (const authHeader of authHeaders) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+          ...authHeader,
+        },
+        body,
+      });
+
+      console.log(`[byok] Validation attempt (${Object.keys(authHeader)[0]}): ${res.status}`);
+
+      // 401/403 = invalid with this auth method, try next
+      if (res.status === 401 || res.status === 403) {
+        continue;
+      }
+
+      // Any other status means the credential is valid
+      // (200 = success, 400 = bad request, 429 = rate limited, 529 = overloaded)
+      return { valid: true };
+    } catch (err) {
+      console.error(`[byok] Validation error with ${Object.keys(authHeader)[0]}:`, err);
+      continue;
     }
-
-    return { valid: true };
-  } catch (err) {
-    console.error('[byok] Credential validation error:', err);
-    return { valid: false, error: 'Could not reach Anthropic API' };
   }
+
+  return { valid: false, error: 'Authentication failed. Please check that your key is active and valid.' };
 }
 
 async function pushCredentialToMachine(
@@ -143,7 +156,7 @@ export async function POST(request: Request) {
     }
 
     // Validate against Anthropic API
-    const validation = await validateCredential(credential);
+    const validation = await validateCredential(credential, type);
     if (!validation.valid) {
       return NextResponse.json(
         { error: validation.error || 'Credential validation failed. Please check that your key is active and valid.' },
