@@ -3,7 +3,8 @@
  * 
  * Mark user as using proxy mode (bill me as I go).
  * This skips BYOK credential setup and keeps the machine in proxy/legacy mode.
- * The user's plan credit allowance covers their AI usage through the Automna proxy.
+ * User must buy prepaid credits for AI usage through the Automna proxy.
+ * New users get a small starter bonus (5K credits) to try it out.
  */
 
 import { auth } from '@clerk/nextjs/server';
