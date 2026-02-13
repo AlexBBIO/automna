@@ -292,31 +292,7 @@ export default function PricingPage() {
 
     if (hasSubscription && currentPlan && currentPlan !== 'free') {
       try {
-        const previewRes = await fetch('/api/upgrade?preview=true', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priceId: plan.priceId, plan: planName }),
-        });
-        const preview = await previewRes.json();
-
-        if (preview.error) {
-          if (preview.error.includes('Already on this plan')) {
-            alert('You\'re already on this plan!');
-            setLoading(null);
-            return;
-          }
-          throw new Error(preview.error);
-        }
-
-        const confirmMsg = preview.isDowngrade
-          ? `Switch to ${plan.name}? Changes take effect at next billing date.`
-          : `Upgrade to ${plan.name}? Prorated charge of $${preview.totalDueNow.toFixed(2)} now.`;
-
-        if (!confirm(confirmMsg)) {
-          setLoading(null);
-          return;
-        }
-
+        // Switch plan directly - no preview/confirm step
         const upgradeRes = await fetch('/api/upgrade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -324,10 +300,19 @@ export default function PricingPage() {
         });
         const result = await upgradeRes.json();
 
+        if (result.error) {
+          if (result.error.includes('Already on this plan')) {
+            setLoading(null);
+            window.location.href = '/setup/connect';
+            return;
+          }
+          throw new Error(result.error);
+        }
+
         if (result.success) {
           window.location.href = '/setup/connect';
         } else {
-          throw new Error(result.error || 'Upgrade failed');
+          throw new Error('Upgrade failed');
         }
       } catch (error) {
         console.error('Upgrade error:', error);
