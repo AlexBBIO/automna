@@ -743,18 +743,31 @@ fi
 AUTOMNA_PROXY_URL="${AUTOMNA_PROXY_URL:-https://automna.ai}"
 echo "[automna] Merging config (proxy: $AUTOMNA_PROXY_URL)..."
 
+BYOK_MODE_FLAG="${BYOK_MODE:-false}"
+
 node -e "
 const fs = require('fs');
 const configFile = '$CONFIG_FILE';
 const proxyUrl = '$AUTOMNA_PROXY_URL';
 const gatewayToken = '$GATEWAY_TOKEN';
+const byokMode = '$BYOK_MODE_FLAG' === 'true';
 
 // Managed keys - these get overwritten on every boot
 const managed = {
   gateway: {
     trustedProxies: ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fd00::/8']
   },
-  models: {
+  hooks: {
+    enabled: true,
+    token: gatewayToken,
+    path: '/hooks'
+  }
+};
+
+// In BYOK mode, don't add automna LLM provider — use anthropic directly
+// In legacy mode, add the proxy provider
+if (!byokMode) {
+  managed.models = {
     providers: {
       automna: {
         baseUrl: proxyUrl + '/api/llm',
@@ -766,13 +779,11 @@ const managed = {
         ]
       }
     }
-  },
-  hooks: {
-    enabled: true,
-    token: gatewayToken,
-    path: '/hooks'
-  }
-};
+  };
+}
+
+// Default model depends on mode
+const defaultModel = byokMode ? 'anthropic/claude-opus-4-5' : 'automna/claude-opus-4-5';
 
 // Defaults - only set if not already present in existing config
 const defaults = {
@@ -784,8 +795,8 @@ const defaults = {
   agents: {
     defaults: {
       workspace: '/home/node/.openclaw/workspace',
-      model: { primary: 'automna/claude-opus-4-5' },
-      imageModel: { primary: 'automna/claude-opus-4-5' },
+      model: { primary: defaultModel },
+      imageModel: { primary: defaultModel },
       verboseDefault: 'on',
       userTimezone: 'America/Los_Angeles',
       timeoutSeconds: 3600,
@@ -857,11 +868,20 @@ if (!config.plugins.entries) config.plugins.entries = {};
 config.plugins.entries['voice-call'] = { enabled: false };
 
 // Fix any stale model references
-const configStr = JSON.stringify(config);
-const fixed = configStr
-  .replace(/\"anthropic\/claude-opus-4-5\"/g, '\"automna/claude-opus-4-5\"')
-  .replace(/\"anthropic\/claude-sonnet-4\"/g, '\"automna/claude-opus-4-5\"')
-  .replace(/\"claude-3-5-sonnet-[0-9]+\"/g, '\"claude-opus-4-5\"');
+let configStr = JSON.stringify(config);
+if (!byokMode) {
+  // Legacy mode: rewrite anthropic → automna provider
+  configStr = configStr
+    .replace(/\"anthropic\/claude-opus-4-5\"/g, '\"automna/claude-opus-4-5\"')
+    .replace(/\"anthropic\/claude-sonnet-4\"/g, '\"automna/claude-opus-4-5\"')
+    .replace(/\"claude-3-5-sonnet-[0-9]+\"/g, '\"claude-opus-4-5\"');
+} else {
+  // BYOK mode: rewrite automna → anthropic provider (direct)
+  configStr = configStr
+    .replace(/\"automna\/claude-opus-4-5\"/g, '\"anthropic/claude-opus-4-5\"')
+    .replace(/\"automna\/claude-sonnet-4\"/g, '\"anthropic/claude-sonnet-4\"');
+}
+const fixed = configStr;
 
 // Remove unsupported top-level 'heartbeat' key (moved to agents.defaults.heartbeat)
 const finalConfig = JSON.parse(fixed);
@@ -925,9 +945,16 @@ sleep 1
 
 echo "[automna] Starting OpenClaw gateway on port $GATEWAY_INTERNAL_PORT (internal)..."
 
-# Route LLM calls through Automna proxy
-# The config uses automna provider, but we also set this as fallback for built-in anthropic provider
-export ANTHROPIC_BASE_URL="$AUTOMNA_PROXY_URL/api/llm"
+# BYOK Mode: LLM calls go direct to Anthropic (user's own key)
+# Legacy Mode: LLM calls route through Automna proxy (our key)
+if [ "${BYOK_MODE}" = "true" ]; then
+    echo "[automna] BYOK mode: LLM calls go direct to Anthropic"
+    # Don't set ANTHROPIC_BASE_URL — defaults to api.anthropic.com
+    # User's credentials are in auth-profiles.json (written by dashboard)
+else
+    echo "[automna] Legacy mode: LLM calls route through Automna proxy"
+    export ANTHROPIC_BASE_URL="$AUTOMNA_PROXY_URL/api/llm"
+fi
 
 # Cap Node.js heap to 1536MB (out of 2048MB total)
 # Leaves ~512MB for Caddy, file server, fixer, and OS overhead
