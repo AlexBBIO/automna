@@ -47,6 +47,28 @@ export async function POST(request: Request) {
       customerId = customer.id;
     }
 
+    // Guard: check for existing active subscriptions (prevents duplicates)
+    const existingSubs = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'active',
+      limit: 1,
+    });
+
+    if (existingSubs.data.length > 0) {
+      // User already has a subscription - send them to billing portal instead
+      const session = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://automna.ai'}/setup/connect`,
+        flow_data: {
+          type: 'subscription_update' as any,
+          subscription_update: {
+            subscription: existingSubs.data[0].id,
+          },
+        },
+      });
+      return NextResponse.json({ url: session.url });
+    }
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
