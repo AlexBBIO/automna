@@ -22,7 +22,14 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Update machines table — explicitly mark as NOT byok (proxy mode)
+    // Store choice in Clerk metadata so it persists before machine exists
+    const { clerkClient: getClerk } = await import('@clerk/nextjs/server');
+    const client = await getClerk();
+    await client.users.updateUserMetadata(userId, {
+      publicMetadata: { byokChoice: 'proxy' },
+    });
+
+    // Update machines table (may be 0 rows if machine not provisioned yet — that's OK)
     await db.update(machines)
       .set({ byokProvider: 'proxy', byokEnabled: 0, updatedAt: new Date() })
       .where(eq(machines.userId, userId));

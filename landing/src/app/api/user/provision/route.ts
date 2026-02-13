@@ -14,7 +14,7 @@
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { machines, machineEvents, phoneNumbers, users, provisionStatus } from "@/lib/db/schema";
+import { machines, machineEvents, phoneNumbers, users, provisionStatus, secrets } from "@/lib/db/schema";
 import Stripe from "stripe";
 import { sendMachineReady } from "@/lib/email";
 import { provisionPhoneNumber } from "@/lib/twilio";
@@ -923,6 +923,11 @@ export async function POST() {
     console.log(`[provision] Machine started, gateway warming up...`);
 
     // Step 5: Store in database
+    // Read byokChoice from Clerk metadata (set during /setup/connect before provisioning)
+    const byokChoice = user.publicMetadata?.byokChoice as string | undefined;
+    const byokProvider = byokChoice || null;
+    const byokEnabled = byokChoice && byokChoice !== 'proxy' ? 1 : 0;
+
     // Note: Heartbeat config is handled by the Docker image on first boot
     await db.insert(machines).values({
       id: machine.id,
@@ -936,6 +941,8 @@ export async function POST() {
       browserbaseContextId,
       agentmailInboxId,
       plan: userPlan,
+      byokProvider,
+      byokEnabled,
       lastActiveAt: new Date(),
     });
 
@@ -952,6 +959,55 @@ export async function POST() {
     // Don't set "ready" here - the status endpoint does a live health check
     // and will upgrade waiting_for_gateway → ready when OpenClaw responds
     console.log(`[provision] Successfully created ${appName} with machine ${machine.id}`);
+
+    // Push BYOK credentials to machine if user already saved them during setup
+    if (byokChoice && byokChoice !== 'proxy') {
+      try {
+        const secret = await db.query.secrets.findFirst({
+          where: and(eq(secrets.userId, userId), eq(secrets.name, 'anthropic_credential')),
+        });
+        if (secret) {
+          const { decryptSecret } = await import('@/lib/crypto');
+          const credential = decryptSecret(secret.encryptedValue, secret.iv, userId);
+          const credType = credential.startsWith('sk-ant-oat') ? 'setup_token' : 'api_key';
+          
+          // Build auth-profiles.json
+          const profile: Record<string, unknown> = credType === 'setup_token'
+            ? { type: 'token', provider: 'anthropic', token: credential }
+            : { type: 'api_key', provider: 'anthropic', key: credential };
+          const authProfilesJson = JSON.stringify({
+            version: 1,
+            profiles: { 'anthropic:default': profile },
+            order: { anthropic: ['anthropic:default'] },
+            lastGood: { anthropic: 'anthropic:default' },
+          });
+
+          // Write to machine via exec
+          const b64 = Buffer.from(authProfilesJson).toString('base64');
+          const cmd = `mkdir -p /home/node/.openclaw/agents/main/agent && echo ${b64} | base64 -d > /home/node/.openclaw/agents/main/agent/auth-profiles.json`;
+          const execRes = await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machine.id}/exec`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${FLY_API_TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: ['sh', '-c', cmd] }),
+          });
+          
+          if (execRes.ok) {
+            console.log(`[provision] Pushed BYOK credentials to ${appName}`);
+            // Signal gateway restart
+            await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${machine.id}/exec`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${FLY_API_TOKEN}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ command: ['sh', '-c', 'kill -USR1 $(pgrep -f openclaw-gateway || pgrep -f entry.js || echo 1)'] }),
+            }).catch(() => {});
+          } else {
+            console.warn(`[provision] Failed to push BYOK credentials: ${execRes.status}`);
+          }
+        }
+      } catch (err) {
+        console.error(`[provision] Error pushing BYOK credentials:`, err);
+        // Non-fatal — user can re-save credentials from settings
+      }
+    }
 
     // Ensure phone number exists for pro/power plans
     const phoneNumber = canUsePhone(userPlan) ? await ensurePhoneNumber(userId) : null;

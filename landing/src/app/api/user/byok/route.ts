@@ -299,13 +299,20 @@ export async function POST(request: Request) {
       });
     }
 
-    // Update machines table
+    // Store choice in Clerk metadata so it persists before machine exists
     const byokProvider = type === 'setup_token' ? 'anthropic_oauth' : 'anthropic_api_key';
+    const { clerkClient: getClerk } = await import('@clerk/nextjs/server');
+    const client = await getClerk();
+    await client.users.updateUserMetadata(userId, {
+      publicMetadata: { byokChoice: byokProvider },
+    });
+
+    // Update machines table (may be 0 rows if machine not provisioned yet — that's OK)
     await db.update(machines)
       .set({ byokProvider, byokEnabled: 1, updatedAt: new Date() })
       .where(eq(machines.userId, userId));
 
-    // Push to Fly machine
+    // Push to Fly machine if it exists
     const machine = await db.query.machines.findFirst({
       where: eq(machines.userId, userId),
     });
@@ -331,6 +338,7 @@ export async function POST(request: Request) {
       success: true,
       type,
       pushedToMachine,
+      machineExists: !!machine,
     });
   } catch (error) {
     console.error('[byok] POST error:', error);
@@ -356,11 +364,24 @@ export async function GET() {
       where: and(eq(secrets.userId, userId), eq(secrets.name, 'anthropic_credential')),
     });
 
+    // If no machine yet, check Clerk metadata for pre-provision choice
+    let type = machine?.byokProvider ?? null;
+    let enabled = machine?.byokEnabled === 1;
+    if (!machine) {
+      const { currentUser } = await import('@clerk/nextjs/server');
+      const user = await currentUser();
+      const byokChoice = user?.publicMetadata?.byokChoice as string | undefined;
+      if (byokChoice) {
+        type = byokChoice;
+        enabled = byokChoice !== 'proxy';
+      }
+    }
+
     return NextResponse.json({
-      enabled: machine?.byokEnabled === 1,
-      type: machine?.byokProvider ?? null,
+      enabled,
+      type,
       lastValidated: secret?.updatedAt ? new Date(secret.updatedAt).toISOString() : null,
-      isProxy: machine?.byokProvider === 'proxy',
+      isProxy: type === 'proxy',
     });
   } catch (error) {
     console.error('[byok] GET error:', error);
