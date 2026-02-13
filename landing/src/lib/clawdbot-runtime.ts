@@ -903,7 +903,12 @@ export function useClawdbotRuntime(config: ClawdbotConfig) {
       log('Error response:', errorMsg);
       // Make rate limit errors user-friendly
       if (errorType === 'rate_limit_error' || errorMsg.toLowerCase().includes('rate limit') || errorMsg.toLowerCase().includes('cost limit') || errorMsg.toLowerCase().includes('token limit')) {
-        setError('You\'ve reached your plan limit for this month. Upgrade your plan to keep chatting.');
+        // Show the actual error message if it's about credits
+        if (errorMsg.toLowerCase().includes('no credits')) {
+          setError(errorMsg);
+        } else {
+          setError('You\'ve reached your plan limit for this month. Upgrade your plan to keep chatting.');
+        }
       } else {
         setError(errorMsg);
       }

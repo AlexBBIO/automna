@@ -24,18 +24,28 @@ export async function GET(request: Request) {
   
   const { userId: clerkUserId } = await auth();
   
+  let isProxy = false;
+  let effectivePlan: string | null = null;
+  let effectivePlanUntil: number | null = null;
+
   if (clerkUserId) {
     userId = clerkUserId;
     const machine = await db.query.machines.findFirst({
       where: eq(machines.userId, clerkUserId),
     });
     plan = (machine?.plan as PlanType) || 'starter';
+    isProxy = machine?.byokProvider === 'proxy';
+    effectivePlan = machine?.effectivePlan ?? null;
+    effectivePlanUntil = machine?.effectivePlanUntil ?? null;
   } else {
     // Try gateway token (agent calling for its own usage)
     const user = await authenticateGatewayToken(request);
     if (user) {
       userId = user.userId;
       plan = user.plan;
+      isProxy = user.byokProvider === 'proxy';
+      effectivePlan = user.effectivePlan;
+      effectivePlanUntil = user.effectivePlanUntil;
     }
   }
   
@@ -43,7 +53,15 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
-  const limits = LEGACY_PLAN_LIMITS[plan as keyof typeof LEGACY_PLAN_LIMITS];
+  // Respect effectivePlan for downgrade grace period
+  let activePlan = plan;
+  const nowTs = Math.floor(Date.now() / 1000);
+  if (effectivePlan && effectivePlanUntil && effectivePlanUntil > nowTs) {
+    activePlan = effectivePlan as PlanType;
+  }
+  
+  const limits = LEGACY_PLAN_LIMITS[activePlan as keyof typeof LEGACY_PLAN_LIMITS]
+    || LEGACY_PLAN_LIMITS[plan as keyof typeof LEGACY_PLAN_LIMITS];
   
   // Get start of current month (UTC)
   const monthStart = new Date();
@@ -121,7 +139,7 @@ export async function GET(request: Request) {
   ));
   
   return Response.json({
-    plan,
+    plan: activePlan,
     period: {
       start: monthStart.toISOString(),
       end: monthEnd.toISOString(),
