@@ -6,43 +6,47 @@ import Link from 'next/link';
 interface BYOKStatus {
   enabled: boolean;
   type: string | null;
+  isProxy?: boolean;
 }
 
-interface ServiceUsage {
+interface CreditUsage {
   plan: string;
-  searches: { used: number; limit: number };
-  browserMinutes: { used: number; limit: number };
-  emails: { used: number; limit: number };
-  callMinutes: { used: number; limit: number };
+  used: number;
+  limit: number;
+  periodStart: string;
+  periodEnd: string;
+  isByok?: boolean;
+  isProxy?: boolean;
 }
 
-// Simplified banner for BYOK mode
+function formatCredits(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toString();
+}
+
+// Usage banner for all user types
 export function UsageBanner({ usage }: { usage: unknown }) {
   const [byokStatus, setBYOKStatus] = useState<BYOKStatus | null>(null);
-  const [serviceUsage, setServiceUsage] = useState<ServiceUsage | null>(null);
+  const [creditUsage, setCreditUsage] = useState<CreditUsage | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // Fetch BYOK status
     fetch('/api/user/byok')
       .then(r => r.ok ? r.json() : null)
       .then(data => setBYOKStatus(data))
       .catch(() => {});
 
-    // Fetch service usage
     fetch('/api/user/usage')
       .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data) setServiceUsage(data);
-      })
+      .then(data => { if (data) setCreditUsage(data); })
       .catch(() => {});
   }, []);
 
   if (dismissed) return null;
 
-  // Show BYOK not connected warning - ONLY for users who have a BYOK plan (type is set but not enabled)
-  // Don't show this to legacy users who are on the old $79/mo plan
-  if (byokStatus && !byokStatus.enabled && byokStatus.type) {
+  // Show connect warning for users who haven't chosen a connection method
+  if (byokStatus && !byokStatus.enabled && !byokStatus.isProxy && byokStatus.type) {
     return (
       <div className="bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/20 px-4 py-2.5">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
@@ -61,51 +65,60 @@ export function UsageBanner({ usage }: { usage: unknown }) {
     );
   }
 
-  // Show service usage summary
-  if (byokStatus?.enabled && serviceUsage) {
-    const planName = serviceUsage.plan.charAt(0).toUpperCase() + serviceUsage.plan.slice(1);
-    const connectionType = byokStatus.type === 'anthropic_oauth' ? 'Claude' : 'API Key';
+  // Credit usage banner for proxy/legacy users
+  if (creditUsage && creditUsage.limit > 0 && !creditUsage.isByok) {
+    const percent = Math.min(100, Math.round((creditUsage.used / creditUsage.limit) * 100));
+    const daysLeft = Math.max(0, Math.ceil((new Date(creditUsage.periodEnd).getTime() - Date.now()) / 86400000));
+    const planName = creditUsage.plan.charAt(0).toUpperCase() + creditUsage.plan.slice(1);
+    const isOver = percent >= 100;
+    const isNear = percent >= 80;
 
-    // Check if any service is near limit (>80%)
-    const items = [
-      serviceUsage.searches,
-      serviceUsage.browserMinutes,
-      serviceUsage.emails,
-      serviceUsage.callMinutes,
-    ].filter(s => s && s.limit > 0);
-    
-    const nearLimit = items.some(s => s.used / s.limit >= 0.8);
-    if (!nearLimit) return null; // Only show when nearing limits
+    // Always show for proxy users so they can track credits
+    const barColor = isOver ? 'bg-red-500' : isNear ? 'bg-amber-500' : 'bg-purple-500';
+    const bgColor = isOver
+      ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20'
+      : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700/50';
 
     return (
-      <div className="bg-blue-50 dark:bg-blue-500/10 border-b border-blue-200 dark:border-blue-500/20 px-4 py-2.5">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <span className="text-base flex-shrink-0">ℹ️</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              <span className="font-medium">{planName} Plan</span>
-              <span className="mx-1.5">•</span>
-              <span className="text-green-600 dark:text-green-400">{connectionType} Connected ✅</span>
-              <span className="mx-1.5 text-blue-400">|</span>
-              <span className="text-xs">
-                Search: {serviceUsage.searches.used}/{serviceUsage.searches.limit.toLocaleString()}
-                {serviceUsage.browserMinutes.limit > 0 && ` | Browser: ${serviceUsage.browserMinutes.used}/${serviceUsage.browserMinutes.limit} min`}
-                {serviceUsage.emails.limit > 0 && ` | Email: ${serviceUsage.emails.used}/${serviceUsage.emails.limit}`}
-                {serviceUsage.callMinutes.limit > 0 && ` | Phone: ${serviceUsage.callMinutes.used}/${serviceUsage.callMinutes.limit} min`}
-              </span>
-            </p>
+      <div className={`${bgColor} border-b px-4 py-3`}>
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-zinc-900 dark:text-white">Usage</span>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">{daysLeft} days left</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-600 text-white font-medium uppercase">{planName}</span>
+              {isOver && (
+                <Link href="/pricing" className="text-xs text-red-600 dark:text-red-400 font-medium hover:underline">
+                  Upgrade →
+                </Link>
+              )}
+            </div>
           </div>
-          <button
-            onClick={() => setDismissed(true)}
-            className="flex-shrink-0 p-1 rounded-lg text-blue-600 dark:text-blue-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+            <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${Math.min(100, percent)}%` }} />
+          </div>
+          <div className="flex justify-between mt-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              {formatCredits(creditUsage.used)} / {formatCredits(creditUsage.limit)} credits
+            </span>
+            <span className={`text-xs font-medium ${isOver ? 'text-red-600 dark:text-red-400' : isNear ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-500 dark:text-zinc-400'}`}>
+              {percent}%
+            </span>
+          </div>
         </div>
       </div>
     );
+  }
+
+  // BYOK users: show connected status only when near service limits
+  if (byokStatus?.enabled && creditUsage) {
+    const planName = creditUsage.plan.charAt(0).toUpperCase() + creditUsage.plan.slice(1);
+    const connectionType = byokStatus.type === 'anthropic_oauth' ? 'Claude' : 'API Key';
+
+    // Minimal: just show plan + connection status, no usage bars
+    return null; // BYOK users don't need a persistent banner
   }
 
   return null;

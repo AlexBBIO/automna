@@ -360,7 +360,7 @@ export default function PricingPage() {
             We handle everything else — infrastructure, tools, integrations, memory.
           </p>
           <p className="text-sm text-zinc-400 dark:text-zinc-500 max-w-xl mx-auto">
-            Use your Claude subscription or API key. No markup on AI usage.
+            Use your Claude subscription, API key, or let us handle it. No markup on BYOK usage.
           </p>
         </div>
 
