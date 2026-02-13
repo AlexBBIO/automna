@@ -40,6 +40,7 @@ export async function checkRateLimits(
   
   // 1. Check credit budget
   const isProxy = user.byokProvider === 'proxy';
+  let usedAutomnaCredits = 0;
   
   if (isProxy) {
     // Proxy users: check prepaid credit balance (hard block at $0)
@@ -60,7 +61,7 @@ export async function checkRateLimits(
     }
   } else {
     // Legacy/subscription users: check monthly Automna Credit budget
-    const usedAutomnaCredits = await getUsedAutomnaCredits(user.userId);
+    usedAutomnaCredits = await getUsedAutomnaCredits(user.userId);
     
     if (usedAutomnaCredits >= limits.monthlyAutomnaCredits) {
       return {
