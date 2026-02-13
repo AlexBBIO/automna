@@ -24,6 +24,10 @@ export const machines = sqliteTable("machines", {
   browserbaseContextId: text("browserbase_context_id"),
   agentmailInboxId: text("agentmail_inbox_id"),
   plan: text("plan").default("starter"),
+  byokProvider: text("byok_provider"),
+  byokEnabled: integer("byok_enabled").default(0),
+  effectivePlan: text("effective_plan"),
+  effectivePlanUntil: integer("effective_plan_until"),
   lastSessionKey: text("last_session_key").default("main"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
@@ -126,6 +130,20 @@ export const callUsage = sqliteTable("call_usage", {
   blandCallIdIdx: index("idx_call_usage_bland_call_id").on(table.blandCallId),
   createdAtIdx: index("idx_call_usage_created_at").on(table.createdAt),
 }));
+
+// Credit balances (prepaid credits for proxy users)
+export const creditBalances = sqliteTable("credit_balances", {
+  userId: text("user_id").primaryKey(),
+  balance: integer("balance").notNull().default(0),
+  autoRefillEnabled: integer("auto_refill_enabled").notNull().default(0),
+  autoRefillAmountCents: integer("auto_refill_amount_cents").notNull().default(1000),
+  autoRefillThreshold: integer("auto_refill_threshold").notNull().default(10000),
+  monthlyCostCapCents: integer("monthly_cost_cap_cents").notNull().default(0),
+  monthlySpentCents: integer("monthly_spent_cents").notNull().default(0),
+  monthlySpentResetAt: integer("monthly_spent_reset_at"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
 
 // Plan limits
 export const PLAN_LIMITS = {

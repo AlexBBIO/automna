@@ -8,6 +8,9 @@ export interface AuthenticatedUser {
   appName: string;
   machineId: string;
   plan: PlanType;
+  byokProvider: string | null;
+  effectivePlan: string | null;
+  effectivePlanUntil: number | null;
 }
 
 // In-memory cache for gateway tokens (5 min TTL)
@@ -24,7 +27,7 @@ export async function lookupGatewayToken(token: string): Promise<AuthenticatedUs
   try {
     const machine = await db.query.machines.findFirst({
       where: eq(machines.gatewayToken, token),
-      columns: { id: true, userId: true, appName: true, plan: true },
+      columns: { id: true, userId: true, appName: true, plan: true, byokProvider: true, effectivePlan: true, effectivePlanUntil: true },
     });
     if (!machine) return null;
 
@@ -33,6 +36,9 @@ export async function lookupGatewayToken(token: string): Promise<AuthenticatedUs
       appName: machine.appName ?? "unknown",
       machineId: machine.id,
       plan: (machine.plan as PlanType) ?? "starter",
+      byokProvider: machine.byokProvider ?? null,
+      effectivePlan: machine.effectivePlan ?? null,
+      effectivePlanUntil: machine.effectivePlanUntil ?? null,
     };
 
     tokenCache.set(token, { user, expiresAt: Date.now() + CACHE_TTL });

@@ -1,5 +1,5 @@
 import { db } from "./db.js";
-import { usageEvents, machines } from "./schema.js";
+import { usageEvents, machines, creditBalances } from "./schema.js";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { MICRODOLLARS_PER_AUTOMNA_TOKEN } from "./cost-constants.js";
 
@@ -33,6 +33,23 @@ export async function logUsageEvent(input: UsageEventInput): Promise<void> {
       metadata: input.metadata ? JSON.stringify(input.metadata) : null,
       error: input.error ?? null,
     });
+
+    // Deduct from prepaid credit balance if user has one
+    if (automnaTokens > 0 && !input.error) {
+      try {
+        const bal = await db.query.creditBalances.findFirst({
+          where: eq(creditBalances.userId, input.userId),
+        });
+        if (bal && bal.balance > 0) {
+          const newBalance = Math.max(0, bal.balance - automnaTokens);
+          await db.update(creditBalances)
+            .set({ balance: newBalance, updatedAt: new Date() })
+            .where(eq(creditBalances.userId, input.userId));
+        }
+      } catch (e) {
+        console.error("[FLY-PROXY][Usage] Credit deduction failed:", e);
+      }
+    }
   } catch (error) {
     console.error("[FLY-PROXY][Usage] Failed to log event:", error);
   }
