@@ -47,29 +47,38 @@ async function validateCredential(credential: string, type: CredentialType): Pro
   });
 
   // Try x-api-key first (works for both API keys and most setup tokens)
-  // Then try Authorization: Bearer (some OAuth tokens need this)
-  const authHeaders = type === 'setup_token'
-    ? [
-        { 'x-api-key': credential },
-        { 'Authorization': `Bearer ${credential}` },
-      ]
-    : [
-        { 'x-api-key': credential },
-      ];
+  // Then try Authorization: Bearer for setup tokens (some OAuth tokens need this)
+  const methods: Array<{ name: string; headers: Record<string, string> }> = [
+    {
+      name: 'x-api-key',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'x-api-key': credential,
+      },
+    },
+  ];
 
-  for (const authHeader of authHeaders) {
+  if (type === 'setup_token') {
+    methods.push({
+      name: 'Bearer',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${credential}`,
+      },
+    });
+  }
+
+  for (const method of methods) {
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
-          ...authHeader,
-        },
+        headers: method.headers,
         body,
       });
 
-      console.log(`[byok] Validation attempt (${Object.keys(authHeader)[0]}): ${res.status}`);
+      console.log(`[byok] Validation attempt (${method.name}): ${res.status}`);
 
       // 401/403 = invalid with this auth method, try next
       if (res.status === 401 || res.status === 403) {
@@ -77,10 +86,9 @@ async function validateCredential(credential: string, type: CredentialType): Pro
       }
 
       // Any other status means the credential is valid
-      // (200 = success, 400 = bad request, 429 = rate limited, 529 = overloaded)
       return { valid: true };
     } catch (err) {
-      console.error(`[byok] Validation error with ${Object.keys(authHeader)[0]}:`, err);
+      console.error(`[byok] Validation error with ${method.name}:`, err);
       continue;
     }
   }
