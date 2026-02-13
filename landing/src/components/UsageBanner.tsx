@@ -40,8 +40,9 @@ export function UsageBanner({ usage }: { usage: unknown }) {
 
   if (dismissed) return null;
 
-  // Show BYOK not connected warning
-  if (byokStatus && !byokStatus.enabled) {
+  // Show BYOK not connected warning - ONLY for users who have a BYOK plan (type is set but not enabled)
+  // Don't show this to legacy users who are on the old $79/mo plan
+  if (byokStatus && !byokStatus.enabled && byokStatus.type) {
     return (
       <div className="bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/20 px-4 py-2.5">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
@@ -71,7 +72,7 @@ export function UsageBanner({ usage }: { usage: unknown }) {
       serviceUsage.browserMinutes,
       serviceUsage.emails,
       serviceUsage.callMinutes,
-    ].filter(s => s.limit > 0);
+    ].filter(s => s && s.limit > 0);
     
     const nearLimit = items.some(s => s.used / s.limit >= 0.8);
     if (!nearLimit) return null; // Only show when nearing limits
