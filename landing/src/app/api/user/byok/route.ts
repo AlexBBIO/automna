@@ -40,8 +40,10 @@ function buildAuthProfilesJson(credential: string, type: CredentialType): string
 }
 
 async function validateCredential(credential: string, type: CredentialType): Promise<{ valid: boolean; error?: string }> {
+  // Use claude-3-haiku for validation - it's available on all subscription tiers
+  // and is the cheapest model, so even API key users won't mind the tiny cost
   const body = JSON.stringify({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-3-haiku-20240307',
     max_tokens: 1,
     messages: [{ role: 'user', content: 'hi' }],
   });
