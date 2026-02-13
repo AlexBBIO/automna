@@ -309,6 +309,46 @@ export const provisionStatus = sqliteTable("provision_status", {
 });
 
 // ============================================
+// PREPAID CREDITS (Bill me as I go)
+// ============================================
+
+export const creditBalances = sqliteTable("credit_balances", {
+  userId: text("user_id").primaryKey().references(() => users.id),
+  balance: integer("balance").notNull().default(0), // Credits remaining
+  autoRefillEnabled: integer("auto_refill_enabled").notNull().default(0),
+  autoRefillAmountCents: integer("auto_refill_amount_cents").notNull().default(1000), // $10 default
+  autoRefillThreshold: integer("auto_refill_threshold").notNull().default(10000), // Refill when below 10K
+  monthlyCostCapCents: integer("monthly_cost_cap_cents").notNull().default(0), // 0 = no cap
+  monthlySpentCents: integer("monthly_spent_cents").notNull().default(0),
+  monthlySpentResetAt: integer("monthly_spent_reset_at"), // Unix timestamp for next monthly reset
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+export const creditTransactions = sqliteTable("credit_transactions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: text("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // 'purchase' | 'usage' | 'refill' | 'bonus'
+  amount: integer("amount").notNull(), // Positive for additions, negative for deductions
+  balanceAfter: integer("balance_after").notNull(),
+  stripePaymentId: text("stripe_payment_id"),
+  description: text("description"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+}, (table) => ({
+  userIdIdx: index("idx_credit_tx_user").on(table.userId),
+}));
+
+// Credit pack pricing
+export const CREDIT_PACKS = [
+  { id: 'pack_50k', credits: 50_000, priceCents: 500, label: '50K credits', priceLabel: '$5' },
+  { id: 'pack_100k', credits: 100_000, priceCents: 1000, label: '100K credits', priceLabel: '$10' },
+  { id: 'pack_300k', credits: 300_000, priceCents: 2500, label: '300K credits', priceLabel: '$25' },
+  { id: 'pack_750k', credits: 750_000, priceCents: 5000, label: '750K credits', priceLabel: '$50' },
+] as const;
+
+export type CreditPackId = typeof CREDIT_PACKS[number]['id'];
+
+// ============================================
 // TYPE EXPORTS
 // ============================================
 
@@ -336,3 +376,5 @@ export type UsageEvent = typeof usageEvents.$inferSelect;
 export type NewUsageEvent = typeof usageEvents.$inferInsert;
 export type ProvisionStatus = typeof provisionStatus.$inferSelect;
 export type NewProvisionStatus = typeof provisionStatus.$inferInsert;
+export type CreditBalance = typeof creditBalances.$inferSelect;
+export type CreditTransaction = typeof creditTransactions.$inferSelect;

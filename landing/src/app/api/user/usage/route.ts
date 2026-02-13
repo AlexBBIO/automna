@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { machines, usageEvents, LEGACY_PLAN_LIMITS } from "@/lib/db/schema";
+import { machines, usageEvents, creditBalances, LEGACY_PLAN_LIMITS } from "@/lib/db/schema";
 import type { PlanType } from "@/lib/db/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 
@@ -65,14 +65,27 @@ export async function GET() {
 
     const used = Number(result[0]?.totalTokens ?? 0);
 
+    // For proxy (bill-as-you-go) users, show prepaid credit balance instead of fixed monthly limit
+    const isProxy = userMachine.byokProvider === 'proxy';
+    let creditBalance = 0;
+    if (isProxy) {
+      const bal = await db.query.creditBalances.findFirst({
+        where: eq(creditBalances.userId, clerkId),
+      });
+      creditBalance = bal?.balance ?? 0;
+    }
+
     return NextResponse.json({
       plan,
       used,
-      limit: limits.monthlyAutomnaCredits,
+      // Proxy users: limit = their purchased credits + what they've used (so the bar makes sense)
+      // Legacy/BYOK users: fixed monthly allowance from plan
+      limit: isProxy ? (creditBalance + used) : limits.monthlyAutomnaCredits,
+      creditBalance: isProxy ? creditBalance : undefined,
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
       isByok,
-      isProxy: userMachine.byokProvider === 'proxy',
+      isProxy,
     });
   } catch (error) {
     console.error("[api/user/usage] Error:", error);

@@ -13,6 +13,7 @@ interface CreditUsage {
   plan: string;
   used: number;
   limit: number;
+  creditBalance?: number;
   periodStart: string;
   periodEnd: string;
   isByok?: boolean;
@@ -65,15 +66,50 @@ export function UsageBanner({ usage }: { usage: unknown }) {
     );
   }
 
-  // Credit usage banner for proxy/legacy users
-  if (creditUsage && creditUsage.limit > 0 && !creditUsage.isByok) {
+  // Prepaid credit balance for proxy (bill-as-you-go) users
+  if (creditUsage?.isProxy) {
+    const balance = creditUsage.creditBalance ?? 0;
+    const isEmpty = balance <= 0;
+    const isLow = balance > 0 && balance < 10000;
+    const bgColor = isEmpty
+      ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20'
+      : isLow
+      ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20'
+      : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700/50';
+
+    return (
+      <div className={`${bgColor} border-b px-4 py-3`}>
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+              {formatCredits(balance)} credits remaining
+            </span>
+            {isEmpty && <span className="text-xs text-red-600 dark:text-red-400 font-medium">Buy credits to continue</span>}
+            {isLow && !isEmpty && <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Running low</span>}
+          </div>
+          <Link
+            href="/dashboard?tab=credits"
+            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              isEmpty
+                ? 'bg-red-600 hover:bg-red-700 text-white'
+                : 'bg-purple-600 hover:bg-purple-500 text-white'
+            }`}
+          >
+            {isEmpty ? 'Buy Credits' : 'Manage Credits'}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Credit usage banner for legacy (non-BYOK, non-proxy) users with monthly allowance
+  if (creditUsage && creditUsage.limit > 0 && !creditUsage.isByok && !creditUsage.isProxy) {
     const percent = Math.min(100, Math.round((creditUsage.used / creditUsage.limit) * 100));
     const daysLeft = Math.max(0, Math.ceil((new Date(creditUsage.periodEnd).getTime() - Date.now()) / 86400000));
     const planName = creditUsage.plan.charAt(0).toUpperCase() + creditUsage.plan.slice(1);
     const isOver = percent >= 100;
     const isNear = percent >= 80;
 
-    // Always show for proxy users so they can track credits
     const barColor = isOver ? 'bg-red-500' : isNear ? 'bg-amber-500' : 'bg-purple-500';
     const bgColor = isOver
       ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20'

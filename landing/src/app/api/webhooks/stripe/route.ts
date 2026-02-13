@@ -4,8 +4,8 @@ import Stripe from 'stripe';
 import { clerkClient } from '@clerk/nextjs/server';
 import { sendSubscriptionStarted, sendSubscriptionCanceled, sendPaymentFailed, updateContactPlan } from '@/lib/email';
 import { db } from '@/lib/db';
-import { machines, machineEvents, phoneNumbers } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { machines, machineEvents, phoneNumbers, creditBalances, creditTransactions } from '@/lib/db/schema';
+import { eq, sql } from 'drizzle-orm';
 import { provisionPhoneNumber } from '@/lib/twilio';
 import { importNumberToBland, configureInboundNumber } from '@/lib/bland';
 import { trackServerEvent } from '@/lib/analytics';
@@ -133,6 +133,45 @@ export async function POST(request: Request) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         const clerkUserId = session.metadata?.clerkUserId;
+
+        // Handle credit purchases (one-time payments)
+        if (session.metadata?.type === 'credit_purchase' && clerkUserId) {
+          const credits = parseInt(session.metadata.credits || '0', 10);
+          const packId = session.metadata.packId || 'unknown';
+          const amountCents = session.amount_total || 0;
+
+          if (credits > 0) {
+            // Ensure balance record exists
+            await db.insert(creditBalances).values({ userId: clerkUserId, balance: 0 }).onConflictDoNothing();
+
+            // Add credits atomically
+            await db.update(creditBalances)
+              .set({
+                balance: sql`${creditBalances.balance} + ${credits}`,
+                monthlySpentCents: sql`${creditBalances.monthlySpentCents} + ${amountCents}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(creditBalances.userId, clerkUserId));
+
+            // Get updated balance for transaction log
+            const updated = await db.query.creditBalances.findFirst({
+              where: eq(creditBalances.userId, clerkUserId),
+            });
+
+            await db.insert(creditTransactions).values({
+              userId: clerkUserId,
+              type: 'purchase',
+              amount: credits,
+              balanceAfter: updated?.balance ?? credits,
+              stripePaymentId: session.payment_intent as string,
+              description: `Purchased ${packId.replace('pack_', '')} credits`,
+            });
+
+            console.log(`[stripe] Credit purchase: ${clerkUserId} +${credits} credits ($${amountCents / 100})`);
+          }
+          break;
+        }
+
         const plan = session.metadata?.plan || 'starter';
 
         if (clerkUserId) {
