@@ -153,21 +153,15 @@ export async function POST(request: Request) {
         },
       });
 
-      // Find the proration line items
-      const prorationLines = invoice.lines.data.filter(
-        (line) => (line as any).parent?.subscription_item_details?.proration === true
-      );
-      const prorationAmount = prorationLines.reduce(
-        (sum, line) => sum + line.amount,
-        0
-      );
+      // Use the invoice total directly - it already accounts for prorations
+      const totalDue = Math.max(0, invoice.total ?? 0);
 
       return NextResponse.json({
         preview: true,
         isDowngrade: false,
         isBillingChange: isSamePlan,
-        prorationAmount: prorationAmount / 100,
-        totalDueNow: Math.max(0, prorationAmount) / 100,
+        prorationAmount: totalDue / 100,
+        totalDueNow: totalDue / 100,
         nextBillingDate,
         currency: invoice.currency,
       });
