@@ -528,6 +528,25 @@ export default function DashboardPage() {
           (window as any).twq('event', 'tw-r4twt-r4v7x', {});
         }
         
+        // BYOK gate: if user has active subscription but no credentials, send to setup
+        // Check for BYOK plans (starter/pro/power with BYOK pricing)
+        const currentPlan = user.publicMetadata?.plan as string | undefined;
+        const isByokPlan = currentPlan && ['starter', 'pro', 'power'].includes(currentPlan);
+        
+        if (hasActiveSub && isByokPlan) {
+          try {
+            const byokCheck = await fetch('/api/user/byok');
+            const byokData = await byokCheck.json().catch(() => ({}));
+            if (!byokData.enabled) {
+              console.log('[dashboard] BYOK plan but no credentials, redirecting to setup');
+              window.location.href = '/setup/connect';
+              return;
+            }
+          } catch (e) {
+            console.warn('[dashboard] BYOK check failed, proceeding:', e);
+          }
+        }
+
         if (!hasActiveSub && !justSubscribed) {
           // No subscription and didn't just come from checkout
           // Check if they have an existing gateway (legacy user without metadata)

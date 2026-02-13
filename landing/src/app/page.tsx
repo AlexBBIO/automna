@@ -167,7 +167,7 @@ const features = [
 
 // FAQ data
 const faqItems = [
-  { q: 'Do I need my own API key?', a: 'No. Automna is fully hosted—no API setup required.' },
+  { q: 'Do I need my own Claude account?', a: 'Yes. You bring your own Claude subscription or API key. Automna handles everything else — infrastructure, tools, integrations, and memory. No markup on AI usage.' },
   { q: "What's the difference between an agent and a chat assistant?", a: 'Chat helps you think. Agents run workflows: they can take tool actions, run on schedules, and deliver finished outputs.' },
   { q: 'Can I control what it does autonomously?', a: 'Yes. You can explain how autonomous you want your agent to be, and the bot will do its best to follow your guidelines.' },
   { q: 'What happens if it gets something wrong?', a: "Agents aren't perfect—they can make mistakes. In most cases agents are self-correcting or correcting with minimal guidance. But it's important not to give your agent access to information that's more sensitive than you would give to an intern." },
@@ -1105,211 +1105,147 @@ export default function Home() {
                 One agent. Your rules.
               </h2>
               <p className="text-zinc-500 dark:text-zinc-400 text-base md:text-lg max-w-2xl mx-auto">
-                Every plan gets the same core agent — Claude Opus, phone calls, email, integrations.
-                Higher tiers add always-on uptime, memory, and more credits.
+                Bring your own Claude account. We handle everything else — infrastructure, tools, integrations, memory. No markup on AI usage.
               </p>
             </div>
 
             {/* What every plan includes */}
             <div className="max-w-3xl mx-auto mb-8 md:mb-10">
               <div className="bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl md:rounded-2xl p-4 md:p-6">
-                <h3 className="text-sm md:text-base font-bold mb-3 text-center text-zinc-900 dark:text-white">What every plan includes</h3>
-                <div className="grid grid-cols-4 gap-2 md:gap-4 text-center">
+                <h3 className="text-sm md:text-base font-bold mb-3 text-center text-zinc-900 dark:text-white">Every plan includes</h3>
+                <div className="grid grid-cols-5 gap-2 md:gap-4 text-center">
                   <div className="p-1 md:p-2">
                     <div className="text-lg md:text-xl mb-1">🧠</div>
-                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Claude Opus</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Your Claude</div>
                   </div>
                   <div className="p-1 md:p-2">
-                    <div className="text-lg md:text-xl mb-1">📞</div>
-                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Phone</div>
+                    <div className="text-lg md:text-xl mb-1">💬</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">All Integrations</div>
+                  </div>
+                  <div className="p-1 md:p-2">
+                    <div className="text-lg md:text-xl mb-1">🌐</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Browser</div>
                   </div>
                   <div className="p-1 md:p-2">
                     <div className="text-lg md:text-xl mb-1">📧</div>
                     <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Email</div>
                   </div>
                   <div className="p-1 md:p-2">
-                    <div className="text-lg md:text-xl mb-1">🌐</div>
-                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Browser</div>
+                    <div className="text-lg md:text-xl mb-1">🧠</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Memory</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* 4-tier pricing grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-              {/* Lite */}
+            {/* 3-tier BYOK pricing grid */}
+            <div className="grid md:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto">
+              {/* Starter */}
               <div className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-white/20 hover:shadow-md transition-all flex flex-col">
-                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Lite</h3>
-                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Experience the magic</p>
+                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Starter</h3>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Get started with your own AI agent</p>
                 <div className="mb-1">
                   <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$20</span>
                   <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
                 </div>
-                <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">Everything. Just a taste.</p>
+                <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">Bring your own Claude. We handle the rest.</p>
                 <ul className="space-y-2 mb-4 flex-grow">
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Full AI agent (Claude Opus)
+                    Full AI agent (bring your own Claude)
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    All integrations
+                    All integrations (Discord, Telegram, WhatsApp, web)
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    50K credits/month
+                    Browser &amp; web search
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Estimated: ~100 tasks/mo
+                    Email (send/receive)
                   </li>
-                  <li className="flex items-center gap-2 text-zinc-400 dark:text-gray-500 text-xs md:text-sm italic">
-                    <span className="text-yellow-500 dark:text-yellow-400 text-xs flex-shrink-0">⚡</span>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    Persistent memory
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-400 dark:text-gray-500 text-xs md:text-sm">
+                    <span className="text-zinc-400 dark:text-zinc-500 text-xs flex-shrink-0">—</span>
                     Machine sleeps when idle
                   </li>
                 </ul>
                 <Link
-                  href="/sign-up?plan=lite"
+                  href="/pricing"
                   className="block w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white rounded-lg font-semibold text-center transition-all text-sm"
                 >
-                  Try for $20
+                  Get Started — $20/mo
                 </Link>
               </div>
 
-              {/* Starter - Most Popular */}
+              {/* Pro - Most Popular */}
               <div className="relative bg-gradient-to-b from-purple-50 to-violet-50 dark:from-purple-500/20 dark:to-purple-900/20 border-2 border-purple-500 rounded-xl p-5 md:p-6 shadow-xl shadow-purple-100 dark:shadow-purple-500/10 flex flex-col">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-purple-600 rounded-full text-xs font-medium whitespace-nowrap text-white">
                   Most Popular
                 </div>
-                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Starter</h3>
-                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Your always-on assistant</p>
+                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Pro</h3>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Always-on with full capabilities</p>
                 <div className="mb-1">
-                  <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$79</span>
+                  <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$30</span>
                   <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
                 </div>
                 <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">Never sleeps. Never forgets.</p>
                 <ul className="space-y-2 mb-4 flex-grow">
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Full AI agent (Claude Opus)
+                    Everything in Starter
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    All integrations
+                    Always-on 24/7
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Always-on (24/7 uptime)
+                    Phone calling (60 min/mo)
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Long-term memory
+                    Scheduled tasks &amp; cron
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    200K credits/month
+                    Custom skills
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Estimated: ~400 tasks/mo
+                    File browser
                   </li>
                 </ul>
                 <Link
-                  href="/sign-up?plan=starter"
+                  href="/pricing"
                   className="block w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold text-center transition-all text-sm"
                 >
-                  Get Starter
+                  Go Pro — $30/mo
                 </Link>
               </div>
 
-              {/* Pro */}
+              {/* Power */}
               <div className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-white/20 hover:shadow-md transition-all flex flex-col">
-                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Pro</h3>
-                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">For power users</p>
+                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Power</h3>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Unlimited power for heavy users</p>
                 <div className="mb-1">
-                  <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$149</span>
+                  <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$40</span>
                   <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
                 </div>
-                <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">Built for heavy use.</p>
+                <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">No limits. Full control.</p>
                 <ul className="space-y-2 mb-4 flex-grow">
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Full AI agent (Claude Opus)
+                    Everything in Pro
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    All integrations
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Always-on (24/7 uptime)
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Long-term memory
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Higher rate limits
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Custom skills
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Email support
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    1M credits/month
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Estimated: ~2,000 tasks/mo
-                  </li>
-                </ul>
-                <Link
-                  href="/sign-up?plan=pro"
-                  className="block w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white rounded-lg font-semibold text-center transition-all text-sm"
-                >
-                  Go Pro
-                </Link>
-              </div>
-
-              {/* Business */}
-              <div className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-white/20 hover:shadow-md transition-all flex flex-col">
-                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Business</h3>
-                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Unlimited power</p>
-                <div className="mb-1">
-                  <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$299</span>
-                  <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
-                </div>
-                <p className="text-purple-600 dark:text-purple-300 text-xs font-medium mb-4">For all-day, every-day use.</p>
-                <ul className="space-y-2 mb-4 flex-grow">
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Full AI agent (Claude Opus)
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    All integrations
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Always-on (24/7 uptime)
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Long-term memory
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Highest rate limits
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Custom skills
+                    Phone calling (120 min/mo)
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
@@ -1317,32 +1253,20 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Analytics dashboard
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Dedicated support
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    5M credits/month
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Estimated: ~10,000 tasks/mo
+                    Team sharing (+1 seat)
                   </li>
                 </ul>
                 <Link
-                  href="/sign-up?plan=business"
+                  href="/pricing"
                   className="block w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white/10 dark:hover:bg-white/20 text-white rounded-lg font-semibold text-center transition-all text-sm"
                 >
-                  Go Business
+                  Go Power — $40/mo
                 </Link>
               </div>
             </div>
 
             <p className="text-center text-zinc-400 dark:text-gray-500 text-xs md:text-sm mt-6 md:mt-8">
-              Not sure yet? <span className="text-purple-600 dark:text-purple-400">Lite at $20/mo</span> gives you the same core agent and tools, but runs on-demand with lower limits. Upgrade anytime.
+              Use your existing Claude subscription or API key. No markup on AI usage. You only pay for infrastructure.
             </p>
           </div>
         </section>
