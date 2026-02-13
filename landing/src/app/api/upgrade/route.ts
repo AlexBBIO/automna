@@ -174,7 +174,7 @@ export async function POST(request: Request) {
     // Upgrades: immediate with proration
     // Downgrades: take effect at end of billing period (no proration)
     // Billing period changes (same plan): immediate with proration
-    const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
+    const updatedSubscription = await stripe.subscriptions.update(subscriptionId!, {
       items: [
         {
           id: existingItem.id,
