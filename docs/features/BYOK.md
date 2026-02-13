@@ -1,7 +1,8 @@
 # BYOK (Bring Your Own Key) System Specification
 
 *Created: 2026-02-08*
-*Status: DRAFT — Awaiting Alex's review*
+*Updated: 2026-02-13*
+*Status: DEPLOYED — Testing on prod*
 
 ---
 
@@ -686,3 +687,72 @@ When a Starter/Pro/Business user hits their budget:
 - Non-LLM billing (unchanged)
 - Machine provisioning (mostly unchanged, just different config for Lite)
 - All platform features work identically regardless of BYOK status
+
+---
+
+## 12. Implementation Notes (2026-02-13)
+
+### What's Actually Built
+
+The BYOK pivot was implemented on the `staging` branch (commit `462c106`, 16 files) and deployed to prod.
+
+**New pricing model:** BYOK-first, 3 tiers at $20/$30/$40. No more reselling LLM compute.
+
+**Two credential types supported:**
+1. **Setup token** (`sk-ant-oat01-...`) — from `claude setup-token` CLI command
+2. **API key** (`sk-ant-api03-...`) — from console.anthropic.com
+
+### Key Files
+- `landing/src/app/api/user/byok/route.ts` — POST/GET/DELETE for credential management
+- `landing/src/app/setup/connect/claude/page.tsx` — Setup token onboarding flow
+- `landing/src/app/setup/connect/apikey/page.tsx` — API key onboarding flow
+- `landing/src/lib/crypto.ts` — AES-256-GCM encryption for stored credentials
+
+### Auth-Profiles Format (How OpenClaw Stores Credentials)
+
+When we push credentials to a user's Fly machine, we write `/home/node/.openclaw/agents/main/agent/auth-profiles.json`:
+
+```json
+{
+  "version": 1,
+  "profiles": {
+    "anthropic:default": {
+      "type": "token",
+      "provider": "anthropic",
+      "token": "sk-ant-oat01-..."
+    }
+  },
+  "order": { "anthropic": ["anthropic:default"] },
+  "lastGood": { "anthropic": "anthropic:default" }
+}
+```
+
+For API keys:
+```json
+{
+  "profiles": {
+    "anthropic:default": {
+      "type": "api_key",
+      "provider": "anthropic",
+      "key": "sk-ant-api03-..."
+    }
+  }
+}
+```
+
+**Critical:** These formats were confirmed by reading OpenClaw source code (`upsertAuthProfile` in `github-copilot-auth-C5ublI9m.js`). Do NOT use `type: "oauth"` with `access` field — that's for full OAuth credentials with refresh tokens, not setup tokens.
+
+### Validation Logic
+
+- **API keys (`sk-ant-api`):** Validated against Anthropic `/v1/messages` API with a minimal request (claude-3-haiku, max_tokens=1). Uses `x-api-key` header.
+- **Setup tokens (`sk-ant-oat`):** NOT validated against the API. These are OAuth access tokens scoped to Claude Code and cannot call `/v1/messages` directly. We accept them based on format only and let OpenClaw handle authentication.
+
+### Bug Fixes (2026-02-13)
+1. **Setup token validation always failed (401):** OAuth tokens can't call `/v1/messages`. Fixed by skipping API validation for setup tokens entirely.
+2. **Wrong auth-profiles.json format:** Was writing `type: "oauth"` + `access` field. Fixed to `type: "token"` + `token` field for setup tokens, `type: "api_key"` + `key` field for API keys.
+3. **Model validation issue:** Initially used `claude-sonnet-4-20250514` for validation which may not be available on all subscription tiers. Switched to `claude-3-haiku-20240307`.
+
+### Known Limitations
+- Setup tokens are accepted on format alone (no server-side validation). If someone pastes an expired or invalid token, the agent just won't work and they'll see errors there.
+- No refresh token handling. If a setup token expires, the user needs to generate a new one.
+- Future improvement: implement our own OAuth flow (redirect to `claude.ai/oauth/authorize`) to get both access + refresh tokens directly.
