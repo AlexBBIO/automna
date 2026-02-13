@@ -116,8 +116,10 @@ export async function POST(request: Request) {
     const previewMode = new URL(request.url).searchParams.get('preview') === 'true';
 
     if (previewMode) {
-      const sub = subscription as any;
-      const nextBillingDate = new Date(sub.current_period_end * 1000).toISOString();
+      const periodEnd = (subscription as any).current_period_end;
+      const nextBillingDate = periodEnd 
+        ? new Date(periodEnd * 1000).toISOString() 
+        : new Date(Date.now() + 30 * 86400000).toISOString(); // fallback: ~30 days
 
       if (isDowngrade) {
         // Downgrades: no proration, takes effect next billing cycle
