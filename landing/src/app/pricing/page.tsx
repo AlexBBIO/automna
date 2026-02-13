@@ -114,10 +114,15 @@ function SubscriptionBanner() {
               <>We&apos;re moving to a bring-your-own-key model with lower prices.</>
             )}
           </p>
-          <p className="text-green-600 dark:text-green-400 text-sm">
-            Pick a new plan below. You&apos;ll connect your own Claude account — no more usage caps from us.
-            Your agent keeps working during the switch.
+          <p className="text-green-600 dark:text-green-400 text-sm mb-3">
+            Pick a new plan below, or keep your current plan and just connect your Claude account.
           </p>
+          <Link
+            href="/setup/connect"
+            className="inline-block px-5 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium text-sm transition"
+          >
+            Keep my plan — just connect Claude →
+          </Link>
         </div>
       </div>
     );
