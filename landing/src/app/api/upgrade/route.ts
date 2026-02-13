@@ -39,18 +39,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Price ID required' }, { status: 400 });
     }
 
-    const subscriptionId = user.publicMetadata?.stripeSubscriptionId as string | undefined;
-    if (!subscriptionId) {
-      return NextResponse.json(
-        { error: 'No active subscription. Use /api/checkout instead.' },
-        { status: 400 }
-      );
-    }
+    let subscriptionId = user.publicMetadata?.stripeSubscriptionId as string | undefined;
+    const customerId = user.publicMetadata?.stripeCustomerId as string | undefined;
 
     const stripe = getStripe();
 
-    // Get current subscription to find the existing item
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    // Try to retrieve subscription, fall back to looking up by customer
+    let subscription: Stripe.Subscription | null = null;
+    
+    if (subscriptionId) {
+      try {
+        subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      } catch (e) {
+        console.warn(`[upgrade] Subscription ${subscriptionId} not found, trying customer lookup`);
+        subscription = null;
+      }
+    }
+
+    // If subscription lookup failed or ID missing, try by customer
+    if (!subscription && customerId) {
+      try {
+        const subs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
+        if (subs.data.length > 0) {
+          subscription = subs.data[0];
+          subscriptionId = subscription.id;
+          console.log(`[upgrade] Found subscription ${subscriptionId} via customer lookup`);
+        }
+      } catch (e) {
+        console.error('[upgrade] Customer subscription lookup failed:', e);
+      }
+    }
+
+    if (!subscription) {
+      return NextResponse.json(
+        { error: 'No active subscription found. Use /api/checkout instead.' },
+        { status: 400 }
+      );
+    }
 
     if (subscription.status !== 'active' && subscription.status !== 'trialing') {
       return NextResponse.json(
