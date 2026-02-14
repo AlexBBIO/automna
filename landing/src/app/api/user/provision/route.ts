@@ -500,9 +500,6 @@ async function createMachine(
     // Note: AGENTMAIL_API_KEY intentionally NOT passed to enforce rate limits via our proxy
   }
 
-  // Determine if machine should sleep when idle (starter/free plans)
-  const sleepEnabled = shouldSleepWhenIdle(plan);
-
   const config: Record<string, unknown> = {
     image: OPENCLAW_IMAGE,
     guest: {
@@ -522,11 +519,8 @@ async function createMachine(
         ],
         protocol: "tcp",
         internal_port: 18789,
-        // Auto-start: Fly proxy holds incoming requests and boots the machine
-        auto_start: true,
-        // Auto-stop: machine stops after idle period (no active connections)
-        // Only enabled for plans with sleepWhenIdle (starter, free)
-        auto_stop: sleepEnabled ? "stop" : "off",
+        // TODO: Add auto_stop/auto_start once we confirm Fly API field names
+        // For now, machines run 24/7. Auto-stop will be configured post-provision.
       },
     ],
     env,
