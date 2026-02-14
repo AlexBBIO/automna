@@ -558,6 +558,11 @@ async function createMachine(
         const machines = await listResp.json();
         const existing = machines.find((m: FlyMachine) => m.name === "openclaw");
         if (existing) {
+          // Read the actual gateway token from the machine's env vars
+          // so the caller can store the correct token in the DB
+          if (existing.config?.env?.OPENCLAW_GATEWAY_TOKEN) {
+            existing._actualGatewayToken = existing.config.env.OPENCLAW_GATEWAY_TOKEN;
+          }
           // If stopped, start it
           if (existing.state === "stopped") {
             await fetch(`${FLY_API_BASE}/apps/${appName}/machines/${existing.id}/start`, {
@@ -905,7 +910,7 @@ export async function POST() {
 
     // Step 2: Create volume, Browserbase context, and Agentmail inbox in parallel
     await setStatus("creating_integrations");
-    const gatewayToken = crypto.randomUUID();
+    let gatewayToken = crypto.randomUUID();
     console.log(`[provision] Creating volume and integrations for ${appName}`);
     const [volume, browserbaseContextId, agentmailInboxId] = await Promise.all([
       createVolume(appName),
@@ -918,6 +923,13 @@ export async function POST() {
     console.log(`[provision] Creating machine for ${appName}`);
     const userByokChoice = user.publicMetadata?.byokChoice as string | null ?? null;
     const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId, agentmailInboxId, userPlan, userByokChoice);
+
+    // If machine was reused (already_exists), use its actual gateway token
+    // to avoid token mismatch between DB and machine
+    if ((machine as any)._actualGatewayToken) {
+      console.log(`[provision] Reused existing machine, adopting its gateway token`);
+      gatewayToken = (machine as any)._actualGatewayToken;
+    }
 
     // Step 4: Wait for Fly machine to be ready
     await setStatus("starting");
