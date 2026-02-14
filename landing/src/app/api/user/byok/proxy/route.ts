@@ -7,10 +7,10 @@
  * New users get a small starter bonus (5K credits) to try it out.
  */
 
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { machines, machineEvents, creditBalances, creditTransactions } from '@/lib/db/schema';
+import { machines, machineEvents, creditBalances, creditTransactions, users } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 const STARTER_BONUS_CREDITS = 5_000; // Free starter credits for new proxy users
@@ -21,6 +21,15 @@ export async function POST() {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Ensure user record exists (normally created by /api/user/sync from dashboard,
+    // but user hits this route from /setup/connect before reaching dashboard)
+    const clerkUser = await currentUser();
+    await db.insert(users).values({
+      id: userId,
+      email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? null,
+      name: clerkUser?.firstName ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim() : null,
+    }).onConflictDoNothing();
 
     // Store choice in Clerk metadata so it persists before machine exists
     const { clerkClient: getClerk } = await import('@clerk/nextjs/server');

@@ -6,10 +6,10 @@
  * DELETE - Remove credential
  */
 
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { machines, secrets, machineEvents } from '@/lib/db/schema';
+import { machines, secrets, machineEvents, users } from '@/lib/db/schema';
 import { encryptSecret, decryptSecret } from '@/lib/crypto';
 import { eq, and } from 'drizzle-orm';
 
@@ -277,6 +277,15 @@ export async function POST(request: Request) {
         );
       }
     }
+
+    // Ensure user record exists (normally created by /api/user/sync from dashboard,
+    // but user hits this route from /setup/connect before reaching dashboard)
+    const clerkUser = await currentUser();
+    await db.insert(users).values({
+      id: userId,
+      email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? null,
+      name: clerkUser?.firstName ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim() : null,
+    }).onConflictDoNothing();
 
     // Encrypt and store
     const { encrypted, iv } = encryptSecret(credential, userId);
