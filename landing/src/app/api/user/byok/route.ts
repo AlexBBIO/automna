@@ -481,9 +481,16 @@ export async function DELETE() {
       await db.delete(secrets).where(eq(secrets.id, secret.id));
     }
 
-    // Update machines table
+    // Fall back to proxy mode (not null — null means legacy)
+    const { clerkClient: getClerk } = await import('@clerk/nextjs/server');
+    const client = await getClerk();
+    await client.users.updateUserMetadata(userId, {
+      publicMetadata: { byokChoice: 'proxy' },
+    });
+
+    // Update machines table — fall back to proxy, not null
     await db.update(machines)
-      .set({ byokProvider: null, byokEnabled: 0, updatedAt: new Date() })
+      .set({ byokProvider: 'proxy', byokEnabled: 0, updatedAt: new Date() })
       .where(eq(machines.userId, userId));
 
     // Revert machine to proxy mode

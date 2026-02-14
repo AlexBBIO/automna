@@ -428,7 +428,8 @@ async function createMachine(
   gatewayToken: string,
   browserbaseContextId: string | null,
   agentmailInboxId: string | null,
-  plan: string = "starter"
+  plan: string = "starter",
+  byokChoice: string | null = null,
 ): Promise<FlyMachine> {
   
   // Build env vars - only include integrations if configured
@@ -447,17 +448,29 @@ async function createMachine(
   // - Anthropic: ANTHROPIC_BASE_URL + gateway token
   // - Gemini: GOOGLE_API_BASE_URL + gateway token  
   // - Browserbase: BROWSERBASE_API_URL + gateway token
+  // Determine if this machine should be in BYOK mode or proxy mode
+  const isProxyMode = !byokChoice || byokChoice === 'proxy';
+  const proxyUrl = "https://automna-proxy.fly.dev";
+
   const env: Record<string, string> = {
     // Gateway auth
     OPENCLAW_GATEWAY_TOKEN: gatewayToken,
     
-    // BYOK mode - user provides their own Claude credentials
-    BYOK_MODE: "true",
-    
     // Proxy URL (entrypoint reads this to configure clawdbot.json)
-    AUTOMNA_PROXY_URL: "https://automna-proxy.fly.dev",
+    AUTOMNA_PROXY_URL: proxyUrl,
 
-    // No ANTHROPIC_API_KEY or ANTHROPIC_BASE_URL - BYOK handles this via auth-profiles.json
+    // BYOK vs proxy mode
+    ...(isProxyMode
+      ? {
+          // Proxy mode: LLM calls route through our proxy
+          ANTHROPIC_API_KEY: gatewayToken,
+          ANTHROPIC_BASE_URL: `${proxyUrl}/api/llm`,
+        }
+      : {
+          // BYOK mode: user provides their own Claude credentials via auth-profiles.json
+          BYOK_MODE: "true",
+          // No ANTHROPIC_API_KEY or ANTHROPIC_BASE_URL - BYOK handles this via auth-profiles.json
+        }),
     
     // Gemini proxy
     GEMINI_API_KEY: gatewayToken,
@@ -909,7 +922,8 @@ export async function POST() {
     // Step 3: Create machine (env vars passed directly, no Fly secrets needed)
     await setStatus("creating_machine");
     console.log(`[provision] Creating machine for ${appName}`);
-    const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId, agentmailInboxId, userPlan);
+    const userByokChoice = user.publicMetadata?.byokChoice as string | null ?? null;
+    const machine = await createMachine(appName, volume.id, gatewayToken, browserbaseContextId, agentmailInboxId, userPlan, userByokChoice);
 
     // Step 4: Wait for Fly machine to be ready
     await setStatus("starting");
