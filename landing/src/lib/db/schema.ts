@@ -322,6 +322,7 @@ export const creditBalances = sqliteTable("credit_balances", {
   autoRefillEnabled: integer("auto_refill_enabled").notNull().default(0),
   autoRefillAmountCents: integer("auto_refill_amount_cents").notNull().default(1000), // $10 default
   autoRefillThreshold: integer("auto_refill_threshold").notNull().default(10000), // Refill when below 10K
+  autoRefillLockedAt: integer("auto_refill_locked_at"), // Unix timestamp, DB-level lock for concurrent refills
   monthlyCostCapCents: integer("monthly_cost_cap_cents").notNull().default(0), // 0 = no cap
   monthlySpentCents: integer("monthly_spent_cents").notNull().default(0),
   monthlySpentResetAt: integer("monthly_spent_reset_at"), // Unix timestamp for next monthly reset

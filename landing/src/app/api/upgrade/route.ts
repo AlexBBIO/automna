@@ -167,9 +167,56 @@ export async function POST(request: Request) {
       });
     }
 
-    // Upgrades: immediate with proration
-    // Downgrades: take effect at end of billing period (no proration)
-    // Billing period changes (same plan): immediate with proration
+    if (isDowngrade) {
+      // Downgrades: schedule price change for end of billing period
+      // User keeps current plan features until period ends
+      const schedule = await stripe.subscriptionSchedules.create({
+        from_subscription: subscriptionId!,
+      });
+
+      await stripe.subscriptionSchedules.update(schedule.id, {
+        phases: [
+          {
+            items: [{ price: existingItem.price.id, quantity: 1 }],
+            start_date: schedule.phases[0].start_date,
+            end_date: schedule.phases[0].end_date,
+            metadata: { ...subscription.metadata, plan: currentPlan },
+          },
+          {
+            items: [{ price: priceId, quantity: 1 }],
+            metadata: { plan: newPlan, previousPlan: currentPlan, changeType: 'downgrade' },
+          },
+        ],
+      });
+
+      // Update Clerk with pending downgrade info (keep current plan active)
+      const { clerkClient: getClerk } = await import('@clerk/nextjs/server');
+      const client = await getClerk();
+      await client.users.updateUserMetadata(userId, {
+        publicMetadata: {
+          stripeCustomerId: subscription.customer as string,
+          stripeSubscriptionId: subscriptionId,
+          plan: currentPlan, // Keep current plan until period end
+          pendingDowngrade: newPlan,
+          subscriptionStatus: 'active',
+        },
+      });
+
+      const periodEnd = (subscription as any).current_period_end;
+      console.log(`[upgrade] User ${userId} scheduled downgrade to ${newPlan} at period end (${new Date((periodEnd || 0) * 1000).toISOString()})`);
+
+      return NextResponse.json({
+        success: true,
+        plan: currentPlan,
+        pendingPlan: newPlan,
+        effectiveDate: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+        subscriptionId: subscriptionId,
+        status: 'active',
+        scheduled: true,
+      });
+    }
+
+    // Upgrades and billing changes: immediate with proration
     const updatedSubscription = await stripe.subscriptions.update(subscriptionId!, {
       items: [
         {
@@ -177,19 +224,14 @@ export async function POST(request: Request) {
           price: priceId,
         },
       ],
-      proration_behavior: isDowngrade ? 'none' : 'create_prorations',
-      ...(isDowngrade && {
-        // Schedule the downgrade for end of current period
-        cancel_at_period_end: false, // Don't cancel, just change
-        billing_cycle_anchor: 'unchanged' as any,
-      }),
+      proration_behavior: 'create_prorations',
       metadata: {
         ...subscription.metadata,
         plan: newPlan,
         upgradedAt: new Date().toISOString(),
         previousPlan: currentPlan,
         previousPriceId: existingItem.price.id,
-        changeType: isDowngrade ? 'downgrade' : isSamePlan ? 'billing_change' : 'upgrade',
+        changeType: isSamePlan ? 'billing_change' : 'upgrade',
       },
     });
 
@@ -201,6 +243,7 @@ export async function POST(request: Request) {
         stripeCustomerId: subscription.customer as string,
         stripeSubscriptionId: subscriptionId,
         plan: newPlan,
+        pendingDowngrade: null, // Clear any pending downgrade
         subscriptionStatus: updatedSubscription.status,
       },
     });

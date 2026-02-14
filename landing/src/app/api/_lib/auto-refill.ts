@@ -9,21 +9,17 @@
 import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { creditBalances, creditTransactions, CREDIT_PACKS } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-// In-flight refills to prevent double-charging from concurrent requests
-const refillsInFlight = new Set<string>();
 
 /**
  * Check if a user needs auto-refill and execute it if so.
  * Call this after credit deduction (fire-and-forget).
+ * Uses DB-level locking (autoRefillLockedAt) to prevent double-charging
+ * across serverless instances.
  */
 export async function checkAutoRefill(userId: string): Promise<void> {
-  // Prevent concurrent refills for the same user
-  if (refillsInFlight.has(userId)) return;
-  refillsInFlight.add(userId);
 
   try {
     const bal = await db.query.creditBalances.findFirst({
@@ -33,6 +29,21 @@ export async function checkAutoRefill(userId: string): Promise<void> {
     if (!bal) return;
     if (bal.autoRefillEnabled !== 1) return;
     if (bal.balance > bal.autoRefillThreshold) return;
+
+    // DB-level lock: atomically set a lock timestamp, only if not already locked
+    // Lock expires after 60s to handle crashed processes
+    const nowTs = Math.floor(Date.now() / 1000);
+    const lockExpiry = nowTs - 60;
+    await db.run(sql`UPDATE credit_balances SET auto_refill_locked_at = ${nowTs} WHERE user_id = ${userId} AND (auto_refill_locked_at IS NULL OR auto_refill_locked_at < ${lockExpiry})`);
+
+    // Re-read to verify we got the lock
+    const lockCheck = await db.query.creditBalances.findFirst({
+      where: eq(creditBalances.userId, userId),
+    });
+    if (!lockCheck || lockCheck.autoRefillLockedAt !== nowTs) {
+      // Another instance got the lock
+      return;
+    }
 
     // Check monthly cost cap
     const refillAmountCents = bal.autoRefillAmountCents;
@@ -106,16 +117,16 @@ export async function checkAutoRefill(userId: string): Promise<void> {
       return;
     }
 
-    // Add credits
+    // Add credits atomically — concurrent deductions may be happening
     await db.update(creditBalances)
       .set({
-        balance: bal.balance + pack.credits, // OK to not be atomic here — this is the only writer after lock
-        monthlySpentCents: (bal.monthlySpentCents ?? 0) + pack.priceCents,
+        balance: sql`MAX(0, ${creditBalances.balance}) + ${pack.credits}`,
+        monthlySpentCents: sql`COALESCE(${creditBalances.monthlySpentCents}, 0) + ${pack.priceCents}`,
         updatedAt: new Date(),
       })
       .where(eq(creditBalances.userId, userId));
 
-    // Get updated balance for transaction
+    // Read updated balance for transaction log
     const updated = await db.query.creditBalances.findFirst({
       where: eq(creditBalances.userId, userId),
     });
@@ -124,7 +135,7 @@ export async function checkAutoRefill(userId: string): Promise<void> {
       userId,
       type: 'refill',
       amount: pack.credits,
-      balanceAfter: updated?.balance ?? bal.balance + pack.credits,
+      balanceAfter: updated?.balance ?? 0,
       stripePaymentId: paymentIntent.id,
       description: `Auto-refill: ${pack.label} ($${(pack.priceCents / 100).toFixed(2)})`,
     });
@@ -138,7 +149,11 @@ export async function checkAutoRefill(userId: string): Promise<void> {
     }
     console.error(`[auto-refill] Error for user ${userId}:`, error);
   } finally {
-    refillsInFlight.delete(userId);
+    // Release DB lock
+    await db.update(creditBalances)
+      .set({ autoRefillLockedAt: null })
+      .where(eq(creditBalances.userId, userId))
+      .catch(() => {}); // best-effort unlock
   }
 }
 

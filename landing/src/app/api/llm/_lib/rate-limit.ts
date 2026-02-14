@@ -63,7 +63,7 @@ export async function checkRateLimits(
     if (creditBalance <= 0) {
       return {
         allowed: false,
-        reason: 'No credits remaining. Purchase more credits to continue.',
+        reason: 'No credits remaining. Visit your dashboard at automna.ai/dashboard to purchase more credits.',
         limits: {
           monthlyAutomnaCredits: { used: 0, limit: 0 },
           requestsPerMinute: { used: 0, limit: rpmLimit },

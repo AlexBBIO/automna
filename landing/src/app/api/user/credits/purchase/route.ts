@@ -33,6 +33,13 @@ export async function POST(request: Request) {
         metadata: { clerkUserId: userId },
       });
       customerId = customer.id;
+
+      // Persist stripeCustomerId in Clerk so future flows don't create duplicates
+      const { clerkClient: getClerk } = await import('@clerk/nextjs/server');
+      const client = await getClerk();
+      await client.users.updateUserMetadata(userId, {
+        publicMetadata: { ...user.publicMetadata, stripeCustomerId: customerId },
+      }).catch(err => console.warn('[credits/purchase] Failed to update Clerk metadata:', err));
     }
 
     const session = await stripe.checkout.sessions.create({

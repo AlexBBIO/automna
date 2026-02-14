@@ -224,7 +224,7 @@ async function pushCredentialToMachine(
         Authorization: `Bearer ${FLY_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ command: ['sh', '-c', 'kill -USR1 $(pgrep -f openclaw-gateway || pgrep -f entry.js || echo 1)'] }),
+      body: JSON.stringify({ command: ['sh', '-c', 'PID=$(pgrep -f openclaw-gateway || pgrep -f entry.js); [ -n "$PID" ] && kill -USR1 $PID || echo "No gateway process found"'] }),
     });
 
     if (!restartRes.ok) {
@@ -419,10 +419,11 @@ async function revertMachineToProxyMode(appName: string, machineId: string): Pro
     const machine = await getRes.json();
     const env = { ...machine.config.env };
 
-    // Remove BYOK mode, restore proxy URL
+    // Remove BYOK mode, restore proxy URL + API key for proxy auth
     delete env.BYOK_MODE;
     const proxyUrl = env.AUTOMNA_PROXY_URL || 'https://automna-proxy.fly.dev';
     env.ANTHROPIC_BASE_URL = `${proxyUrl}/api/llm`;
+    env.ANTHROPIC_API_KEY = env.OPENCLAW_GATEWAY_TOKEN; // Use gateway token for proxy auth
 
     const updatedConfig = { ...machine.config, env };
     updatedConfig.image = 'registry.fly.io/automna-openclaw-image:latest';
