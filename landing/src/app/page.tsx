@@ -1110,10 +1110,10 @@ export default function Home() {
             </div>
 
             {/* What every plan includes */}
-            <div className="max-w-3xl mx-auto mb-8 md:mb-10">
+            <div className="max-w-4xl mx-auto mb-8 md:mb-10">
               <div className="bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl md:rounded-2xl p-4 md:p-6">
                 <h3 className="text-sm md:text-base font-bold mb-3 text-center text-zinc-900 dark:text-white">Every plan includes</h3>
-                <div className="grid grid-cols-5 gap-2 md:gap-4 text-center">
+                <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-4 text-center">
                   <div className="p-1 md:p-2">
                     <div className="text-lg md:text-xl mb-1">🧠</div>
                     <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Your Claude</div>
@@ -1134,6 +1134,18 @@ export default function Home() {
                     <div className="text-lg md:text-xl mb-1">🧠</div>
                     <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Memory</div>
                   </div>
+                  <div className="p-1 md:p-2">
+                    <div className="text-lg md:text-xl mb-1">🛠️</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Custom Skills</div>
+                  </div>
+                  <div className="p-1 md:p-2">
+                    <div className="text-lg md:text-xl mb-1">📁</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">File Browser</div>
+                  </div>
+                  <div className="p-1 md:p-2">
+                    <div className="text-lg md:text-xl mb-1">🖥️</div>
+                    <div className="text-zinc-700 dark:text-gray-300 font-medium text-xs md:text-sm">Browser Sessions</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1143,7 +1155,7 @@ export default function Home() {
               {/* Starter */}
               <div className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-white/20 hover:shadow-md transition-all flex flex-col">
                 <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Starter</h3>
-                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Get started with your own AI agent</p>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Try it out</p>
                 <div className="mb-1">
                   <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$20</span>
                   <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
@@ -1152,27 +1164,15 @@ export default function Home() {
                 <ul className="space-y-2 mb-4 flex-grow">
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Full AI agent (bring your own Claude)
+                    Wakes on demand (~30s cold start)
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    All integrations (Discord, Telegram, WhatsApp, web)
+                    100 emails/mo
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Browser &amp; web search
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Email (send/receive)
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Persistent memory
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-400 dark:text-gray-500 text-xs md:text-sm">
-                    <span className="text-zinc-400 dark:text-zinc-500 text-xs flex-shrink-0">—</span>
-                    Machine sleeps when idle
+                    Community support
                   </li>
                 </ul>
                 <Link
@@ -1189,7 +1189,7 @@ export default function Home() {
                   Most Popular
                 </div>
                 <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Pro</h3>
-                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Always-on with full capabilities</p>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Your always-on assistant</p>
                 <div className="mb-1">
                   <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$30</span>
                   <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
@@ -1198,11 +1198,11 @@ export default function Home() {
                 <ul className="space-y-2 mb-4 flex-grow">
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Everything in Starter
+                    Always-on 24/7
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Always-on 24/7
+                    500 emails/mo
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
@@ -1210,15 +1210,11 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Scheduled tasks &amp; cron
+                    Scheduled tasks &amp; automations
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Custom skills
-                  </li>
-                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
-                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    File browser
+                    Priority support
                   </li>
                 </ul>
                 <Link
@@ -1232,7 +1228,7 @@ export default function Home() {
               {/* Power */}
               <div className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl p-5 md:p-6 hover:border-zinc-300 dark:hover:border-white/20 hover:shadow-md transition-all flex flex-col">
                 <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white">Power</h3>
-                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Unlimited power for heavy users</p>
+                <p className="text-zinc-500 dark:text-gray-400 text-xs md:text-sm mb-3">Full control</p>
                 <div className="mb-1">
                   <span className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">$40</span>
                   <span className="text-zinc-400 dark:text-gray-400 text-sm">/mo</span>
@@ -1241,7 +1237,11 @@ export default function Home() {
                 <ul className="space-y-2 mb-4 flex-grow">
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Everything in Pro
+                    Always-on 24/7
+                  </li>
+                  <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
+                    <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
+                    2,000 emails/mo
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
@@ -1253,7 +1253,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2 text-zinc-700 dark:text-gray-300 text-xs md:text-sm">
                     <span className="text-green-500 dark:text-green-400 text-xs flex-shrink-0">✓</span>
-                    Team sharing (+1 seat)
+                    Dedicated support
                   </li>
                 </ul>
                 <Link
