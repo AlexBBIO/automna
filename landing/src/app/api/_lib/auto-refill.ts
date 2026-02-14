@@ -58,7 +58,7 @@ export async function checkAutoRefill(userId: string): Promise<void> {
     // Reset monthly spent if past reset date
     const now = Math.floor(Date.now() / 1000);
     if (bal.monthlySpentResetAt && bal.monthlySpentResetAt < now) {
-      const nextReset = getNextMonthReset();
+      const nextReset = getNextMonthReset(bal.monthlySpentResetAt);
       await db.update(creditBalances)
         .set({ monthlySpentCents: 0, monthlySpentResetAt: nextReset, updatedAt: new Date() })
         .where(eq(creditBalances.userId, userId));
@@ -178,7 +178,18 @@ function findClosestPack(targetCents: number): typeof CREDIT_PACKS[number] {
   return best;
 }
 
-function getNextMonthReset(): number {
-  const now = new Date();
-  return Math.floor(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).getTime() / 1000);
+/**
+ * Get next monthly reset timestamp, aligned to billing cycle.
+ * If we have a previous reset date, advance by one month from that date
+ * (same day of month). Otherwise, set 30 days from now.
+ */
+function getNextMonthReset(currentResetAt?: number | null): number {
+  if (currentResetAt) {
+    // Advance one month from the previous reset date (preserves billing day)
+    const prev = new Date(currentResetAt * 1000);
+    prev.setUTCMonth(prev.getUTCMonth() + 1);
+    return Math.floor(prev.getTime() / 1000);
+  }
+  // No previous reset — set 30 days from now
+  return Math.floor((Date.now() + 30 * 86400000) / 1000);
 }

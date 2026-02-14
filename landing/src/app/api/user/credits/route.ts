@@ -28,7 +28,7 @@ export async function GET() {
 
     // Reset monthly spent if past reset date
     if (balance && balance.monthlySpentResetAt && balance.monthlySpentResetAt < Math.floor(Date.now() / 1000)) {
-      const nextReset = getNextMonthReset();
+      const nextReset = getNextMonthReset(balance.monthlySpentResetAt);
       await db.update(creditBalances)
         .set({ monthlySpentCents: 0, monthlySpentResetAt: nextReset, updatedAt: new Date() })
         .where(eq(creditBalances.userId, userId));
@@ -93,7 +93,11 @@ export async function POST(request: Request) {
   }
 }
 
-function getNextMonthReset(): number {
-  const now = new Date();
-  return Math.floor(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).getTime() / 1000);
+function getNextMonthReset(currentResetAt?: number | null): number {
+  if (currentResetAt) {
+    const prev = new Date(currentResetAt * 1000);
+    prev.setUTCMonth(prev.getUTCMonth() + 1);
+    return Math.floor(prev.getTime() / 1000);
+  }
+  return Math.floor((Date.now() + 30 * 86400000) / 1000);
 }
