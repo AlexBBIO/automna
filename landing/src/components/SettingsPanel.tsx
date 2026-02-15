@@ -17,12 +17,14 @@ interface AgentInfo {
 interface UsageInfo {
   plan: string;
   used: number;
-  limit: number;
+  limit: number | null;
   periodStart: string;
   periodEnd: string;
+  isByok?: boolean;
 }
 
-function formatNumber(n: number): string {
+function formatNumber(n: number | null | undefined): string {
+  if (n == null) return '0';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString();
@@ -63,7 +65,9 @@ function UsageSection() {
 
   if (!usage) return null;
 
-  const pct = usage.limit > 0 ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
+  const isByok = usage.isByok;
+  const hasLimit = usage.limit != null && usage.limit > 0;
+  const pct = hasLimit ? Math.min((usage.used / usage.limit!) * 100, 100) : 0;
   const barColor = pct >= 80 ? 'bg-red-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-green-500';
   const periodEnd = new Date(usage.periodEnd);
   const daysLeft = Math.max(0, Math.ceil((periodEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
@@ -94,26 +98,37 @@ function UsageSection() {
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div className="mb-2">
-        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-          <div
-            className={`h-full ${barColor} rounded-full transition-all duration-500`}
-            style={{ width: `${pct}%` }}
-          />
+      {isByok ? (
+        <div className="text-sm text-zinc-600 dark:text-zinc-400">
+          <span className="inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-1 rounded">
+            ✓ Bring Your Own Key
+          </span>
+          <span className="ml-2">Usage billed directly by your AI provider.</span>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Progress bar */}
+          <div className="mb-2">
+            <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${barColor} rounded-full transition-all duration-500`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
 
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-zinc-600 dark:text-zinc-400">
-          <span className="font-semibold text-zinc-900 dark:text-white">{formatNumber(usage.used)}</span>
-          {' / '}
-          {formatNumber(usage.limit)} credits
-        </span>
-        <span className={`font-medium ${pct >= 80 ? 'text-red-500' : pct >= 50 ? 'text-yellow-500' : 'text-zinc-500 dark:text-zinc-400'}`}>
-          {pct.toFixed(1)}%
-        </span>
-      </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-zinc-600 dark:text-zinc-400">
+              <span className="font-semibold text-zinc-900 dark:text-white">{formatNumber(usage.used)}</span>
+              {' / '}
+              {formatNumber(usage.limit)} credits
+            </span>
+            <span className={`font-medium ${pct >= 80 ? 'text-red-500' : pct >= 50 ? 'text-yellow-500' : 'text-zinc-500 dark:text-zinc-400'}`}>
+              {pct.toFixed(1)}%
+            </span>
+          </div>
+        </>
+      )}
     </section>
   );
 }
