@@ -8,6 +8,7 @@
 
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 import { db } from '@/lib/db';
 import { machines, secrets, machineEvents, users } from '@/lib/db/schema';
 import { encryptSecret, decryptSecret } from '@/lib/crypto';
@@ -244,6 +245,15 @@ export async function POST(request: Request) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limit: 5 BYOK attempts per minute per user
+    const rl = rateLimit(`byok:${userId}`, 5, 60 * 1000);
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: `Too many attempts. Try again in ${rl.retryAfterSeconds} seconds.` },
+        { status: 429 }
+      );
     }
 
     const { credential: rawCredential } = await request.json();

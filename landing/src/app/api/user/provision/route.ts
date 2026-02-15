@@ -13,6 +13,7 @@
 
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { machines, machineEvents, phoneNumbers, users, provisionStatus, secrets } from "@/lib/db/schema";
 import Stripe from "stripe";
@@ -656,6 +657,15 @@ export async function POST() {
     
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit: 1 provision attempt per 5 minutes per user
+    const rl = rateLimit(`provision:${userId}`, 1, 5 * 60 * 1000);
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: `Too many provision attempts. Try again in ${rl.retryAfterSeconds} seconds.` },
+        { status: 429 }
+      );
     }
 
     if (!FLY_API_TOKEN) {
