@@ -42,11 +42,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ allowed: false, balance: 0, reason: 'no_credits' });
     }
 
-    // Deduct credits
-    const newBalance = Math.max(0, currentBalance - amount);
-    await db.update(creditBalances)
-      .set({ balance: newBalance, updatedAt: new Date() })
-      .where(eq(creditBalances.userId, userId));
+    // Atomic deduct: single UPDATE prevents race conditions from concurrent requests
+    const result = await db.update(creditBalances)
+      .set({
+        balance: sql`MAX(0, ${creditBalances.balance} - ${amount})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(creditBalances.userId, userId))
+      .returning({ balance: creditBalances.balance });
+
+    const newBalance = result[0]?.balance ?? Math.max(0, currentBalance - amount);
 
     // Log transaction
     await db.insert(creditTransactions).values({
