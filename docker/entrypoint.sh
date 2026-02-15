@@ -961,6 +961,9 @@ echo "[automna] Caddy running (PID: $CADDY_PID)"
 # Wait for Caddy to be ready
 sleep 1
 
+# Fix ownership of all OpenClaw dirs (entrypoint runs as root, gateway runs as node)
+chown -R node:node "$OPENCLAW_DIR" 2>/dev/null || true
+
 echo "[automna] Starting OpenClaw gateway on port $GATEWAY_INTERNAL_PORT (internal)..."
 
 # BYOK Mode: LLM calls go direct to Anthropic (user's own key)

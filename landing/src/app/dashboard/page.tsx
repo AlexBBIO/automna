@@ -1058,7 +1058,7 @@ export default function DashboardPage() {
             Your agent isn&apos;t configured yet. Complete the setup to start chatting.
           </p>
           <Link
-            href="/dashboard/setup"
+            href="/setup/connect"
             className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg font-semibold transition-colors"
           >
             Start Setup →

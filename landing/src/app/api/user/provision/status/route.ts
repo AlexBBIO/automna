@@ -42,8 +42,8 @@ export async function GET() {
       if (machine?.appName && machine?.gatewayToken) {
         try {
           const resp = await fetch(
-            `https://${machine.appName}.fly.dev/ws/api/sessions?token=${machine.gatewayToken}`,
-            { method: "GET", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(4000) }
+            `https://${machine.appName}.fly.dev/ws/api/sessions`,
+            { method: "GET", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${machine.gatewayToken}` }, signal: AbortSignal.timeout(4000) }
           );
           if (resp.status === 200) {
             // Gateway is ready! Update status
