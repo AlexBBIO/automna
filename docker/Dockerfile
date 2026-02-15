@@ -11,7 +11,7 @@
 #
 # The phioranex image runs as 'node' user with config at /home/node/.openclaw
 
-FROM ghcr.io/phioranex/openclaw-docker:latest
+FROM ghcr.io/phioranex/openclaw-docker@sha256:4dd8f27c5573a3d60b5b05a22d86c2521a15e702c34f5d8bffd20ac9eb716ba3
 
 # Switch to root to install components
 USER root

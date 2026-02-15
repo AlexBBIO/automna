@@ -14,6 +14,7 @@ import { usageEvents, machines, LEGACY_PLAN_LIMITS } from '@/lib/db/schema';
 import { eq, sql, and, gte } from 'drizzle-orm';
 import { authenticateGatewayToken } from '../_lib/auth';
 import type { PlanType } from '@/lib/db/schema';
+import { isByokUser } from '@/lib/user-type';
 
 export const runtime = 'edge';
 
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
     });
     plan = (machine?.plan as PlanType) || 'starter';
     isProxy = machine?.byokProvider === 'proxy';
-    isByok = machine?.byokProvider === 'anthropic_oauth' || machine?.byokProvider === 'anthropic_api_key';
+    isByok = isByokUser(machine?.byokProvider);
     effectivePlan = machine?.effectivePlan ?? null;
     effectivePlanUntil = machine?.effectivePlanUntil ?? null;
   } else {
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
       userId = user.userId;
       plan = user.plan;
       isProxy = user.byokProvider === 'proxy';
-      isByok = user.byokProvider === 'anthropic_oauth' || user.byokProvider === 'anthropic_api_key';
+      isByok = isByokUser(user.byokProvider);
       effectivePlan = user.effectivePlan;
       effectivePlanUntil = user.effectivePlanUntil;
     }

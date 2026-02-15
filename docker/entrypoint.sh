@@ -778,7 +778,9 @@ const automnaProvider = {
   apiKey: gatewayToken,
   api: 'anthropic-messages',
 };
-if (!byokMode) {
+if (byokMode) {
+  automnaProvider.models = [];
+} else {
   automnaProvider.models = [
     { id: 'claude-opus-4-5', name: 'Claude Opus 4.5' },
     { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }
@@ -894,9 +896,9 @@ if (byokMode) {
   // CRITICAL: Remove models list from automna provider so OpenClaw doesn't match
   // model names to the proxy. Without this, anthropic/claude-opus-4-5 resolves
   // to automna provider instead of auth-profiles.json.
-  if (config.models?.providers?.automna?.models) {
-    delete config.models.providers.automna.models;
-    console.log('[automna] Removed models list from automna provider (BYOK mode)');
+  if (config.models?.providers?.automna) {
+    config.models.providers.automna.models = [];
+    console.log('[automna] Cleared models list from automna provider (BYOK mode)');
   }
 }
 

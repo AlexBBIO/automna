@@ -6,10 +6,11 @@
  */
 
 import { db } from '@/lib/db';
-import { llmRateLimits, creditBalances, LEGACY_PLAN_LIMITS, PLAN_LIMITS } from '@/lib/db/schema';
+import { llmRateLimits, creditBalances, LEGACY_PLAN_LIMITS } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import type { AuthenticatedUser } from './auth';
 import { getUsedAutomnaCredits } from '@/app/api/_lib/usage-events';
+import { isByokUser, shouldCheckCredits } from '@/lib/user-type';
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -37,11 +38,12 @@ export async function checkRateLimits(
   const legacyLimits = LEGACY_PLAN_LIMITS[effectivePlan as keyof typeof LEGACY_PLAN_LIMITS] 
     || LEGACY_PLAN_LIMITS[user.plan as keyof typeof LEGACY_PLAN_LIMITS];
   
-  // BYOK users (own credentials) bypass credit/token limits entirely.
-  // Their LLM calls go direct to Anthropic, and service calls (search, browser, email)
-  // are free for now. Only RPM limits apply to prevent abuse.
-  const isByok = user.byokProvider === 'anthropic_oauth' || user.byokProvider === 'anthropic_api_key';
-  const monthlyCreditsLimit = isByok ? Infinity : legacyLimits.monthlyAutomnaCredits;
+  // BYOK users bypass credit/token limits entirely.
+  // Their LLM calls go direct to Anthropic, service calls are free for now.
+  // Only RPM limits apply to prevent abuse.
+  const monthlyCreditsLimit = shouldCheckCredits(user.byokProvider)
+    ? legacyLimits.monthlyAutomnaCredits
+    : Infinity;
   const rpmLimit = legacyLimits.requestsPerMinute; // RPM same for all
   
   const currentMinute = Math.floor(now / 60);

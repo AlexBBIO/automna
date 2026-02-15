@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { isByokUser } from '@/lib/user-type';
 
 interface BYOKStatus {
   enabled: boolean;
