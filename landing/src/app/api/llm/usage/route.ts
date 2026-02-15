@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   const { userId: clerkUserId } = await auth();
   
   let isProxy = false;
+  let isByok = false;
   let effectivePlan: string | null = null;
   let effectivePlanUntil: number | null = null;
 
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
     });
     plan = (machine?.plan as PlanType) || 'starter';
     isProxy = machine?.byokProvider === 'proxy';
+    isByok = machine?.byokProvider === 'anthropic_oauth' || machine?.byokProvider === 'anthropic_api_key';
     effectivePlan = machine?.effectivePlan ?? null;
     effectivePlanUntil = machine?.effectivePlanUntil ?? null;
   } else {
@@ -44,6 +46,7 @@ export async function GET(request: Request) {
       userId = user.userId;
       plan = user.plan;
       isProxy = user.byokProvider === 'proxy';
+      isByok = user.byokProvider === 'anthropic_oauth' || user.byokProvider === 'anthropic_api_key';
       effectivePlan = user.effectivePlan;
       effectivePlanUntil = user.effectivePlanUntil;
     }
@@ -134,7 +137,8 @@ export async function GET(request: Request) {
   const monthEnd = new Date(monthStart);
   monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
   
-  const percentUsed = Math.min(100, Math.round(
+  // BYOK users bypass credit limits — never show as over limit
+  const percentUsed = isByok ? 0 : Math.min(100, Math.round(
     (totalAutomnaCredits / limits.monthlyAutomnaCredits) * 100
   ));
   
@@ -163,6 +167,7 @@ export async function GET(request: Request) {
     remaining: {
       automnaCredits: Math.max(0, limits.monthlyAutomnaCredits - totalAutomnaCredits),
     },
+    isByok,
     percentUsed: {
       tokens: percentUsed,
       cost: percentUsed,  // Same number now — both derived from AC

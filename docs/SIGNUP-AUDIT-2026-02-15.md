@@ -4,26 +4,32 @@
 ## Summary
 Audited 15+ route files across signup/provisioning/billing/BYOK flows. Found **5 critical**, **6 high**, **8 medium**, and **4 low** severity issues.
 
+### Fix Status (2026-02-15)
+- ✅ Critical #1 — Gateway token moved to Authorization header (`f94108b`)
+- ✅ Critical #2/3 — Dead legacy routes deleted (`f94108b`)
+- ✅ Critical #4 — Credit deduction race condition fixed with atomic SQL (`62c9a8a`)
+- ✅ Critical #5 — Setup token format validation added (`bfa6152`)
+- ✅ High #6/7 — Rate limiting added to provision + BYOK (`048548c`)
+- ⬚ Critical #5b — Stripe webhook metadata mismatch (outstanding)
+- ⬚ High #9-11 — Cleanup, dual DB, plan validation (outstanding)
+- ⬚ Medium/Low — See below (outstanding)
+
 ---
 
 ## CRITICAL
 
-### 1. Gateway token leaked in provision status health check URL
+### 1. ✅ FIXED — Gateway token leaked in provision status health check URL
 **File:** `src/app/api/user/provision/status/route.ts` — line ~40
-**Issue:** Gateway token passed as query parameter in GET request — tokens in URLs get logged by proxies, CDNs, Fly.io load balancers.
+**Fix:** Moved token from URL query param to `Authorization: Bearer` header.
 
-### 2. `/api/setup/deploy` uses hardcoded salt and weak encryption
-**File:** `src/app/api/setup/deploy/route.ts` — lines 8-14
-**Issue:** Static salt `'salt'` and default key `'automna-default-key-change-me!!'`. Trivially decryptable if `ENCRYPTION_KEY` unset.
+### 2/3. ✅ FIXED — `/api/setup/deploy` dead legacy route deleted
+**Fix:** Deleted route, validate-key route, and old setup wizard page. 592 lines removed.
 
-### 3. `/api/setup/deploy` is a dead legacy route with Prisma dependency
-**Issue:** Uses Prisma (PostgreSQL) while app uses Turso/Drizzle. Creates orphaned DB records. Should be deleted.
+### 4. ✅ FIXED — Race condition in credit deduction (non-atomic)
+**File:** `src/app/api/user/credits/deduct/route.ts`
+**Fix:** Replaced read-then-write with atomic `UPDATE ... SET balance = MAX(0, balance - amount)` with `.returning()`.
 
-### 4. Race condition in credit deduction (non-atomic)
-**File:** `src/app/api/user/credits/deduct/route.ts` — lines 34-43
-**Issue:** Read-then-write pattern allows concurrent requests to double-deduct. Needs atomic SQL update.
-
-### 5. Stripe webhook uses customer metadata for Clerk user ID — may be missing
+### 5. ⬚ OUTSTANDING — Stripe webhook uses customer metadata for Clerk user ID — may be missing
 **File:** `src/app/api/webhooks/stripe/route.ts` — line ~180
 **Issue:** `clerkUserId` from customer metadata may not exist for customers created outside `/api/checkout`. Subscription changes silently skip.
 
@@ -31,15 +37,11 @@ Audited 15+ route files across signup/provisioning/billing/BYOK flows. Found **5
 
 ## HIGH
 
-### 6. No rate limiting on `/api/user/provision` POST
-**Risk:** Spam creates Fly apps, volumes, Twilio numbers ($1/mo each).
+### 6/7. ✅ FIXED — No rate limiting on provision + BYOK
+**Fix:** Added shared rate-limit utility. Provision: 1/5min. BYOK: 5/min. Returns 429.
 
-### 7. No rate limiting on `/api/user/byok` POST
-**Risk:** Machine restart spam, API key oracle.
-
-### 8. Setup token (sk-ant-oat) validation skipped entirely
-**File:** `src/app/api/user/byok/route.ts` — line ~200
-**Issue:** Any string starting with `sk-ant-oat` accepted and stored. User won't know it's invalid until agent fails.
+### 8. ✅ FIXED — Setup token (sk-ant-oat) validation skipped entirely
+**Fix:** Added format validation: min 50 chars, alphanumeric/hyphens/underscores only after prefix.
 
 ### 9. Clerk webhook `user.deleted` doesn't clean up Fly/Turso/Browserbase/Agentmail
 **Risk:** Orphaned Fly machines keep running and costing money.

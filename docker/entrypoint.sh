@@ -769,20 +769,24 @@ const managed = {
   }
 };
 
-// Always add automna provider — it's the proxy fallback (future: overages)
-// In BYOK mode, user's auth-profiles.json credential takes priority for anthropic
-// In legacy mode, automna is the only LLM provider
+// In BYOK mode: automna provider exists as fallback but WITHOUT a models list.
+// This prevents OpenClaw from matching model names to the proxy provider —
+// anthropic/ prefixed models will resolve to auth-profiles.json instead.
+// In legacy mode: automna is the primary provider with explicit model list.
+const automnaProvider = {
+  baseUrl: proxyUrl + '/api/llm',
+  apiKey: gatewayToken,
+  api: 'anthropic-messages',
+};
+if (!byokMode) {
+  automnaProvider.models = [
+    { id: 'claude-opus-4-5', name: 'Claude Opus 4.5' },
+    { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }
+  ];
+}
 managed.models = {
   providers: {
-    automna: {
-      baseUrl: proxyUrl + '/api/llm',
-      apiKey: gatewayToken,
-      api: 'anthropic-messages',
-      models: [
-        { id: 'claude-opus-4-5', name: 'Claude Opus 4.5' },
-        { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }
-      ]
-    }
+    automna: automnaProvider
   }
 };
 
@@ -887,6 +891,13 @@ config.plugins.entries['voice-call'] = { enabled: false };
 // In legacy mode: automna provider is the primary, model refs use automna/
 if (byokMode) {
   console.log('[automna] BYOK mode: keeping automna provider as fallback, default model uses anthropic');
+  // CRITICAL: Remove models list from automna provider so OpenClaw doesn't match
+  // model names to the proxy. Without this, anthropic/claude-opus-4-5 resolves
+  // to automna provider instead of auth-profiles.json.
+  if (config.models?.providers?.automna?.models) {
+    delete config.models.providers.automna.models;
+    console.log('[automna] Removed models list from automna provider (BYOK mode)');
+  }
 }
 
 // Fix any stale model references

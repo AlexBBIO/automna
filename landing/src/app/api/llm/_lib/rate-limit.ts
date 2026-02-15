@@ -37,14 +37,11 @@ export async function checkRateLimits(
   const legacyLimits = LEGACY_PLAN_LIMITS[effectivePlan as keyof typeof LEGACY_PLAN_LIMITS] 
     || LEGACY_PLAN_LIMITS[user.plan as keyof typeof LEGACY_PLAN_LIMITS];
   
-  // BYOK users (own credentials) get small service credit allowances from new PLAN_LIMITS
-  // Legacy users (no byokProvider) keep their existing generous allowances
+  // BYOK users (own credentials) bypass credit/token limits entirely.
+  // Their LLM calls go direct to Anthropic, and service calls (search, browser, email)
+  // are free for now. Only RPM limits apply to prevent abuse.
   const isByok = user.byokProvider === 'anthropic_oauth' || user.byokProvider === 'anthropic_api_key';
-  const byokPlanLimits = PLAN_LIMITS[effectivePlan as keyof typeof PLAN_LIMITS]
-    || PLAN_LIMITS[user.plan as keyof typeof PLAN_LIMITS];
-  const monthlyCreditsLimit = isByok && byokPlanLimits
-    ? byokPlanLimits.monthlyServiceCredits
-    : legacyLimits.monthlyAutomnaCredits;
+  const monthlyCreditsLimit = isByok ? Infinity : legacyLimits.monthlyAutomnaCredits;
   const rpmLimit = legacyLimits.requestsPerMinute; // RPM same for all
   
   const currentMinute = Math.floor(now / 60);

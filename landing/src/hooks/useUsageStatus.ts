@@ -16,6 +16,7 @@ export interface UsageData {
     tokens: number;
     cost: number;
   };
+  isByok?: boolean;
 }
 
 // Poll every 5 minutes normally, every 30 seconds when at limit
@@ -36,8 +37,9 @@ export function useUsageStatus(authToken?: string) {
       const data: UsageData = await res.json();
       setUsage(data);
       
+      // BYOK users bypass credit limits — never lock chat input
       const maxPercent = Math.max(data.percentUsed.tokens, data.percentUsed.cost);
-      setIsOverLimit(maxPercent >= 100);
+      setIsOverLimit(data.isByok ? false : maxPercent >= 100);
     } catch {
       // Silent fail
     }
